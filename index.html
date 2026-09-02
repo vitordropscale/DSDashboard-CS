@@ -687,8 +687,20 @@ var STORE_COLOR = {Lumvelle:"#4c8dff", Elevare:"#0ad39b", Koda:"#f0794f",
    "Old Harvest", mas um registro antigo pode ter vindo "OLD HARVEST". */
 var STORE_CANON = {};
 STORES.forEach(function(s){ STORE_CANON[s.toLowerCase()] = s; });
+
+/* Apelidos: variacoes que devem cair na mesma loja. Serve para registro antigo,
+   nome digitado diferente, ou script de agente que ainda nao foi atualizado.
+   Para criar um apelido novo, e so acrescentar uma linha aqui. */
+var STORE_ALIAS = {
+  "harvest":     "Old Harvest",
+  "oldharvest":  "Old Harvest",
+  "old-harvest": "Old Harvest",
+  "old_harvest": "Old Harvest"
+};
+
 function canonStore(v){
-  return STORE_CANON[String(v||"").trim().toLowerCase()] || "Sem loja";
+  var k = String(v||"").trim().toLowerCase();
+  return STORE_CANON[k] || STORE_ALIAS[k] || "Sem loja";
 }
 var PALETTE     = ["#4c8dff","#0ad39b","#f0794f","#b06cf7","#ffcf5c","#22c7dd","#ff5c72","#84cc16","#f472b6","#a3a3ff"];
 var WD          = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
@@ -989,10 +1001,12 @@ function applyFilters(from,to){
 }
 
 function buildFilters(){
-  // lojas presentes nos dados
+  // As lojas configuradas aparecem sempre, mesmo sem registro ainda — senao uma
+  // loja nova so surge no filtro depois do primeiro email, o que confunde.
+  // "Sem loja" e a excecao: so aparece se houver registro sem loja atribuida.
   var present = {};
   RECS.forEach(function(r){ present[r.loja]=1; });
-  var list = STORES.filter(function(s){ return present[s]; });
+  var list = LOJAS.concat(present["Sem loja"] ? ["Sem loja"] : []);
   var seg = $("segStore");
   if (seg.dataset.built === list.join("|")) { /* nada mudou */ }
   else {
