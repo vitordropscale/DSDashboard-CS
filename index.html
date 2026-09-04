@@ -158,8 +158,10 @@ tbody tr:last-child td{border-bottom:none}
 .hist-row .meta-ag{flex:0 0 190px;min-width:0}
 .hist-meta{color:var(--muted);font-weight:400;font-size:10.5px;margin-left:2px}
 .hist-dots{flex:1 1 auto;display:flex;gap:3px;flex-wrap:wrap;min-width:0}
-.hd{width:13px;height:13px;border-radius:3px;flex:none;transition:transform .12s}
+.hd{width:13px;height:13px;border-radius:3px;flex:none;transition:transform .12s;position:relative}
 .hd:hover{transform:scale(1.35)}
+/* dia com nota registrada: anel amarelo em volta do quadradinho */
+.hd.note{box-shadow:0 0 0 1.5px var(--yellow)}
 .hist-num{flex:none;text-align:right;min-width:118px}
 .hist-num b{font-size:15px;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
 .hist-num i{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:1px}
@@ -180,20 +182,62 @@ tbody tr:last-child td{border-bottom:none}
 .meta-tag.ok{background:rgba(10,211,155,.15);color:#5fe6bd}
 .meta-tag.no{background:rgba(255,92,114,.13);color:#ff9aa8}
 .meta-tag.na{background:rgba(255,255,255,.05);color:var(--muted)}
-.meta-head{display:flex;gap:12px;font-size:10px;color:var(--muted);text-transform:uppercase;
-  letter-spacing:.6px;font-weight:600;padding-bottom:7px;border-bottom:1px solid var(--line);margin-bottom:4px}
-.meta-head span:nth-child(1){flex:1 1 auto}
-.meta-head span:nth-child(2){flex:none;width:104px;text-align:right}
-.meta-head span:nth-child(3){flex:none;width:220px}
-.meta-edit{display:flex;align-items:center;gap:12px;padding:10px 0;
-  border-bottom:1px solid rgba(35,35,45,.6)}
-.meta-edit .meta-ag{flex:1 1 auto}
-.meta-edit input{width:104px;flex:none;text-align:right;padding:7px 10px;border-radius:var(--r-sm);
+/* ---------- metas por loja ---------- */
+.meta-blk{border-bottom:1px solid rgba(35,35,45,.6);padding:9px 0}
+.meta-blk:last-child{border-bottom:none}
+.meta-sub{display:flex;gap:6px;flex-wrap:wrap;padding:7px 0 1px 31px}
+.ms{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:3px 9px;border-radius:999px;
+  background:var(--bg2);border:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ms i{width:6px;height:6px;border-radius:50%;flex:none;font-style:normal}
+.ms b{font-weight:700}
+.ms.ok b{color:#5fe6bd} .ms.no b{color:#ff9aa8}
+.meta-warn{font-size:10.5px;color:var(--yellow);padding:6px 0 0 31px;line-height:1.5}
+/* editor de metas: uma linha por agente, com um campo por loja */
+.me-blk{border-bottom:1px solid rgba(35,35,45,.6);padding:12px 0}
+.me-blk:last-child{border-bottom:none}
+.me-top{display:flex;align-items:center;gap:12px}
+.me-top .meta-ag{flex:1 1 auto}
+.me-tot{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.me-lab{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.me-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:8px;
+  padding:10px 0 0 31px}
+.me-cell{display:flex;flex-direction:column;gap:3px}
+.me-cell .me-lab{display:flex;align-items:center;gap:5px}
+.me-cell .me-lab i{width:6px;height:6px;border-radius:50%;flex:none;font-style:normal}
+.me-blk input{width:100%;text-align:right;padding:7px 10px;border-radius:var(--r-sm);
   border:1px solid var(--line2);background:var(--bg2);color:var(--text);font-size:13px;
   font-family:inherit;font-variant-numeric:tabular-nums}
-.meta-edit input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(76,141,255,.14)}
-.meta-ref{flex:none;width:220px;font-size:10.5px;color:var(--muted);line-height:1.5}
-.meta-ref b{color:var(--text2);font-weight:600}
+.me-blk input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(76,141,255,.14)}
+.me-tot input{width:104px}
+.me-sum{font-size:10.5px;color:var(--muted);padding:9px 0 0 31px;line-height:1.5}
+.me-sum b{color:var(--text2);font-weight:600}
+.me-sum.bad{color:var(--yellow)}
+.me-hint{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ---------- notas do dia ---------- */
+.nt{display:flex;gap:11px;align-items:flex-start;padding:11px 0;
+  border-bottom:1px solid rgba(35,35,45,.6);font-size:12.5px;line-height:1.55}
+.nt:last-child{border-bottom:none}
+.nt-when{flex:0 0 92px;color:var(--text2);font-weight:600;font-size:11.5px;padding-top:1px}
+.nt-when i{display:block;font-style:normal;font-size:10px;color:var(--muted);font-weight:400;margin-top:1px}
+.nt-main{flex:1 1 auto;min-width:0;word-break:break-word}
+.nt-meta{color:var(--muted);font-size:10.5px;margin-top:3px}
+.nt-act{flex:none;display:flex;gap:5px}
+.nt-tag{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  padding:2px 7px;border-radius:4px;margin-right:7px;vertical-align:1px}
+.nt-tag.nota{background:rgba(76,141,255,.16);color:#8fb7ff}
+.nt-tag.bom{background:rgba(10,211,155,.16);color:#5fe6bd}
+.nt-tag.ruim{background:rgba(255,92,114,.15);color:#ff9aa8}
+.nt-tag.ausencia{background:rgba(255,207,92,.15);color:#ffdd8f}
+.nt-tag.sistema{background:rgba(176,108,247,.16);color:#c99bff}
+.nt-edit{background:none;border:1px solid var(--line2);color:var(--muted);font-size:10.5px;
+  padding:3px 9px;border-radius:6px;cursor:pointer;font-family:inherit;flex:none;transition:.15s}
+.nt-edit:hover{color:var(--text);border-color:var(--blue)}
+@media(max-width:680px){
+  .nt{flex-wrap:wrap}
+  .nt-when{flex:1 1 100%}
+  .me-grid,.me-sum,.meta-sub,.meta-warn{padding-left:0}
+}
 
 /* ---------- report ---------- */
 .rp{border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
@@ -328,6 +372,7 @@ table.mtx tbody tr:hover td{background:rgba(255,255,255,.03)}
       <div class="stat"><span class="dot live" id="stDot"></span><span id="stTxt">carregando…</span></div>
       <div class="stat" id="stRows" title="Registros carregados da planilha">—</div>
       <button class="btn" id="btnCsv" title="Baixar os dados do filtro atual em CSV">⤓ CSV</button>
+      <button class="btn" id="btnNota" title="Registrar o que aconteceu de especial num dia">✚ Nota</button>
       <button class="btn" id="btnAdj" title="Corrigir loja ou ajustar totais">✎ Ajustes</button>
       <button class="btn" id="btnReport" title="Gerar o texto do report semanal">▤ Report</button>
       <button class="btn" id="btnRefresh" title="Atualizar agora">
@@ -407,6 +452,15 @@ table.mtx tbody tr:hover td{background:rgba(255,255,255,.03)}
       </div>
     </div>
     <div id="histBox"></div>
+  </div>
+
+  <div class="card" id="notasCard" style="margin-bottom:14px">
+    <div class="card-h">
+      <div><div class="card-t">Notas do período</div>
+      <div class="card-sub" id="notasSub">&nbsp;</div></div>
+      <button class="btn" id="btnNotaAdd">Nova nota</button>
+    </div>
+    <div id="notasBox"></div>
   </div>
 
   <div class="grid g-2">
@@ -597,11 +651,12 @@ table.mtx tbody tr:hover td{background:rgba(255,255,255,.03)}
   </div>
 
   <div class="ov" id="ovMetas">
-    <div class="modal">
+    <div class="modal" style="max-width:760px">
       <div class="modal-h">
         <div>
-          <h2>Metas diárias por agente</h2>
-          <p>Você define o valor. Os números ao lado são só referência do histórico.</p>
+          <h2>Metas diárias por agente e loja</h2>
+          <p>O <b>total</b> é a meta do dia inteiro. Os campos por loja repartem esse total —
+             ex.: 400 no total, 200 Lumvelle e 200 Elevare. Deixe em branco o que não tem meta.</p>
         </div>
         <button class="x" id="metasClose" title="Fechar">×</button>
       </div>
@@ -616,9 +671,6 @@ table.mtx tbody tr:hover td{background:rgba(255,255,255,.03)}
           <button class="btn-primary" id="metasLogin">Entrar</button>
         </div>
         <div id="metasPanel" style="display:none">
-          <div class="meta-head">
-            <span>Agente</span><span>Meta / dia</span><span>Referência do histórico</span>
-          </div>
           <div id="metasList"></div>
           <div class="field" style="margin:16px 0 13px">
             <label for="metasDesde">Vigente a partir de</label>
@@ -628,6 +680,66 @@ table.mtx tbody tr:hover td{background:rgba(255,255,255,.03)}
           <button class="btn-primary" id="metasSave">Salvar metas</button>
           <div id="metasHistBox" style="margin-top:18px"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ov" id="ovNota">
+    <div class="modal">
+      <div class="modal-h">
+        <div>
+          <h2>Notas do dia</h2>
+          <p>O que aconteceu de especial — falta, queda de sistema, promoção, elogio.
+             Entram no report semanal para nada se perder no fechamento.</p>
+        </div>
+        <button class="x" id="notaClose" title="Fechar">×</button>
+      </div>
+      <div class="modal-b">
+
+        <div class="msg" id="notaMsg"></div>
+
+        <div id="notaAuth">
+          <div class="field">
+            <label for="notaPwd">Senha</label>
+            <input type="password" class="inp" id="notaPwd" autocomplete="current-password"
+                   placeholder="a senha definida no Apps Script">
+            <div class="hint">Fica guardada só nesta aba do navegador, até você fechá-la.</div>
+          </div>
+          <button class="btn-primary" id="notaLogin">Entrar</button>
+        </div>
+
+        <div id="notaPanel" style="display:none">
+          <div class="row2">
+            <div class="field"><label for="ntData">Dia</label>
+              <input type="date" class="inp" id="ntData"></div>
+            <div class="field"><label for="ntTipo">Tipo</label>
+              <select class="inp" id="ntTipo">
+                <option value="nota">Nota — só registrar</option>
+                <option value="bom">Positivo — deu certo</option>
+                <option value="ruim">Problema — atrapalhou</option>
+                <option value="ausencia">Ausência — folga, atestado, falta</option>
+                <option value="sistema">Sistema — queda, lentidão, ferramenta</option>
+              </select></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="ntAgente">Agente <span style="text-transform:none;font-weight:400">(opcional)</span></label>
+              <select class="inp" id="ntAgente"></select></div>
+            <div class="field"><label for="ntLoja">Loja <span style="text-transform:none;font-weight:400">(opcional)</span></label>
+              <select class="inp" id="ntLoja"></select></div>
+          </div>
+          <div class="field">
+            <label for="ntTexto">Nota</label>
+            <textarea class="inp" id="ntTexto" rows="3" maxlength="1000"
+                      placeholder="ex.: Gorgias fora do ar das 10h às 12h — volume do dia não é comparável"></textarea>
+            <div class="hint">Qualquer pessoa com o link do dashboard lê esta nota. Nada confidencial aqui.</div>
+          </div>
+          <input type="hidden" id="ntId">
+          <button class="btn-primary" id="ntSave">Salvar nota</button>
+          <button class="btn" id="ntCancel" style="display:none;width:100%;justify-content:center;margin-top:8px">
+            Cancelar edição</button>
+          <div id="notaList" style="margin-top:18px"></div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -705,33 +817,92 @@ function canonStore(v){
 var PALETTE     = ["#4c8dff","#0ad39b","#f0794f","#b06cf7","#ffcf5c","#22c7dd","#ff5c72","#84cc16","#f472b6","#a3a3ff"];
 var WD          = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
+/* Tipos de nota do dia: chave -> rotulo curto que aparece na etiqueta. */
+var NOTA_TIPOS = { nota:"nota", bom:"positivo", ruim:"problema",
+                   ausencia:"ausência", sistema:"sistema" };
+
 /* =============================================================================
    ESTADO
    ========================================================================== */
 var RECS=[], CHARTS={}, LOADING=false, LAST_OK=null, SKIPPED=0, DATE_BROKEN=0, ADJ_COUNT=0;
-var METAS = {};       // {agente: meta diaria}, vem da aba Metas
-var METAS_HIST = [];  // [{agente, meta, desde}] — historico com data de vigencia
-var META_IDX   = {};  // {agente: [{desde, meta}, ...]} ordenado por desde
+var METAS = {};       // {agente: meta TOTAL diaria} — compatibilidade, vem da API
+var METAS_HIST = [];  // [{agente, loja, meta, desde}] — historico com data de vigencia
+var META_IDX   = {};  // {"agente|loja": [{desde, meta}, ...]} ordenado por desde
+var NOTAS = [];       // [{id, data, tipo, agente, loja, texto}]
+var NOTAS_DIA = {};   // {"yyyy-MM-dd": [nota, ...]}
+var API_VERSION = 0;  // versao do Apps Script implantado (metas por loja e notas: 8+)
+
+/* Metas por loja e notas exigem o Apps Script v8. Sem ele a gravacao seria
+   aceita e ignorada em silencio — melhor avisar antes de tentar. */
+function precisaV8(){
+  return API_VERSION && API_VERSION < 8
+    ? "O Apps Script publicado ainda é a versão " + API_VERSION + ". Cole o AppsScript.gs novo " +
+      "no editor da planilha e reimplante (Implantar › Gerenciar implantações › Nova versão) — " +
+      "em todas as implantações ativas."
+    : "";
+}
+
+/* Chave do indice de metas. loja "" (ou ausente) = meta total do agente. */
+function metaKey(agente, loja){ return agente + "|" + (loja || ""); }
 
 function indexMetas(){
   META_IDX = {};
   METAS_HIST.forEach(function(m){
-    (META_IDX[m.agente] = META_IDX[m.agente] || []).push({ desde:m.desde, meta:m.meta });
+    var k = metaKey(m.agente, m.loja);
+    (META_IDX[k] = META_IDX[k] || []).push({ desde:m.desde, meta:m.meta });
   });
-  Object.keys(META_IDX).forEach(function(a){
-    META_IDX[a].sort(function(x,y){ return x.desde < y.desde ? -1 : x.desde > y.desde ? 1 : 0; });
+  Object.keys(META_IDX).forEach(function(k){
+    META_IDX[k].sort(function(x,y){ return x.desde < y.desde ? -1 : x.desde > y.desde ? 1 : 0; });
   });
 }
 
-/** Meta que valia para o agente naquele dia. 0 = nao havia meta ainda. */
-function metaFor(agente, day){
-  var h = META_IDX[agente];
-  if (!h || !h.length) return METAS[agente] || 0;
+function indexNotas(){
+  NOTAS_DIA = {};
+  NOTAS.forEach(function(n){ (NOTAS_DIA[n.data] = NOTAS_DIA[n.data] || []).push(n); });
+}
+
+/**
+ * Meta que valia naquele dia. Sem `loja`, devolve a meta total do agente;
+ * com loja, a meta daquela loja. 0 = nao havia meta.
+ */
+function metaFor(agente, day, loja){
+  var h = META_IDX[metaKey(agente, loja)];
+  if (!h || !h.length) return (loja ? 0 : (METAS[agente] || 0));
   var v = 0;
   for (var i = 0; i < h.length; i++){
     if (h[i].desde <= day) v = h[i].meta; else break;
   }
   return v;
+}
+
+/** Lojas com meta definida para o agente naquele dia, na ordem de LOJAS. */
+function metaStores(agente, day){
+  return LOJAS.filter(function(s){ return metaFor(agente, day, s) > 0; });
+}
+
+/** Soma das metas por loja. Serve de total quando o total nao foi digitado. */
+function metaStoreSum(agente, day){
+  return metaStores(agente, day).reduce(function(s,l){ return s + metaFor(agente, day, l); }, 0);
+}
+
+/**
+ * Meta efetiva do agente no dia: o total digitado; na falta dele, a soma das
+ * lojas. Assim quem so preenche "200 Lumvelle + 200 Elevare" ja ve 400 de meta.
+ */
+function metaTotal(agente, day){
+  return metaFor(agente, day, "") || metaStoreSum(agente, day);
+}
+
+/**
+ * Meta usada nos cards conforme o filtro de loja: com uma loja selecionada,
+ * mede contra a meta daquela loja (se houver); com "Todas", contra o total.
+ */
+function metaVigente(agente, day){
+  if (state.store !== "__all" && state.store !== "Sem loja"){
+    var m = metaFor(agente, day, state.store);
+    return { meta:m, loja:state.store, especifica:m > 0 };
+  }
+  return { meta:metaTotal(agente, day), loja:"", especifica:false };
 }
 var BURST_AT = 10;   // N ou mais emails no mesmo minuto = suspeito
 var state = {
@@ -802,6 +973,28 @@ function normalize(payload){
   }
   SKIPPED = skipped; DATE_BROKEN = broken;
   out.sort(function(a,b){ return a.day < b.day ? -1 : a.day > b.day ? 1 : 0; });
+  return out;
+}
+
+/** Notas vindas da API: descarta o que não tem dia ou texto. */
+function normalizeNotas(raw){
+  if (Object.prototype.toString.call(raw) !== "[object Array]") return [];
+  var out = [];
+  raw.forEach(function(n){
+    if (!n) return;
+    var day = parseDay(n.data);
+    var txt = String(n.texto || n.nota || "").trim();
+    if (!day || !txt) return;
+    out.push({
+      id:     String(n.id || ""),
+      data:   day,
+      tipo:   NOTA_TIPOS[String(n.tipo || "nota").toLowerCase()] ? String(n.tipo).toLowerCase() : "nota",
+      agente: String(n.agente || "").trim(),
+      loja:   n.loja ? canonStore(n.loja) : "",
+      texto:  txt
+    });
+  });
+  out.sort(function(a,b){ return a.data < b.data ? 1 : a.data > b.data ? -1 : 0; });
   return out;
 }
 
@@ -898,7 +1091,9 @@ function loadData(manual){
       ADJ_COUNT = Number(payload.ajustes) || 0;
       METAS = (payload.metas && typeof payload.metas === "object") ? payload.metas : {};
       METAS_HIST = Array.isArray(payload.metasHist) ? payload.metasHist : [];
-      indexMetas();
+      NOTAS = normalizeNotas(payload.notas);
+      API_VERSION = Number(payload.version) || 0;
+      indexMetas(); indexNotas();
       LAST_OK = new Date();
       try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at:LAST_OK.getTime(), payload:payload })); } catch(e){}
       buildFilters();
@@ -957,6 +1152,10 @@ function loadCache(){
     var c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
     if (!c || !c.payload) return;
     RECS = normalize(c.payload); refreshAgentColors();
+    METAS = (c.payload.metas && typeof c.payload.metas === "object") ? c.payload.metas : {};
+    METAS_HIST = Array.isArray(c.payload.metasHist) ? c.payload.metasHist : [];
+    NOTAS = normalizeNotas(c.payload.notas);
+    indexMetas(); indexNotas();
     LAST_OK = new Date(c.at);
     if (RECS.length){ buildFilters(); render(); setStatus("warn","cache local"); }
   }catch(e){}
@@ -1104,6 +1303,7 @@ function render(){
   renderHeat(A, rows);
   renderMetas();
   renderMetaHistory();
+  renderNotas(r);
   renderProd(rows);
   renderBursts(rows);
   renderTable(A, rows);
@@ -1612,11 +1812,15 @@ function exportCSV(){
    METAS
    ========================================================================== */
 
-/** Totais diários de um agente, ignorando dias sem movimento e descontando rajadas. */
-function dailyTotals(agente){
+/**
+ * Totais diários de um agente, ignorando dias sem movimento e descontando rajadas.
+ * Com `loja`, conta só os emails daquela loja.
+ */
+function dailyTotals(agente, loja){
   var byDay={}, slot={};
   RECS.forEach(function(r){
     if (r.agente !== agente) return;
+    if (loja && r.loja !== loja) return;
     byDay[r.day] = (byDay[r.day]||0)+1;
     if (r.hm) slot[r.day+"|"+r.hm] = (slot[r.day+"|"+r.hm]||0)+1;
   });
@@ -1652,70 +1856,120 @@ function metaDay(){
   return (r.from === r.to) ? r.from : iso(today());
 }
 
+/** Linha de progresso usada tanto no total quanto numa loja isolada. */
+function metaRowHTML(nome, cor, feito, meta){
+  var pct = meta ? feito/meta*100 : 0;
+  var bateu = feito >= meta;
+  var c = bateu ? "var(--green)" : pct >= 70 ? "var(--yellow)" : "var(--red)";
+  return '<div class="meta-row" style="border-bottom:none;padding:0">' +
+    '<div class="meta-ag"><span class="av" style="background:'+cor+'">'+esc(initials(nome))+'</span>'+esc(nome)+'</div>' +
+    '<div class="meta-num"><b style="color:'+c+'">'+nf(feito)+'</b>'+
+      '<span style="color:var(--muted)"> / '+nf(meta)+'</span></div>' +
+    '<div class="meta-bar"><div class="bar" style="height:7px">' +
+      '<span style="width:'+Math.min(100,pct).toFixed(1)+'%;background:'+c+'"></span></div></div>' +
+    '<div class="meta-tag '+(bateu?"ok":"no")+'">' +
+      (bateu ? "bateu +"+nf(feito-meta) : "faltam "+nf(meta-feito)) + '</div>' +
+  '</div>';
+}
+
 function renderMetas(){
   var day  = metaDay();
   var hoje = iso(today());
   var box  = $("metaBox");
+  var umaLoja = (state.store !== "__all" && state.store !== "Sem loja") ? state.store : "";
 
   $("metaSub").textContent = (day === hoje ? "hoje" : brDate(day)) +
-    (day === hoje ? " · dia em andamento" : "");
+    (day === hoje ? " · dia em andamento" : "") +
+    (umaLoja ? " · meta de " + umaLoja : "");
 
   var nomes = {};
   RECS.forEach(function(r){ nomes[r.agente]=1; });
   nomes = Object.keys(nomes);
   if (!nomes.length){ box.innerHTML = '<div class="empty" style="padding:26px">Sem dados.</div>'; return; }
 
-  var comMeta = nomes.filter(function(a){ return METAS[a] > 0; });
+  // quanto cada agente já fez no dia, no total e por loja
+  var feito = {}, feitoLoja = {};
+  RECS.forEach(function(r){
+    if (r.day !== day) return;
+    feito[r.agente] = (feito[r.agente]||0)+1;
+    feitoLoja[r.agente+"|"+r.loja] = (feitoLoja[r.agente+"|"+r.loja]||0)+1;
+  });
+
+  var comMeta = nomes.filter(function(a){
+    return umaLoja ? metaFor(a, day, umaLoja) > 0 : metaTotal(a, day) > 0;
+  });
   if (!comMeta.length){
     box.innerHTML = '<div class="empty" style="padding:26px">' +
-      'Nenhuma meta definida ainda. Clique em <b>Definir metas</b> para cadastrar.</div>';
+      (umaLoja ? 'Nenhuma meta de <b>'+esc(umaLoja)+'</b> definida. Clique em <b>Definir metas</b> ' +
+                 'para repartir a meta do agente entre as lojas.'
+               : 'Nenhuma meta definida ainda. Clique em <b>Definir metas</b> para cadastrar.') + '</div>';
     return;
   }
 
-  var feito = {};
-  RECS.forEach(function(r){ if (r.day === day) feito[r.agente] = (feito[r.agente]||0)+1; });
-
-  comMeta.sort(function(a,b){ return (feito[b]||0)/METAS[b] - (feito[a]||0)/METAS[a]; });
+  var metaDe = function(a){ return umaLoja ? metaFor(a, day, umaLoja) : metaTotal(a, day); };
+  var feitoDe = function(a){ return umaLoja ? (feitoLoja[a+"|"+umaLoja]||0) : (feito[a]||0); };
+  comMeta.sort(function(a,b){ return feitoDe(b)/metaDe(b) - feitoDe(a)/metaDe(a); });
 
   box.innerHTML = comMeta.map(function(a){
-    var f = feito[a]||0, m = METAS[a], pct = m ? f/m*100 : 0;
-    var bateu = f >= m;
-    var falta = m - f;
-    var c = bateu ? "var(--green)" : pct >= 70 ? "var(--yellow)" : "var(--red)";
-    return '<div class="meta-row">' +
-      '<div class="meta-ag"><span class="av" style="background:'+agColor(a)+'">'+esc(initials(a))+'</span>'+esc(a)+'</div>' +
-      '<div class="meta-num"><b style="color:'+c+'">'+nf(f)+'</b>'+
-        '<span style="color:var(--muted)"> / '+nf(m)+'</span></div>' +
-      '<div class="meta-bar"><div class="bar" style="height:7px">' +
-        '<span style="width:'+Math.min(100,pct).toFixed(1)+'%;background:'+c+'"></span></div></div>' +
-      '<div class="meta-tag '+(bateu?"ok":"no")+'">' +
-        (bateu ? "bateu +"+nf(f-m) : "faltam "+nf(falta)) + '</div>' +
-    '</div>';
+    var m = metaDe(a);
+    var html = '<div class="meta-blk">' + metaRowHTML(a, agColor(a), feitoDe(a), m);
+
+    // com "Todas" selecionado, abre a meta do agente em pastilhas por loja
+    if (!umaLoja){
+      var lojas = metaStores(a, day);
+      if (lojas.length){
+        html += '<div class="meta-sub">' + lojas.map(function(l){
+          var ml = metaFor(a, day, l), fl = feitoLoja[a+"|"+l]||0;
+          return '<span class="ms '+(fl>=ml?"ok":"no")+'">' +
+            '<i style="background:'+(STORE_COLOR[l]||"#5e5e73")+'"></i>'+esc(l)+
+            ' <b>'+nf(fl)+'</b>/'+nf(ml)+'</span>';
+        }).join("") + '</div>';
+
+        var soma = metaStoreSum(a, day), tot = metaFor(a, day, "");
+        if (tot && soma !== tot){
+          html += '<div class="meta-warn">As metas por loja somam '+nf(soma)+
+                  ', mas a meta total é '+nf(tot)+'. Ajuste em <b>Definir metas</b>.</div>';
+        }
+      }
+    }
+    return html + '</div>';
   }).join("");
 
-  var semMeta = nomes.filter(function(a){ return !(METAS[a] > 0); });
+  var semMeta = nomes.filter(function(a){ return comMeta.indexOf(a) < 0; });
   if (semMeta.length){
-    box.innerHTML += '<div class="adj-why" style="padding-top:10px">Sem meta definida: ' +
-      semMeta.map(esc).join(", ") + '</div>';
+    box.innerHTML += '<div class="adj-why" style="padding-top:10px">Sem meta' +
+      (umaLoja ? " em "+esc(umaLoja) : " definida") + ": " + semMeta.map(esc).join(", ") + '</div>';
   }
 }
 
 /**
- * Atingimento historico. Mede sempre contra TODAS as lojas (a meta e do agente,
- * nao da loja) e ignora o dia de hoje, que ainda esta em andamento.
+ * Atingimento historico, ignorando o dia de hoje (ainda em andamento).
+ * Com "Todas" as lojas, mede o total do agente contra a meta total. Com uma
+ * loja selecionada, mede so os emails daquela loja contra a meta daquela loja —
+ * e, se o agente nao tiver meta especifica ali, volta a medir o total (senao o
+ * card mentiria: parte do trabalho ficaria de fora da conta).
  */
 function metaHistory(){
   var r    = dateRange();
   var hoje = iso(today());
   var dias = dayList(r.from, r.to).filter(function(d){ return d < hoje; });
   if (dias.length > 60) dias = dias.slice(-60);
+  var umaLoja = (state.store !== "__all" && state.store !== "Sem loja") ? state.store : "";
 
-  var porDia = {};
+  // por agente: usa a meta da loja filtrada quando ela existe
+  var porLoja = {};
+  if (umaLoja){
+    METAS_HIST.forEach(function(m){ if (m.loja === umaLoja && m.meta > 0) porLoja[m.agente] = 1; });
+  }
+
+  var porDia = {}, porDiaLoja = {};
   if (dias.length){
     RECS.forEach(function(rec){
       if (rec.day < dias[0] || rec.day > dias[dias.length-1]) return;
       if (state.agents[rec.agente]) return;
       porDia[rec.agente+"|"+rec.day] = (porDia[rec.agente+"|"+rec.day]||0)+1;
+      if (umaLoja && rec.loja === umaLoja)
+        porDiaLoja[rec.agente+"|"+rec.day] = (porDiaLoja[rec.agente+"|"+rec.day]||0)+1;
     });
   }
 
@@ -1725,11 +1979,15 @@ function metaHistory(){
   METAS_HIST.forEach(function(m){ nomes[m.agente] = 1; });
   nomes = Object.keys(nomes).filter(function(a){ return !state.agents[a]; });
 
-  return { dias:dias, agentes: nomes.map(function(a){
+  var medidos = 0;
+  nomes.forEach(function(a){ if (porLoja[a]) medidos++; });
+
+  return { dias:dias, loja:umaLoja, porLoja:medidos, agentes: nomes.map(function(a){
+    var naLoja = !!porLoja[a];
     var serie = [], bateu = 0, trabalhou = 0, metas = {};
     dias.forEach(function(d){
-      var meta = metaFor(a, d);
-      var v = porDia[a+"|"+d] || 0;
+      var meta = naLoja ? metaFor(a, d, umaLoja) : metaTotal(a, d);
+      var v = naLoja ? (porDiaLoja[a+"|"+d] || 0) : (porDia[a+"|"+d] || 0);
       if (meta > 0) metas[meta] = 1;
       var st = (!meta || v === 0) ? "off" : (v >= meta ? "ok" : "no");
       if (v > 0 && meta > 0){ trabalhou++; if (v >= meta) bateu++; }
@@ -1746,7 +2004,10 @@ function metaHistory(){
       if (s.st === "ok"){ atual++; if (atual > melhor) melhor = atual; } else atual = 0;
     });
     var lista = Object.keys(metas).map(Number).sort(function(x,y){ return x-y; });
-    return { agente:a, meta:metaFor(a, dias[dias.length-1]), metasNoPeriodo:lista,
+    var ultimo = dias.length ? dias[dias.length-1] : iso(today());
+    return { agente:a, naLoja:naLoja,
+             meta: naLoja ? metaFor(a, ultimo, umaLoja) : metaTotal(a, ultimo),
+             metasNoPeriodo:lista,
              serie:serie, bateu:bateu, trabalhou:trabalhou, seq:seq, melhor:melhor };
   })};
 }
@@ -1758,8 +2019,8 @@ function renderMetaHistory(){
   if (!h.agentes.length){
     $("histSub").textContent = "";
     box.innerHTML = '<div class="empty" style="padding:26px">' +
-      (Object.keys(METAS).length ? "Nenhum agente com meta no filtro atual."
-                                 : "Defina as metas para acompanhar o atingimento.") + '</div>';
+      (METAS_HIST.length ? "Nenhum agente com meta no filtro atual."
+                         : "Defina as metas para acompanhar o atingimento.") + '</div>';
     return;
   }
   if (!h.dias.length){
@@ -1770,9 +2031,14 @@ function renderMetaHistory(){
 
   var totB = 0, totT = 0;
   h.agentes.forEach(function(a){ totB += a.bateu; totT += a.trabalhou; });
+  var nota = "";
+  if (h.loja){
+    if (h.porLoja === h.agentes.length) nota = " \u00b7 medido contra a meta de "+h.loja;
+    else if (h.porLoja)                 nota = " \u00b7 quem tem meta de "+h.loja+" \u00e9 medido nela; o resto, no total";
+    else                                nota = " \u00b7 sem meta de "+h.loja+": metas medidas em todas as lojas";
+  }
   $("histSub").textContent = brDate(h.dias[0])+" a "+brDate(h.dias[h.dias.length-1]) +
-    " \u00b7 " + (totT ? Math.round(totB/totT*100) : 0) + "% de atingimento geral" +
-    (state.store !== "__all" ? " \u00b7 metas medidas em todas as lojas" : "");
+    " \u00b7 " + (totT ? Math.round(totB/totT*100) : 0) + "% de atingimento geral" + nota;
 
   h.agentes.sort(function(a,b){
     return (b.trabalhou?b.bateu/b.trabalhou:0) - (a.trabalhou?a.bateu/a.trabalhou:0);
@@ -1785,12 +2051,16 @@ function renderMetaHistory(){
       var bg = s.st === "ok" ? "#0ad39b" : s.st === "no" ? "#ff5c72" : "rgba(255,255,255,.09)";
       var t  = brDate(s.day)+" \u2014 "+(!s.meta ? "sem meta definida"
                : s.v ? nf(s.v)+" de "+nf(s.meta) : "sem registro (meta "+nf(s.meta)+")");
-      return '<i class="hd" style="background:'+bg+'" title="'+esc(t)+'"></i>';
+      var nt = notasDoDia(s.day, a.agente);
+      if (nt.length) t += "\n" + nt.map(function(n){ return "• "+n.texto; }).join("\n");
+      return '<i class="hd'+(nt.length?" note":"")+'" style="background:'+bg+'" title="'+esc(t)+'"></i>';
     }).join("");
+    var rot = a.metasNoPeriodo.length>1 ? "metas "+a.metasNoPeriodo.map(nf).join(" → ") : "meta "+nf(a.meta);
+    if (a.naLoja) rot += " · " + h.loja;
     return '<div class="hist-row">' +
       '<div class="meta-ag"><span class="av" style="background:'+agColor(a.agente)+'">' +
         esc(initials(a.agente))+'</span>'+esc(a.agente) +
-        '<span class="hist-meta">'+(a.metasNoPeriodo.length>1 ? "metas "+a.metasNoPeriodo.map(nf).join(" → ") : "meta "+nf(a.meta))+'</span></div>' +
+        '<span class="hist-meta">'+rot+'</span></div>' +
       '<div class="hist-dots">'+dots+'</div>' +
       '<div class="hist-num"><b style="color:'+c+'">'+a.bateu+'/'+a.trabalhou+'</b>' +
         '<i>'+pct+'% \u00b7 sequência '+a.seq+(a.melhor>a.seq?" (melhor "+a.melhor+")":"")+'</i></div>' +
@@ -1815,19 +2085,67 @@ function fillMetasForm(){
   nomes = Object.keys(nomes).sort();
   if (!$("metasDesde").value) $("metasDesde").value = iso(today());
   renderMetasHistBox();
+
+  // as metas mostradas são as que valem na data de vigência escolhida
+  var dia = $("metasDesde").value || iso(today());
+
   $("metasList").innerHTML = nomes.map(function(a){
-    var st = stats(dailyTotals(a));
+    var st  = stats(dailyTotals(a));
     var ref = st
-      ? "média <b>"+nf(st.media)+"</b> · mediana <b>"+nf(st.mediana)+"</b><br>" +
+      ? "histórico: média <b>"+nf(st.media)+"</b> · mediana <b>"+nf(st.mediana)+"</b> · " +
         "melhor "+nf(st.melhor)+" · pior "+nf(st.pior)+" · "+st.dias+" dia"+(st.dias>1?"s":"")
-      : "sem histórico";
-    return '<div class="meta-edit">' +
-      '<div class="meta-ag"><span class="av" style="background:'+agColor(a)+'">'+esc(initials(a))+'</span>'+esc(a)+'</div>' +
-      '<input type="number" min="0" step="1" data-ag="'+esc(a)+'" value="'+(METAS[a]||"")+'" placeholder="—">' +
-      '<div class="meta-ref">'+ref+'</div>' +
+      : "sem histórico ainda";
+
+    var campos = LOJAS.map(function(l){
+      var sl = stats(dailyTotals(a, l));
+      return '<div class="me-cell">' +
+        '<div class="me-lab"><i style="background:'+(STORE_COLOR[l]||"#5e5e73")+'"></i>'+esc(l)+'</div>' +
+        '<input type="number" min="0" step="1" data-ag="'+esc(a)+'" data-loja="'+esc(l)+'" ' +
+          'value="'+(metaFor(a, dia, l)||"")+'" placeholder="—">' +
+        '<div class="me-hint">'+(sl ? "méd. "+nf(sl.media) : "sem histórico")+'</div>' +
+      '</div>';
+    }).join("");
+
+    return '<div class="me-blk" data-blk="'+esc(a)+'">' +
+      '<div class="me-top">' +
+        '<div class="meta-ag"><span class="av" style="background:'+agColor(a)+'">'+esc(initials(a))+'</span>'+esc(a)+'</div>' +
+        '<div class="me-tot"><div class="me-lab">Total / dia</div>' +
+          '<input type="number" min="0" step="1" data-ag="'+esc(a)+'" data-loja="" ' +
+            'value="'+(metaFor(a, dia, "")||"")+'" placeholder="—"></div>' +
+      '</div>' +
+      '<div class="me-grid">'+campos+'</div>' +
+      '<div class="me-sum" data-sum="'+esc(a)+'"></div>' +
+      '<div class="me-sum" style="padding-top:2px">'+ref+'</div>' +
     '</div>';
   }).join("");
+
+  $("metasList").querySelectorAll("input[data-ag]").forEach(function(i){
+    i.addEventListener("input", function(){ updateMetaSum(i.dataset.ag); });
+  });
+  nomes.forEach(updateMetaSum);
 }
+
+/** Confere, ao vivo, se as metas por loja fecham com o total digitado. */
+function updateMetaSum(agente){
+  var box = $("metasList").querySelector('[data-sum="'+cssq(agente)+'"]');
+  if (!box) return;
+  var tot = 0, soma = 0, temLoja = false;
+  $("metasList").querySelectorAll('input[data-ag="'+cssq(agente)+'"]').forEach(function(i){
+    var v = parseInt(i.value,10); if (!(v > 0)) return;
+    if (i.dataset.loja){ soma += v; temLoja = true; } else tot = v;
+  });
+  box.className = "me-sum";
+  if (!temLoja && !tot){ box.innerHTML = ""; return; }
+  if (!temLoja){ box.innerHTML = "Meta única de <b>"+nf(tot)+"</b>/dia, sem divisão por loja."; return; }
+  if (!tot){ box.innerHTML = "As lojas somam <b>"+nf(soma)+"</b>/dia — esse vira o total do agente."; return; }
+  if (soma === tot){ box.innerHTML = "As lojas fecham com o total: <b>"+nf(tot)+"</b>/dia."; return; }
+  box.className = "me-sum bad";
+  box.innerHTML = "As lojas somam <b>"+nf(soma)+"</b>, mas o total está em <b>"+nf(tot)+"</b>" +
+    " (diferença de "+nf(Math.abs(tot-soma))+"). Dá para salvar assim, só confira se é o que você quer.";
+}
+
+/** Escapa aspas para usar um nome dentro de um seletor CSS. */
+function cssq(s){ return String(s).replace(/["\\]/g, "\\$&"); }
 
 $("btnMetasEdit").onclick = openMetas;
 $("metasClose").onclick   = function(){ $("ovMetas").classList.remove("show"); };
@@ -1849,16 +2167,31 @@ $("metasLogin").onclick = function(){
 };
 $("metasPwd").onkeydown = function(e){ if(e.key==="Enter") $("metasLogin").click(); };
 
+/* trocar a data de vigência recarrega os campos com as metas que valem nela */
+$("metasDesde").onchange = function(){ fillMetasForm(); };
+
 $("metasSave").onclick = function(){
-  var metas={}, algum=false;
-  $("metasList").querySelectorAll("input[data-ag]").forEach(function(i){
-    var v = parseInt(i.value,10);
-    if (v > 0){ metas[i.dataset.ag] = v; algum = true; }
-  });
-  if(!algum){ metasMsg("bad","Preencha ao menos uma meta."); return; }
   var desde = $("metasDesde").value || iso(today());
+  var metas = [], algum = false;
+
+  $("metasList").querySelectorAll("input[data-ag]").forEach(function(i){
+    var ag = i.dataset.ag, loja = i.dataset.loja || "";
+    var v  = parseInt(i.value,10);
+    if (v > 0){ metas.push({ agente:ag, loja:loja, meta:v }); algum = true; return; }
+    // campo apagado: só vale gravar o zero se havia meta valendo nessa data,
+    // e isso encerra a meta dali em diante sem mexer no passado
+    if (metaFor(ag, desde, loja) > 0){ metas.push({ agente:ag, loja:loja, meta:0 }); algum = true; }
+  });
+
+  if(!algum){ metasMsg("bad","Preencha ao menos uma meta."); return; }
+  // script antigo: recusa metas por loja e manda as totais no formato que ele entende
+  var v8 = precisaV8(), envio = metas;
+  if (v8){
+    if (metas.some(function(m){ return m.loja; })){ metasMsg("bad", v8); return; }
+    envio = {}; metas.forEach(function(m){ envio[m.agente] = m.meta; });
+  }
   var b=this; b.disabled=true; b.textContent="Salvando…"; metasMsg(null,"");
-  apiPost({ action:"setMetas", metas:JSON.stringify(metas), desde:desde, base:"manual" })
+  apiPost({ action:"setMetas", metas:JSON.stringify(envio), desde:desde, base:"manual" })
     .then(function(res){
       if(res.status!=="ok") throw new Error(res.message||"erro ao salvar");
       metasMsg("ok","Metas salvas, vigentes a partir de "+brDate(desde)+".");
@@ -1878,13 +2211,18 @@ function renderMetasHistBox(){
 
   box.innerHTML = '<div class="card-t" style="margin-bottom:9px">Histórico de metas</div>' +
     Object.keys(porAg).sort().map(function(a){
-      return porAg[a].slice().reverse().map(function(m){
+      return porAg[a].slice().sort(function(x,y){
+        return x.desde < y.desde ? 1 : x.desde > y.desde ? -1 : (x.loja < y.loja ? -1 : 1);
+      }).map(function(m){
+        var alvo = m.loja ? esc(m.loja) : "total";
         return '<div class="adj"><div class="adj-main">' +
-          '<span class="adj-tag total">'+esc(a)+'</span>' + nf(m.meta) + '/dia' +
+          '<span class="adj-tag '+(m.loja?"loja":"total")+'">'+esc(a)+' · '+alvo+'</span>' +
+          (m.meta > 0 ? nf(m.meta) + '/dia' : 'sem meta') +
           '<div class="adj-why">desde '+(m.desde==="0000-01-01"?"sempre":brDate(m.desde))+
             (m.criadaEm?" · registrada em "+esc(m.criadaEm):"")+'</div></div>' +
           (m.desde==="0000-01-01" ? '' :
-            '<button class="undo" data-ag="'+esc(a)+'" data-desde="'+esc(m.desde)+'">remover</button>') +
+            '<button class="undo" data-ag="'+esc(a)+'" data-loja="'+esc(m.loja||"")+
+              '" data-desde="'+esc(m.desde)+'">remover</button>') +
         '</div>';
       }).join("");
     }).join("");
@@ -1892,7 +2230,7 @@ function renderMetasHistBox(){
   box.querySelectorAll(".undo").forEach(function(b){
     b.onclick = function(){
       b.disabled = true; b.textContent = "…";
-      apiPost({ action:"delMeta", agente:b.dataset.ag, desde:b.dataset.desde })
+      apiPost({ action:"delMeta", agente:b.dataset.ag, loja:b.dataset.loja, desde:b.dataset.desde })
         .then(function(res){
           if(res.status!=="ok") throw new Error(res.message||"erro");
           metasMsg("ok","Entrada removida.");
@@ -1903,6 +2241,218 @@ function renderMetasHistBox(){
     };
   });
 }
+/* =============================================================================
+   NOTAS DO DIA
+   ========================================================================== */
+
+/** Notas de um dia. Com `agente`, traz as dele mais as gerais (sem agente). */
+function notasDoDia(day, agente){
+  var lista = NOTAS_DIA[day] || [];
+  if (!agente) return lista;
+  return lista.filter(function(n){ return !n.agente || n.agente === agente; });
+}
+
+/** Notas do período, respeitando os filtros de loja e de agente da tela. */
+function notasNoPeriodo(from, to){
+  return NOTAS.filter(function(n){
+    if (n.data < from || n.data > to) return false;
+    if (n.agente && state.agents[n.agente]) return false;
+    if (state.store !== "__all" && n.loja && n.loja !== state.store) return false;
+    return true;
+  });
+}
+
+function notaTagHTML(tipo){
+  var t = NOTA_TIPOS[tipo] ? tipo : "nota";
+  return '<span class="nt-tag '+t+'">'+esc(NOTA_TIPOS[t])+'</span>';
+}
+
+function renderNotas(r){
+  var box   = $("notasBox");
+  var lista = notasNoPeriodo(r.from, r.to);
+
+  $("notasSub").textContent = lista.length
+    ? lista.length + (lista.length === 1 ? " nota" : " notas") + " em " + r.label
+    : r.label;
+
+  if (!lista.length){
+    box.innerHTML = '<div class="empty" style="padding:26px">' +
+      'Nada anotado neste período. Use <b>Nova nota</b> para registrar o que sair do normal — ' +
+      'falta, queda de sistema, promoção, elogio — e isso aparece no report semanal.</div>';
+    return;
+  }
+
+  var hoje = iso(today());
+  box.innerHTML = lista.map(function(n){
+    var quem = [];
+    if (n.agente) quem.push(esc(n.agente));
+    if (n.loja)   quem.push(esc(n.loja));
+    return '<div class="nt">' +
+      '<div class="nt-when">'+brDate(n.data)+
+        '<i>'+(n.data===hoje ? "hoje" : WD[dowOf(n.data)])+'</i></div>' +
+      '<div class="nt-main">'+notaTagHTML(n.tipo)+esc(n.texto) +
+        (quem.length ? '<div class="nt-meta">'+quem.join(" · ")+'</div>' : '') + '</div>' +
+      '<div class="nt-act"><button class="nt-edit" data-id="'+esc(n.id)+'">editar</button></div>' +
+    '</div>';
+  }).join("");
+
+  box.querySelectorAll(".nt-edit").forEach(function(b){
+    b.onclick = function(){ openNota(null, b.dataset.id); };
+  });
+}
+
+/* ---------- modal ---------- */
+
+function notaMsg(kind, text){
+  var m = $("notaMsg");
+  if (!text){ m.className = "msg"; m.textContent = ""; return; }
+  m.className = "msg show " + (kind==="ok" ? "ok" : "bad");
+  m.textContent = text;
+}
+
+/** Abre o modal. `day` pré-seleciona o dia; `id` carrega uma nota para editar. */
+function openNota(day, id){
+  $("ovNota").classList.add("show");
+  notaMsg(null,"");
+  var abrir = function(){
+    fillNotaOptions();
+    if (id) carregarNota(id);
+    else { limparNota(); if (day) $("ntData").value = day; }
+    renderNotaList();
+  };
+  if (getPwd()){
+    $("notaAuth").style.display="none"; $("notaPanel").style.display="";
+    abrir();
+  } else {
+    $("notaAuth").style.display=""; $("notaPanel").style.display="none";
+    window.__notaPending = abrir;
+    $("notaPwd").focus();
+  }
+}
+
+function fillNotaOptions(){
+  var names={}; RECS.forEach(function(r){ names[r.agente]=1; });
+  var ag = $("ntAgente"), lj = $("ntLoja");
+  var atualAg = ag.value, atualLj = lj.value;
+  ag.innerHTML = '<option value="">— o dia todo —</option>' +
+    Object.keys(names).sort().map(function(a){ return '<option>'+esc(a)+'</option>'; }).join("");
+  lj.innerHTML = '<option value="">— todas as lojas —</option>' +
+    LOJAS.map(function(s){ return '<option>'+esc(s)+'</option>'; }).join("");
+  ag.value = atualAg; lj.value = atualLj;
+}
+
+function limparNota(){
+  $("ntId").value = "";
+  $("ntTexto").value = "";
+  $("ntTipo").value = "nota";
+  $("ntAgente").value = ""; $("ntLoja").value = "";
+  var r = dateRange();
+  $("ntData").value = (r.from === r.to) ? r.from : iso(today());
+  $("ntSave").textContent = "Salvar nota";
+  $("ntCancel").style.display = "none";
+}
+
+function carregarNota(id){
+  var n = null;
+  NOTAS.forEach(function(x){ if (x.id === id) n = x; });
+  if (!n){ limparNota(); return; }
+  $("ntId").value = n.id;
+  $("ntData").value = n.data;
+  $("ntTipo").value = NOTA_TIPOS[n.tipo] ? n.tipo : "nota";
+  $("ntAgente").value = n.agente || "";
+  $("ntLoja").value = n.loja || "";
+  $("ntTexto").value = n.texto;
+  $("ntSave").textContent = "Salvar alteração";
+  $("ntCancel").style.display = "";
+  $("ntTexto").focus();
+}
+
+/** Lista as notas recentes dentro do modal, com opção de apagar. */
+function renderNotaList(){
+  var box = $("notaList");
+  if (!NOTAS.length){ box.innerHTML = ""; return; }
+  box.innerHTML = '<div class="card-t" style="margin-bottom:9px">Últimas notas</div>' +
+    NOTAS.slice(0,25).map(function(n){
+      var quem = [];
+      if (n.agente) quem.push(esc(n.agente));
+      if (n.loja)   quem.push(esc(n.loja));
+      return '<div class="adj"><div class="adj-main">' +
+        notaTagHTML(n.tipo) + brDate(n.data) + " — " + esc(n.texto) +
+        (quem.length ? '<div class="adj-why">'+quem.join(" · ")+'</div>' : '') +
+        '</div>' +
+        '<div class="nt-act">' +
+          '<button class="nt-edit" data-edit="'+esc(n.id)+'">editar</button>' +
+          '<button class="undo" data-del="'+esc(n.id)+'">apagar</button>' +
+        '</div></div>';
+    }).join("");
+
+  box.querySelectorAll("[data-edit]").forEach(function(b){
+    b.onclick = function(){ carregarNota(b.dataset.edit); };
+  });
+  box.querySelectorAll("[data-del]").forEach(function(b){
+    b.onclick = function(){
+      b.disabled = true; b.textContent = "…";
+      apiPost({ action:"delNota", id:b.dataset.del })
+        .then(function(res){
+          if(res.status!=="ok") throw new Error(res.message||"erro");
+          notaMsg("ok","Nota apagada.");
+          if ($("ntId").value === b.dataset.del) limparNota();
+          return loadData(true);
+        })
+        .then(renderNotaList)
+        .catch(function(e){ notaMsg("bad", e.message); b.disabled=false; b.textContent="apagar"; });
+    };
+  });
+}
+
+$("btnNota").onclick    = function(){ openNota(null, null); };
+$("btnNotaAdd").onclick = function(){ openNota(null, null); };
+$("notaClose").onclick  = function(){ $("ovNota").classList.remove("show"); };
+$("ovNota").onclick     = function(e){ if(e.target===$("ovNota")) $("ovNota").classList.remove("show"); };
+$("ntCancel").onclick   = function(){ limparNota(); notaMsg(null,""); };
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape" && $("ovNota").classList.contains("show")) $("ovNota").classList.remove("show");
+});
+
+$("notaLogin").onclick = function(){
+  var v = $("notaPwd").value.trim();
+  if(!v){ notaMsg("bad","Digite a senha."); return; }
+  setPwd(v);
+  var b=this; b.disabled=true; b.textContent="Verificando…";
+  apiPost({ action:"listAdjust" })
+    .then(function(res){
+      if(res.status!=="ok") throw new Error(res.message||"erro");
+      notaMsg(null,""); $("notaPwd").value="";
+      $("notaAuth").style.display="none"; $("notaPanel").style.display="";
+      if (window.__notaPending){ var f = window.__notaPending; window.__notaPending = null; f(); }
+    })
+    .catch(function(e){ setPwd(""); notaMsg("bad", e.message); })
+    .then(function(){ b.disabled=false; b.textContent="Entrar"; });
+};
+$("notaPwd").onkeydown = function(e){ if(e.key==="Enter") $("notaLogin").click(); };
+
+$("ntSave").onclick = function(){
+  var texto = $("ntTexto").value.trim();
+  var data  = $("ntData").value;
+  if (!data){ notaMsg("bad","Escolha o dia da nota."); return; }
+  if (!texto){ notaMsg("bad","Escreva a nota."); return; }
+  var v8 = precisaV8();
+  if (v8){ notaMsg("bad", v8); return; }
+
+  var b=this, original=b.textContent;
+  b.disabled=true; b.textContent="Salvando…"; notaMsg(null,"");
+  apiPost({ action:"addNota", id:$("ntId").value, data:data, tipo:$("ntTipo").value,
+            agente:$("ntAgente").value, loja:$("ntLoja").value, texto:texto })
+    .then(function(res){
+      if(res.status!=="ok") throw new Error(res.message||"erro ao salvar");
+      notaMsg("ok", res.editada ? "Nota atualizada." : "Nota registrada em "+brDate(data)+".");
+      return loadData(true);
+    })
+    .then(function(){ limparNota(); renderNotaList(); })
+    .catch(function(e){ notaMsg("bad", e.message); })
+    .then(function(){ b.disabled=false; b.textContent=$("ntId").value ? "Salvar alteração" : original; });
+};
+
 /* =============================================================================
    REPORT SEMANAL
    ========================================================================== */
@@ -1936,6 +2486,12 @@ function buildReport(qual){
   var total = A.total;
   var nomes = Object.keys(A.byAgent).sort(function(a,b){ return A.byAgent[b]-A.byAgent[a]; });
   var dias  = Object.keys(A.byDay).length || 1;
+
+  // último dia da semana que já passou — as metas são lidas nesta data
+  var hojeIso   = iso(today());
+  var ultimoDia = w.to < hojeIso ? w.to : hojeIso;
+  var notasSem  = NOTAS.filter(function(n){ return n.data >= w.from && n.data <= w.to; })
+                       .slice().sort(function(a,b){ return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
 
   // horas trabalhadas por agente (slots dia+hora distintos)
   var slots={}, tot={};
@@ -1973,9 +2529,10 @@ function buildReport(qual){
     "TOTAL EMAILS\n" + nf(total) + "\n" + deltaTxt + "\n\n" +
     "AGENTES ATIVOS\n" + nomes.length + "\n" + nomes.join(", ") + "\n\n" +
     "MÉDIA / AGENTE\n" + nf(Math.round(total/(nomes.length||1))) + "\n" +
-      (Object.keys(METAS).length
-        ? "meta: " + nf(Object.keys(METAS).reduce(function(s,a){ return s+METAS[a]; },0)) + "/dia somando os agentes"
-        : "meta: não definida") + "\n\n" +
+      (function(){
+        var soma = nomes.reduce(function(s,a){ return s + metaTotal(a, ultimoDia); }, 0);
+        return soma ? "meta: " + nf(soma) + "/dia somando os agentes" : "meta: não definida";
+      })() + "\n\n" +
     "EMAILS / HORA\n" + (total/horasTotal).toFixed(1) + "/h\n" +
       (pico!==null ? "pico: "+pad(pico)+"h ("+nf(A.byHour[pico])+" emails)" : "") + "\n\n" +
     "DESTAQUES DA SEMANA\n" +
@@ -1984,7 +2541,11 @@ function buildReport(qual){
     "• " + (lojaTop||"—") + " concentrou a maior demanda: " + nf(A.byStore[lojaTop]||0) + " emails (" +
       (total?Math.round((A.byStore[lojaTop]||0)/total*100):0) + "%)\n" +
     "• Pico às " + (pico!==null?pad(pico)+"h":"—") + " com " + nf(pico!==null?A.byHour[pico]:0) + " emails\n" +
-    "• [observação — preencher]\n" +
+    (notasSem.length
+      ? notasSem.slice(0,2).map(function(n){
+          return "• " + brDate(n.data) + " — " + n.texto +
+                 (n.agente ? " ("+n.agente+")" : "") + "\n"; }).join("")
+      : "• [observação — preencher]\n") +
     "• " + deltaTxt });
 
   out.push({ t:"Slide 3 — Performance por Agente", txt:
@@ -1996,25 +2557,42 @@ function buildReport(qual){
           "\t"+(hs[a]?(A.byAgent[a]/hs[a]).toFixed(1):"0")+"/h";
       })).join("\n") +
     (function(){
-      // atingimento de metas na semana (medido em todas as lojas)
-      var comMeta = nomes.filter(function(a){ return METAS[a] > 0; });
+      // atingimento de metas na semana (medido em todas as lojas, mais o detalhe por loja)
+      var comMeta = nomes.filter(function(a){ return metaTotal(a, ultimoDia) > 0; });
       if (!comMeta.length) return "\n\nINSIGHTS\n[Metas não definidas — cadastre no dashboard para este bloco sair preenchido.]";
-      var hoje = iso(today());
-      var dd = dayList(w.from, w.to).filter(function(d){ return d <= hoje; });
-      var pd = {};
+      var dd = dayList(w.from, w.to).filter(function(d){ return d <= hojeIso; });
+      var pd = {}, pdl = {};
       RECS.forEach(function(r){
         if (r.day < w.from || r.day > w.to) return;
         pd[r.agente+"|"+r.day] = (pd[r.agente+"|"+r.day]||0)+1;
+        pdl[r.agente+"|"+r.loja+"|"+r.day] = (pdl[r.agente+"|"+r.loja+"|"+r.day]||0)+1;
       });
       var linhas = comMeta.map(function(a){
         var b=0, t=0;
         dd.forEach(function(d){
           var v = pd[a+"|"+d] || 0;
-          var mt = metaFor(a, d);
+          var mt = metaTotal(a, d);
           if (v > 0 && mt > 0){ t++; if (v >= mt) b++; }
         });
-        return a+": bateu em "+b+" de "+t+" dia"+(t===1?"":"s")+
-               " ("+(t?Math.round(b/t*100):0)+"%) — meta "+nf(metaFor(a, dd[dd.length-1]))+"/dia";
+        var linha = a+": bateu em "+b+" de "+t+" dia"+(t===1?"":"s")+
+                    " ("+(t?Math.round(b/t*100):0)+"%) — meta "+nf(metaTotal(a, ultimoDia))+"/dia";
+
+        // quebra por loja, só para quem tem meta repartida
+        var lojasA = metaStores(a, ultimoDia);
+        if (lojasA.length){
+          linha += "\n" + lojasA.map(function(l){
+            var bl=0, tl=0, feito=0;
+            dd.forEach(function(d){
+              var v = pdl[a+"|"+l+"|"+d] || 0;
+              var ml = metaFor(a, d, l);
+              feito += v;
+              if (v > 0 && ml > 0){ tl++; if (v >= ml) bl++; }
+            });
+            return "   " + l + ": " + nf(feito) + " na semana · bateu em " + bl + " de " + tl +
+                   " dia" + (tl===1?"":"s") + " — meta " + nf(metaFor(a, ultimoDia, l)) + "/dia";
+          }).join("\n");
+        }
+        return linha;
       });
       return "\n\nATINGIMENTO DE METAS\n" + linhas.join("\n") +
              "\n\nINSIGHTS\n[Comparar o topo com a média, apontar quem ficou abaixo da meta e sugerir coaching ou redistribuição.]";
@@ -2053,10 +2631,27 @@ function buildReport(qual){
   if (piores.length) recs.push("Revisar a contagem de "+piores.join(" e ")+
     " — "+nf(exc[piores[0]])+" registro(s) em rajadas de "+BURST_AT+"+ no mesmo minuto sugerem contagem duplicada, não volume real.");
 
-  var comMeta = nomes.filter(function(a){ return METAS[a]>0; });
-  var abaixo = comMeta.filter(function(a){ return A.byAgent[a]/dias < METAS[a]*0.85; });
+  var comMeta = nomes.filter(function(a){ return metaTotal(a, ultimoDia) > 0; });
+  var abaixo = comMeta.filter(function(a){ return A.byAgent[a]/dias < metaTotal(a, ultimoDia)*0.85; });
   if (abaixo.length) recs.push("Acompanhar "+abaixo.join(", ")+" — média diária abaixo de 85% da meta definida.");
   if (!comMeta.length) recs.push("Definir metas diárias por agente no dashboard para acompanhar atingimento.");
+
+  // loja que ficou longe da meta na semana inteira
+  var furos = [];
+  comMeta.forEach(function(a){
+    metaStores(a, ultimoDia).forEach(function(l){
+      var feito = A.byAgentStore[a+" "+l] || 0;
+      var alvo  = metaFor(a, ultimoDia, l) * dias;
+      if (alvo && feito < alvo*0.8) furos.push(a+" em "+l+" ("+nf(feito)+" de "+nf(alvo)+")");
+    });
+  });
+  if (furos.length) recs.push("Revisar a divisão de metas por loja: "+furos.slice(0,3).join(", ")+
+    " — ficou abaixo de 80% do esperado para a loja na semana.");
+
+  var ruins = notasSem.filter(function(n){ return n.tipo==="ruim" || n.tipo==="sistema"; });
+  if (ruins.length) recs.push("Considerar no julgamento da semana as "+ruins.length+
+    " ocorrência(s) anotada(s): "+ruins.slice(0,2).map(function(n){
+      return brDate(n.data)+" "+n.texto; }).join("; ")+".");
 
   if (pico!==null) recs.push("Concentrar cobertura entre "+pad(Math.max(hIni,pico-1))+"h e "+
     pad(Math.min(hFim,pico+2))+"h, faixa que concentra o maior volume da semana.");
@@ -2070,6 +2665,23 @@ function buildReport(qual){
   out.push({ t:"Slide 6 — Recomendações", txt:
     recs.slice(0,4).map(function(r,i){ return "0"+(i+1)+"\n"+r; }).join("\n\n") +
     "\n\n(sugestões geradas dos dados — revise e ajuste o texto)" });
+
+  // Checklist do fechamento: tudo que foi anotado nos dias da semana.
+  out.push({ t:"Notas da semana — checklist do fechamento", txt:
+    (function(){
+      if (!notasSem.length)
+        return "Nenhuma nota registrada nesta semana.\n\n" +
+               "(Anote no dashboard, botão ✚ Nota, o que sair do normal em cada dia — " +
+               "falta, queda de sistema, promoção, elogio. Aparece aqui na semana seguinte.)";
+      var porDia = {};
+      notasSem.forEach(function(n){ (porDia[n.data]=porDia[n.data]||[]).push(n); });
+      return Object.keys(porDia).sort().map(function(d){
+        return brDate(d)+" ("+WD[dowOf(d)]+")\n" + porDia[d].map(function(n){
+          var quem = [n.agente, n.loja].filter(Boolean).join(" · ");
+          return "• ["+NOTA_TIPOS[n.tipo]+"] "+n.texto+(quem?" — "+quem:"");
+        }).join("\n");
+      }).join("\n\n");
+    })() });
 
   return { w:w, rows:rows.length, blocos:out };
 }
