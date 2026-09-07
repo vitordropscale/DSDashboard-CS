@@ -1,6 +1,7 @@
 # CS Dashboard — Email Counter
 
-Painel de KPIs de atendimento por e-mail das operações Lumvelle, Elevare e Koda.
+Painel de KPIs de atendimento por e-mail das operações Lumvelle, Elevare, Koda,
+Old Harvest, Vigewell e Vellum.
 Página estática, sem build, publicada pelo GitHub Pages.
 
 ## Como funciona
@@ -25,6 +26,28 @@ navegador — não há servidor nem build.
 |---|---|
 | `index.html` | O dashboard inteiro: HTML, CSS e JS num arquivo só. |
 | `AppsScript.gs` | Código do Google Apps Script. Referência e backup — não é implantado daqui. |
+
+## Adicionando uma loja
+
+Tudo no painel — filtros, colunas da tabela, gráficos, metas por loja, correções,
+notas, CSV e o report — é gerado a partir de três listas no topo do bloco de
+configuração do `index.html`. Para incluir uma loja nova, edite só estas quatro
+coisas:
+
+1. `STORES` — todas as lojas, incluindo `"Sem loja"`, que fica sempre por último.
+2. `LOJAS` — as lojas reais, sem `"Sem loja"`. Define a ordem em que aparecem.
+3. `STORE_COLOR` — a cor da loja nos gráficos e nas etiquetas de meta.
+4. Uma regra CSS `.seg.stores button.on[data-store="Nome"]` com a mesma cor, para
+   o botão do filtro quando selecionado. Em fundo claro, defina também um `color`
+   escuro, senão o texto branco some.
+
+O Apps Script não precisa de alteração: ele grava o valor de `loja` que chegar,
+sem lista fixa. O que precisa mudar é o **script AHK na máquina dos agentes**, que
+é quem manda `?loja=`. Enquanto ele não for atualizado, a loja nova aparece no
+filtro e nas metas, mas sem registros.
+
+Nomes chegam normalizados por `canonStore()`, que ignora maiúsculas. Grafias
+realmente diferentes (espaço, hífen, underscore) entram em `STORE_ALIAS`.
 
 ## Publicação
 
