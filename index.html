@@ -68,6 +68,7 @@ body{
 .seg.stores button.on[data-store="Old Harvest"]{background:var(--yellow);color:#2a2205}
 .seg.stores button.on[data-store="Vigewell"]{background:var(--purple)}
 .seg.stores button.on[data-store="Vellum"]{background:var(--cyan);color:#04222a}
+.seg.stores button.on[data-store="Stratum"]{background:#84cc16;color:#1a2605}
 .seg.stores button.on[data-store="Sem loja"]{background:var(--muted)}
 .seg.stores button.on[data-store="__all"]{background:#3b3b48}
 .range{display:none;gap:6px;align-items:center}
@@ -792,10 +793,10 @@ var API_URL = (function(){
 var REFRESH_MS  = 60000;
 var CACHE_KEY   = "emailcounter.cache.v5";
 var TEST_AGENTS = ["NOME_DO_AGENTE","Sem nome","Teste","Teste1","Teste2","Teste3","teste"];
-var STORES      = ["Lumvelle","Elevare","Koda","Old Harvest","Vigewell","Vellum","Sem loja"];
-var LOJAS       = ["Lumvelle","Elevare","Koda","Old Harvest","Vigewell","Vellum"];   // sem o "Sem loja"
+var STORES      = ["Lumvelle","Elevare","Koda","Old Harvest","Vigewell","Vellum","Stratum","Sem loja"];
+var LOJAS       = ["Lumvelle","Elevare","Koda","Old Harvest","Vigewell","Vellum","Stratum"];   // sem o "Sem loja"
 var STORE_COLOR = {Lumvelle:"#4c8dff", Elevare:"#0ad39b", Koda:"#f0794f",
-                   "Old Harvest":"#ffcf5c", Vigewell:"#b06cf7", Vellum:"#22c7dd",
+                   "Old Harvest":"#ffcf5c", Vigewell:"#b06cf7", Vellum:"#22c7dd", Stratum:"#84cc16",
                    "Sem loja":"#5e5e73"};
 
 /* Casa o nome da loja sem depender de maiuscula/minuscula: o AHK manda
