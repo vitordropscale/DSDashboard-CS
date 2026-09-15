@@ -65,9 +65,13 @@ O `AppsScript.gs` deste repositório é backup. Para alterar de verdade:
 
 ## Senha
 
-As ações de escrita (ajustes e metas) exigem senha, guardada em
+As ações de escrita de **ajustes** e **notas** exigem senha, guardada em
 **Configurações do projeto › Propriedades do script**, chave `ADMIN_TOKEN`.
 Nunca no código, nunca neste repositório.
+
+As **metas** não pedem senha a partir do Apps Script v9. Quem abrir o dashboard
+publicado consegue alterá-las. Com um Apps Script mais antigo, o painel de metas
+continua pedindo a senha, porque a gravação ainda é recusada sem ela.
 
 A leitura (`?action=getData`) é aberta. A URL da API é montada em tempo de execução
 em vez de aparecer literal no código — isso evita coleta automática por scanners que
@@ -85,3 +89,6 @@ publicado vê a URL. Os dados expostos são volume de e-mail por agente, dia e l
   padrão típico de contagem acidental. As referências de meta descontam esse excesso.
 - **Metas**: guardadas com data de vigência, então alterar a meta hoje não reescreve
   o atingimento dos dias anteriores.
+- **Gravações na hora**: ao salvar metas ou ajustes, o painel aplica a mudança na tela
+  antes de a API confirmar, e desfaz se ela recusar. Antes ele esperava gravar e baixar
+  a base inteira de novo (~20s). Desfazer um ajuste ainda depende dessa recarga.

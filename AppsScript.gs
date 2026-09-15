@@ -1,7 +1,7 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas)  v7.0
- *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas"
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas)  v9.0
+ *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas"
  * =============================================================
  *
  *  COMO ATUALIZAR
@@ -11,31 +11,51 @@
  *  A senha ja configurada em ADMIN_TOKEN continua valendo — nao precisa refazer.
  *
  *  ENDPOINTS DE LEITURA (abertos)
- *   GET  ?action=getData                 -> {status,total,rows,ajustes,metas}
+ *   GET  ?action=getData                 -> {status,total,rows,ajustes,metas,metasHist,notas}
  *   GET  ?action=getData&compact=1       -> payload ~5x menor
  *   GET  ?action=getData&callback=fn     -> JSONP
  *   GET  ?action=ping                    -> teste de saude
  *   GET  ?agente=Vitor&contador=12&loja=Lumvelle   -> grava 1 email (AHK)
+ *   POST {action:'setMetas', metas:[{agente,loja,meta},...], desde, base}   (sem senha desde a v9)
+ *   POST {action:'delMeta',  agente, loja, desde}                          (sem senha desde a v9)
  *
  *  ENDPOINTS PROTEGIDOS (exigem senha)
  *   POST {action:'listAdjust', token}
  *   POST {action:'addAdjust',  token, tipo, data, agente, deLoja, paraLoja, qtd, motivo}
  *   POST {action:'delAdjust',  token, id}
- *   POST {action:'setMetas',   token, metas:{Agente:N,...}, base:'mediana'}
+ *   POST {action:'addNota',    token, data, texto, tipo, agente, loja [, id p/ editar]}
+ *   POST {action:'delNota',    token, id}
  *
  *  METAS
- *   Uma linha por agente na aba "Metas". Sao lidas junto com getData (sem senha),
- *   para o dashboard mostrar o progresso do dia sem precisar de login. So a
- *   gravacao e protegida.
+ *   Uma linha por (agente, loja, data de vigencia) na aba "Metas". A coluna
+ *   "Loja" vazia = meta do agente somando todas as lojas; preenchida = meta
+ *   daquela loja. Assim o Thiago pode ter 400/dia no total, sendo 200 Lumvelle
+ *   e 200 Elevare. Metas antigas (planilha sem a coluna Loja) continuam valendo
+ *   como meta total — a coluna e criada sozinha na primeira leitura.
+ *
+ *  NOTAS
+ *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
+ *   sistema, promocao, elogio). Sao lidas junto com getData e entram no report
+ *   semanal, para nada se perder no fechamento.
+ *
+ *  As metas e as notas sao lidas SEM senha, junto com o resto dos dados — quem
+ *  tiver a URL da API le tudo. Nao escreva em nota nada que nao possa ser lido
+ *  por quem abrir o dashboard.
+ *
+ *  A partir da v9 as METAS tambem sao gravadas sem senha: quem abrir o dashboard
+ *  publicado pode altera-las. Ajustes e notas continuam exigindo a senha.
  */
 
 var SHEET_NAME  = 'Logs';
 var ADJ_SHEET   = 'Ajustes';
 var META_SHEET  = 'Metas';
+var NOTA_SHEET  = 'Notas';
 var TZ          = 'America/Sao_Paulo';
 var HEADER      = ['Timestamp', 'Agente', 'Email #', 'Data', 'Hora', 'Dia da Semana', 'Loja'];
 var ADJ_HEADER  = ['ID', 'Registrado em', 'Tipo', 'Data', 'Agente', 'De loja', 'Para loja', 'Qtd', 'Motivo', 'Ativo'];
-var META_HEADER = ['Agente', 'Meta diaria', 'Vigente a partir de', 'Definida em', 'Base'];
+var META_HEADER = ['Agente', 'Meta diaria', 'Vigente a partir de', 'Definida em', 'Base', 'Loja'];
+var NOTA_HEADER = ['ID', 'Registrado em', 'Data', 'Tipo', 'Agente', 'Loja', 'Nota', 'Ativo'];
+var NOTA_TIPOS  = ['nota', 'bom', 'ruim', 'ausencia', 'sistema'];
 
 /* ============================================================
    SENHA
@@ -69,7 +89,8 @@ function checkToken_(t) {
    ROTEAMENTO
    ============================================================ */
 
-var PROTEGIDAS = ['listAdjust', 'addAdjust', 'delAdjust', 'setMetas', 'delMeta'];
+var PROTEGIDAS = ['listAdjust', 'addAdjust', 'delAdjust', 'addNota', 'delNota'];
+var LIVRES     = ['setMetas', 'delMeta'];   // gravacao sem senha (v9)
 
 function doGet(e) {
   var p = (e && e.parameter) || {};
@@ -78,6 +99,7 @@ function doGet(e) {
     if (p.action === 'getData') return respond_(getData_(p), p.callback);
 
     // Fallback por GET (usado se o POST falhar no redirect do Apps Script)
+    if (LIVRES.indexOf(p.action) > -1)     return respond_(livre_(p), p.callback);
     if (PROTEGIDAS.indexOf(p.action) > -1) return respond_(protegida_(p), p.callback);
 
     // O AHK grava via GET simples: ?agente=X&contador=N&loja=Y
@@ -100,6 +122,7 @@ function doPost(e) {
     for (var b in body) d[b] = body[b];
 
     if (d.action === 'getData') return respond_(getData_(d), p.callback);
+    if (LIVRES.indexOf(d.action) > -1)     return respond_(livre_(d), p.callback);
     if (PROTEGIDAS.indexOf(d.action) > -1) return respond_(protegida_(d), p.callback);
     return respond_(logHit_(d), p.callback);
   } catch (err2) {
@@ -112,8 +135,14 @@ function protegida_(d) {
   if (d.action === 'listAdjust') return { status: 'ok', ajustes: listAdjust_() };
   if (d.action === 'addAdjust')  return addAdjust_(d);
   if (d.action === 'delAdjust')  return delAdjust_(d.id);
-  if (d.action === 'setMetas')   return setMetas_(d);
-  if (d.action === 'delMeta')    return delMeta_(d);
+  if (d.action === 'addNota')    return addNota_(d);
+  if (d.action === 'delNota')    return delNota_(d.id);
+  return { status: 'error', message: 'Acao desconhecida.' };
+}
+
+function livre_(d) {
+  if (d.action === 'setMetas') return setMetas_(d);
+  if (d.action === 'delMeta')  return delMeta_(d);
   return { status: 'error', message: 'Acao desconhecida.' };
 }
 
@@ -164,22 +193,44 @@ function ensureSheet_(name, header) {
    ============================================================ */
 
 /**
- * Historico completo de metas: uma linha por (agente, data de vigencia).
- * Linhas antigas sem data de vigencia valem "desde sempre".
+ * Aba "Metas" garantindo a coluna "Loja". Planilhas criadas antes da v8 tem
+ * so 5 colunas: a sexta e acrescentada aqui, sem tocar nas linhas existentes
+ * (que ficam com a loja vazia = meta total do agente).
+ */
+function getMetaSheet_() {
+  var sh = ensureSheet_(META_SHEET, META_HEADER);
+  if (sh.getMaxColumns() < META_HEADER.length) {
+    sh.insertColumnsAfter(sh.getMaxColumns(), META_HEADER.length - sh.getMaxColumns());
+  }
+  if (String(sh.getRange(1, META_HEADER.length).getDisplayValue()).trim() !== META_HEADER[META_HEADER.length - 1]) {
+    sh.getRange(1, META_HEADER.length).setValue(META_HEADER[META_HEADER.length - 1]);
+    sh.getRange(1, 1, 1, META_HEADER.length)
+      .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('white');
+  }
+  return sh;
+}
+
+/**
+ * Historico completo de metas: uma linha por (agente, loja, data de vigencia).
+ * Loja vazia = meta total do agente. Linhas antigas sem data de vigencia valem
+ * "desde sempre". Meta 0 e valida: significa "deixou de ter meta a partir dali".
  */
 function listMetasHist_() {
-  var sh = ensureSheet_(META_SHEET, META_HEADER);
+  var sh = getMetaSheet_();
   var last = sh.getLastRow();
   var out = [];
   if (last < 2) return out;
   var v = sh.getRange(2, 1, last - 1, META_HEADER.length).getDisplayValues();
   for (var i = 0; i < v.length; i++) {
     var nome = String(v[i][0] || '').trim();
-    var meta = Number(String(v[i][1]).replace(/[^0-9.-]/g, ''));
-    if (!nome || !(meta > 0)) continue;
+    var cru  = String(v[i][1] === null || v[i][1] === undefined ? '' : v[i][1]).trim();
+    if (!nome || cru === '') continue;
+    var meta = Number(cru.replace(/[^0-9.-]/g, ''));
+    if (isNaN(meta) || meta < 0) continue;
     var dt = parseAny_(v[i][2]);
     out.push({
       agente: nome,
+      loja:   String(v[i][5] || '').trim(),      // '' = meta total do agente
       meta:   Math.round(meta),
       desde:  dt ? fmt_(dt, 'yyyy-MM-dd') : '0000-01-01',
       criadaEm: String(v[i][3] || ''),
@@ -188,35 +239,59 @@ function listMetasHist_() {
   }
   out.sort(function (a, b) {
     if (a.agente !== b.agente) return a.agente < b.agente ? -1 : 1;
+    if (a.loja   !== b.loja)   return a.loja   < b.loja   ? -1 : 1;
     return a.desde < b.desde ? -1 : a.desde > b.desde ? 1 : 0;
   });
   return out;
 }
 
-/** Meta em vigor hoje, por agente — para o card do dia. */
+/** Meta TOTAL em vigor hoje, por agente — formato antigo, mantido por compatibilidade. */
 function listMetas_() {
   var hoje = fmt_(new Date(), 'yyyy-MM-dd');
   var hist = listMetasHist_();
   var out = {};
   for (var i = 0; i < hist.length; i++) {
+    if (hist[i].loja) continue;
     if (hist[i].desde <= hoje) out[hist[i].agente] = hist[i].meta;
+  }
+  return out;
+}
+
+/** Aceita o formato novo (lista) e o antigo ({Agente:N} = meta total). */
+function normalizaMetas_(metas) {
+  if (typeof metas === 'string') {
+    try { metas = JSON.parse(metas); } catch (e) { return null; }
+  }
+  if (!metas || typeof metas !== 'object') return null;
+
+  var out = [];
+  if (Object.prototype.toString.call(metas) === '[object Array]') {
+    for (var i = 0; i < metas.length; i++) {
+      var m = metas[i] || {};
+      var nome = String(m.agente || '').trim();
+      var val  = Math.round(Number(m.meta));
+      if (!nome || isNaN(val) || val < 0) continue;
+      out.push({ agente: nome, loja: String(m.loja || '').trim(), meta: val });
+    }
+  } else {
+    var nomes = Object.keys(metas);
+    for (var j = 0; j < nomes.length; j++) {
+      var val2 = Math.round(Number(metas[nomes[j]]));
+      if (isNaN(val2) || val2 < 0) continue;
+      out.push({ agente: nomes[j], loja: '', meta: val2 });
+    }
   }
   return out;
 }
 
 /**
  * Grava metas com data de vigencia. NAO apaga o historico: se ja existir uma
- * linha do mesmo agente na mesma data, ela e atualizada; senao, uma nova entra.
+ * linha do mesmo agente/loja na mesma data, ela e atualizada; senao, uma nova entra.
  */
 function setMetas_(d) {
-  var metas = d.metas;
-  if (typeof metas === 'string') {
-    try { metas = JSON.parse(metas); } catch (e) { return { status: 'error', message: 'Metas em formato invalido.' }; }
-  }
-  if (!metas || typeof metas !== 'object') return { status: 'error', message: 'Nenhuma meta recebida.' };
-
-  var nomes = Object.keys(metas);
-  if (!nomes.length) return { status: 'error', message: 'Nenhuma meta recebida.' };
+  var lista = normalizaMetas_(d.metas);
+  if (!lista) return { status: 'error', message: 'Metas em formato invalido.' };
+  if (!lista.length) return { status: 'error', message: 'Nenhuma meta recebida.' };
 
   var dv = parseAny_(d.desde);
   var desde = dv ? fmt_(dv, 'yyyy-MM-dd') : fmt_(new Date(), 'yyyy-MM-dd');
@@ -224,7 +299,7 @@ function setMetas_(d) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(15000); } catch (ignore) {}
   try {
-    var sh   = ensureSheet_(META_SHEET, META_HEADER);
+    var sh   = getMetaSheet_();
     var last = sh.getLastRow();
     var atuais = last > 1 ? sh.getRange(2, 1, last - 1, META_HEADER.length).getDisplayValues() : [];
 
@@ -232,24 +307,27 @@ function setMetas_(d) {
     var base   = String(d.base || 'manual');
     var novas = 0, atualizadas = 0;
 
-    for (var i = 0; i < nomes.length; i++) {
-      var nome = nomes[i];
-      var val  = Math.round(Number(metas[nome]) || 0);
-      if (!(val > 0)) continue;
+    for (var i = 0; i < lista.length; i++) {
+      var nome = lista[i].agente;
+      var loja = lista[i].loja;
+      var val  = lista[i].meta;      // 0 e valido: encerra a meta a partir desta data
 
       var achou = -1;
       for (var j = 0; j < atuais.length; j++) {
         var dj = parseAny_(atuais[j][2]);
         var sj = dj ? fmt_(dj, 'yyyy-MM-dd') : '0000-01-01';
-        if (String(atuais[j][0]).trim() === nome && sj === desde) { achou = j; break; }
+        if (String(atuais[j][0]).trim() === nome &&
+            String(atuais[j][5] || '').trim() === loja && sj === desde) { achou = j; break; }
       }
+
       if (achou > -1) {
         sh.getRange(achou + 2, 2).setValue(val);
         sh.getRange(achou + 2, 4).setValue(quando);
         sh.getRange(achou + 2, 5).setValue(base);
         atualizadas++;
       } else {
-        sh.appendRow([nome, val, desde, quando, base]);
+        sh.appendRow([nome, val, desde, quando, base, loja]);
+        atuais.push([nome, String(val), desde, quando, base, loja]);
         novas++;
       }
     }
@@ -259,26 +337,121 @@ function setMetas_(d) {
   }
 }
 
-/** Remove uma entrada do historico (agente + data de vigencia). */
+/** Remove uma entrada do historico (agente + loja + data de vigencia). */
 function delMeta_(d) {
   var nome = String(d.agente || '').trim();
+  var loja = String(d.loja || '').trim();
   var dv   = parseAny_(d.desde);
   if (!nome || !dv) return { status: 'error', message: 'Informe agente e data de vigencia.' };
   var alvo = fmt_(dv, 'yyyy-MM-dd');
 
-  var sh   = ensureSheet_(META_SHEET, META_HEADER);
+  var sh   = getMetaSheet_();
   var last = sh.getLastRow();
   if (last < 2) return { status: 'error', message: 'Meta nao encontrada.' };
   var v = sh.getRange(2, 1, last - 1, META_HEADER.length).getDisplayValues();
   for (var i = 0; i < v.length; i++) {
     var di = parseAny_(v[i][2]);
     var si = di ? fmt_(di, 'yyyy-MM-dd') : '0000-01-01';
-    if (String(v[i][0]).trim() === nome && si === alvo) {
+    if (String(v[i][0]).trim() === nome && String(v[i][5] || '').trim() === loja && si === alvo) {
       sh.deleteRow(i + 2);
       return { status: 'ok' };
     }
   }
   return { status: 'error', message: 'Meta nao encontrada.' };
+}
+
+/* ============================================================
+   NOTAS DO DIA
+   ============================================================ */
+
+function getNotaSheet_() {
+  var sh = ensureSheet_(NOTA_SHEET, NOTA_HEADER);
+  sh.setColumnWidth(7, 420);
+  return sh;
+}
+
+function listNotas_() {
+  var sh = getNotaSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var v = sh.getRange(2, 1, last - 1, NOTA_HEADER.length).getDisplayValues();
+  var out = [];
+  for (var i = 0; i < v.length; i++) {
+    if (!v[i][0]) continue;
+    if (String(v[i][7]).toUpperCase() === 'NAO') continue;
+    var dt = parseAny_(v[i][2]);
+    out.push({
+      id:       String(v[i][0]),
+      criadoEm: String(v[i][1]),
+      data:     dt ? fmt_(dt, 'yyyy-MM-dd') : String(v[i][2]),
+      tipo:     String(v[i][3] || 'nota').toLowerCase(),
+      agente:   String(v[i][4] || ''),
+      loja:     String(v[i][5] || ''),
+      texto:    String(v[i][6] || '')
+    });
+  }
+  out.sort(function (a, b) { return a.data < b.data ? 1 : a.data > b.data ? -1 : 0; });  // recentes primeiro
+  return out;
+}
+
+/** Cria uma nota. Se vier `id` de uma nota existente, edita aquela linha. */
+function addNota_(d) {
+  var dt = parseAny_(d.data);
+  if (!dt) return { status: 'error', message: 'Data invalida.' };
+
+  var texto = String(d.texto || d.nota || '').trim();
+  if (!texto) return { status: 'error', message: 'Escreva a nota.' };
+  if (texto.length > 1000) texto = texto.slice(0, 1000);
+
+  var tipo = String(d.tipo || 'nota').toLowerCase();
+  if (NOTA_TIPOS.indexOf(tipo) < 0) tipo = 'nota';
+
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (ignore) {}
+  try {
+    var sh = getNotaSheet_();
+    var quando = Utilities.formatDate(new Date(), TZ, 'dd/MM/yyyy HH:mm:ss');
+    var linha = [
+      '', quando, fmt_(dt, 'yyyy-MM-dd'), tipo,
+      String(d.agente || '').trim(), String(d.loja || '').trim(), texto, 'SIM'
+    ];
+
+    var id = String(d.id || '').trim();
+    if (id) {
+      var last = sh.getLastRow();
+      var ids = last > 1 ? sh.getRange(2, 1, last - 1, 1).getDisplayValues() : [];
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === id) {
+          linha[0] = id;
+          sh.getRange(i + 2, 1, 1, NOTA_HEADER.length).setValues([linha]);
+          return { status: 'ok', id: id, editada: true };
+        }
+      }
+      return { status: 'error', message: 'Nota nao encontrada.' };
+    }
+
+    linha[0] = 'N' + Utilities.formatDate(new Date(), TZ, 'yyyyMMddHHmmss') + Math.floor(Math.random() * 900 + 100);
+    sh.appendRow(linha);
+    return { status: 'ok', id: linha[0] };
+  } finally {
+    try { lock.releaseLock(); } catch (ignore) {}
+  }
+}
+
+function delNota_(id) {
+  id = String(id || '');
+  if (!id) return { status: 'error', message: 'ID nao informado.' };
+  var sh = getNotaSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return { status: 'error', message: 'Nota nao encontrada.' };
+  var ids = sh.getRange(2, 1, last - 1, 1).getDisplayValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === id) {
+      sh.getRange(i + 2, 8).setValue('NAO');
+      return { status: 'ok', id: id };
+    }
+  }
+  return { status: 'error', message: 'Nota nao encontrada.' };
 }
 
 /* ============================================================
@@ -433,10 +606,13 @@ function getData_(p) {
     return ka < kb ? -1 : ka > kb ? 1 : 0;
   });
 
+  var notas = [];
+  try { notas = listNotas_(); } catch (eN) {}
+
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
-    metas: listMetas_(), metasHist: listMetasHist_(),
-    tz: tz, generatedAt: nowStr_(), version: 7
+    metas: listMetas_(), metasHist: listMetasHist_(), notas: notas,
+    tz: tz, generatedAt: nowStr_(), version: 9
   };
 
   if (p.compact) {
@@ -608,15 +784,18 @@ function diagnostico() {
   var dt = parseAny_(d0[0]) || parseAny_(d0[3]);
   Logger.log('6. Data reconhecida: %s', dt ? Utilities.formatDate(dt, TZ, 'yyyy-MM-dd') : 'FALHOU');
   Logger.log('7. Hora reconhecida: %s', JSON.stringify(parseTime_(d0[4])));
-  Logger.log('8. Aba "%s": %s | Aba "%s": %s', ADJ_SHEET,
+  Logger.log('8. Aba "%s": %s | Aba "%s": %s | Aba "%s": %s', ADJ_SHEET,
     ss.getSheetByName(ADJ_SHEET) ? 'existe' : 'ainda nao criada',
-    META_SHEET, ss.getSheetByName(META_SHEET) ? 'existe' : 'ainda nao criada');
+    META_SHEET, ss.getSheetByName(META_SHEET) ? 'existe' : 'ainda nao criada',
+    NOTA_SHEET, ss.getSheetByName(NOTA_SHEET) ? 'existe' : 'ainda nao criada');
 }
 
 function testarLeitura() {
   var r = getData_({});
   Logger.log('Linhas validas: %s | ignoradas: %s | ajustes: %s', r.total, r.skipped, r.ajustes);
-  Logger.log('Metas: %s', JSON.stringify(r.metas));
+  Logger.log('Metas (total por agente): %s', JSON.stringify(r.metas));
+  Logger.log('Metas com loja: %s', JSON.stringify(r.metasHist));
+  Logger.log('Notas: %s', (r.notas || []).length);
   if (r.total) {
     Logger.log('Primeira: %s', JSON.stringify(r.rows[0]));
     Logger.log('Ultima:   %s', JSON.stringify(r.rows[r.total - 1]));

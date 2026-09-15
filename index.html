@@ -782,7 +782,8 @@ table.mtx tbody tr:hover td{background:rgba(255,255,255,.03)}
    procurando a string literal de endpoints do Apps Script. Quebrar a URL em
    pedacos codificados impede essa coleta automatica.
    Isto NAO e seguranca — quem abrir o DevTools no site ve a URL montada.
-   A escrita (ajustes e metas) continua protegida por senha no Apps Script. */
+   A escrita de ajustes e notas continua protegida por senha no Apps Script;
+   metas nao pedem senha a partir da v9. */
 var API_URL = (function(){
   var p = ["aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWN",
            "yb3Mvcy9BS2Z5Y2J3b1haNHM2SGJjUEZuWllxMT",
@@ -838,6 +839,8 @@ var META_IDX   = {};  // {"agente|loja": [{desde, meta}, ...]} ordenado por desd
 var NOTAS = [];       // [{id, data, tipo, agente, loja, texto}]
 var NOTAS_DIA = {};   // {"yyyy-MM-dd": [nota, ...]}
 var API_VERSION = 0;  // versao do Apps Script implantado (metas por loja e notas: 8+)
+var LAST_WRITE  = 0;  // instante da ultima gravacao iniciada ou confirmada (ver loadData)
+function markWrite(){ LAST_WRITE = Date.now(); }
 
 /* Metas por loja e notas exigem o Apps Script v8. Sem ele a gravacao seria
    aceita e ignorada em silencio — melhor avisar antes de tentar. */
@@ -848,6 +851,10 @@ function precisaV8(){
       "em todas as implantações ativas."
     : "";
 }
+
+/* Metas sem senha exigem o Apps Script v9. Nas versoes anteriores a gravacao
+   de metas ainda e protegida, entao o painel continua pedindo a senha. */
+function metasSemSenha(){ return API_VERSION >= 9; }
 
 /* Chave do indice de metas. loja "" (ou ausente) = meta total do agente. */
 function metaKey(agente, loja){ return agente + "|" + (loja || ""); }
@@ -1087,6 +1094,9 @@ function loadData(manual){
 
   var base = API_URL + "?action=getData";
   var errs = [];
+  // Uma leitura que saiu antes de uma gravacao terminar volta sem ela, e
+  // desfaria na tela o que acabou de ser salvo. Essa e descartada e refeita.
+  var started = Date.now(), stale = false;
 
   return fetchJSON(base + "&compact=1&_=" + Date.now())
     .catch(function(e){ errs.push("compact: "+e.message); return fetchJSON(base + "&_=" + Date.now()); })
@@ -1094,6 +1104,7 @@ function loadData(manual){
     .then(function(payload){
       if (!payload || payload.status === "error")
         throw new Error((payload && payload.message) || "a API retornou erro");
+      if (started <= LAST_WRITE){ stale = true; return; }
       RECS = normalize(payload); refreshAgentColors();
       ADJ_COUNT = Number(payload.ajustes) || 0;
       METAS = (payload.metas && typeof payload.metas === "object") ? payload.metas : {};
@@ -1118,6 +1129,7 @@ function loadData(manual){
     .then(function(){
       LOADING = false;
       $("btnRefresh").classList.remove("spin");
+      if (stale) setTimeout(function(){ loadData(); }, 300);
     });
 }
 
@@ -1162,6 +1174,7 @@ function loadCache(){
     METAS = (c.payload.metas && typeof c.payload.metas === "object") ? c.payload.metas : {};
     METAS_HIST = Array.isArray(c.payload.metasHist) ? c.payload.metasHist : [];
     NOTAS = normalizeNotas(c.payload.notas);
+    API_VERSION = Number(c.payload.version) || 0;
     indexMetas(); indexNotas();
     LAST_OK = new Date(c.at);
     if (RECS.length){ buildFilters(); render(); setStatus("warn","cache local"); }
@@ -2078,7 +2091,7 @@ function renderMetaHistory(){
 function openMetas(){
   $("ovMetas").classList.add("show");
   metasMsg(null,"");
-  if (getPwd()){ $("metasAuth").style.display="none"; $("metasPanel").style.display=""; fillMetasForm(); }
+  if (metasSemSenha() || getPwd()){ $("metasAuth").style.display="none"; $("metasPanel").style.display=""; fillMetasForm(); }
   else { $("metasAuth").style.display=""; $("metasPanel").style.display="none"; $("metasPwd").focus(); }
 }
 function metasMsg(kind,text){
@@ -2197,17 +2210,74 @@ $("metasSave").onclick = function(){
     if (metas.some(function(m){ return m.loja; })){ metasMsg("bad", v8); return; }
     envio = {}; metas.forEach(function(m){ envio[m.agente] = m.meta; });
   }
-  var b=this; b.disabled=true; b.textContent="Salvando…"; metasMsg(null,"");
+  // Aplica na tela antes de gravar: a gravacao leva uns segundos, e recarregar
+  // a base inteira depois dela levava mais uns 20. Se a API recusar, volta.
+  var antes = snapshotMetas();
+  aplicarMetasLocal(metas, desde);
+  markWrite(); render(); fillMetasForm();
+  metasMsg("ok","Metas aplicadas a partir de "+brDate(desde)+". Gravando na planilha…");
+
+  var b=this; b.disabled=true; b.textContent="Gravando…";
   apiPost({ action:"setMetas", metas:JSON.stringify(envio), desde:desde, base:"manual" })
     .then(function(res){
       if(res.status!=="ok") throw new Error(res.message||"erro ao salvar");
+      markWrite();
       metasMsg("ok","Metas salvas, vigentes a partir de "+brDate(desde)+".");
-      return loadData(true);
     })
-    .then(function(){ fillMetasForm(); renderMetasHistBox(); })
-    .catch(function(e){ metasMsg("bad", e.message); })
+    .catch(function(e){
+      restoreMetas(antes); render(); fillMetasForm();
+      metasMsg("bad", "Não gravou, as metas voltaram ao que eram. " + erroMetas(e));
+    })
     .then(function(){ b.disabled=false; b.textContent="Salvar metas"; });
 };
+
+/** Copia do estado de metas, para desfazer na tela se a gravacao falhar. */
+function snapshotMetas(){
+  return { hist: JSON.parse(JSON.stringify(METAS_HIST)), metas: JSON.parse(JSON.stringify(METAS)) };
+}
+function restoreMetas(s){ METAS_HIST = s.hist; METAS = s.metas; indexMetas(); }
+
+/**
+ * Faz na memoria o mesmo que setMetas_ faz na planilha: atualiza a linha do
+ * mesmo agente/loja/data de vigencia, ou acrescenta uma nova. O historico
+ * anterior nao e tocado.
+ */
+function aplicarMetasLocal(lista, desde){
+  var d = new Date();
+  var quando = pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear()+" "+pad(d.getHours())+":"+pad(d.getMinutes());
+  lista.forEach(function(m){
+    var loja = m.loja || "", achou = null;
+    for (var i = 0; i < METAS_HIST.length; i++){
+      var h = METAS_HIST[i];
+      if (h.agente === m.agente && (h.loja || "") === loja && h.desde === desde){ achou = h; break; }
+    }
+    if (achou){ achou.meta = m.meta; achou.criadaEm = quando; achou.base = "manual"; }
+    else METAS_HIST.push({ agente:m.agente, loja:loja, meta:m.meta, desde:desde, criadaEm:quando, base:"manual" });
+  });
+  reindexMetas();
+}
+
+/** Ordena como a API devolve e recalcula a meta total vigente hoje (formato antigo). */
+function reindexMetas(){
+  METAS_HIST.sort(function(a, b){
+    if (a.agente !== b.agente) return a.agente < b.agente ? -1 : 1;
+    if ((a.loja || "") !== (b.loja || "")) return (a.loja || "") < (b.loja || "") ? -1 : 1;
+    return a.desde < b.desde ? -1 : a.desde > b.desde ? 1 : 0;
+  });
+  if (API_VERSION >= 8){
+    var hoje = iso(today());
+    METAS = {};
+    METAS_HIST.forEach(function(h){ if (!h.loja && h.desde <= hoje) METAS[h.agente] = h.meta; });
+  }
+  indexMetas();
+}
+
+function erroMetas(e){
+  var m = (e && e.message) || "erro ao salvar";
+  return /senha/i.test(m) && metasSemSenha()
+    ? m + " O Apps Script publicado ainda pede senha para metas: cole o AppsScript.gs e reimplante."
+    : m;
+}
 
 /** Lista o historico de metas com opcao de remover uma entrada errada. */
 function renderMetasHistBox(){
@@ -2236,15 +2306,22 @@ function renderMetasHistBox(){
 
   box.querySelectorAll(".undo").forEach(function(b){
     b.onclick = function(){
-      b.disabled = true; b.textContent = "…";
-      apiPost({ action:"delMeta", agente:b.dataset.ag, loja:b.dataset.loja, desde:b.dataset.desde })
+      var ag = b.dataset.ag, loja = b.dataset.loja, desde = b.dataset.desde;
+      var antes = snapshotMetas();
+      METAS_HIST = METAS_HIST.filter(function(m){
+        return !(m.agente === ag && (m.loja || "") === loja && m.desde === desde);
+      });
+      reindexMetas(); markWrite(); render(); fillMetasForm();
+      metasMsg("ok","Entrada removida. Gravando na planilha…");
+      apiPost({ action:"delMeta", agente:ag, loja:loja, desde:desde })
         .then(function(res){
           if(res.status!=="ok") throw new Error(res.message||"erro");
-          metasMsg("ok","Entrada removida.");
-          return loadData(true);
+          markWrite(); metasMsg("ok","Entrada removida.");
         })
-        .then(function(){ fillMetasForm(); renderMetasHistBox(); })
-        .catch(function(e){ metasMsg("bad", e.message); b.disabled=false; b.textContent="remover"; });
+        .catch(function(e){
+          restoreMetas(antes); render(); fillMetasForm();
+          metasMsg("bad", "Não gravou, a entrada voltou. " + erroMetas(e));
+        });
     };
   });
 }
@@ -2848,39 +2925,50 @@ function updatePreviews(){
   }
 }
 
+/* Ultima lista de ajustes lida. Aparece na hora ao abrir o painel enquanto a
+   leitura nova chega, e e atualizada na memoria ao salvar ou desfazer. */
+var ADJ_LIST = null;
+
 function loadAdjList(){
-  var box = $("adjList");
-  box.innerHTML = '<div class="empty" style="padding:26px">Carregando…</div>';
+  var box = $("adjList"), started = Date.now();
+  if (ADJ_LIST) renderAdjList();
+  else box.innerHTML = '<div class="empty" style="padding:26px">Carregando…</div>';
   apiPost({ action:"listAdjust" })
     .then(function(res){
       if (res.status !== "ok") throw new Error(res.message || "erro ao listar");
-      var list = (res.ajustes || []).filter(function(x){ return x.ativo; });
-      if (!list.length){
-        box.innerHTML = '<div class="empty" style="padding:26px">Nenhum ajuste registrado ainda.</div>';
-        return;
-      }
-      box.innerHTML = list.map(function(x){
-        var txt;
-        if (x.tipo === "loja"){
-          txt = esc(x.agente)+" · "+brDate(x.data)+" · "+esc(x.deLoja)+" → "+esc(x.paraLoja)+
-                (x.qtd ? " ("+nf(x.qtd)+")" : " (todos)");
-        } else {
-          txt = esc(x.agente)+" · "+brDate(x.data)+" · "+esc(x.paraLoja)+" · "+
-                (x.qtd>0?"+":"")+nf(x.qtd);
-        }
-        return '<div class="adj"><div class="adj-main">' +
-          '<span class="adj-tag '+esc(x.tipo)+'">'+esc(x.tipo)+'</span>'+txt +
-          (x.motivo ? '<div class="adj-why">'+esc(x.motivo)+'</div>' : '') +
-          '</div><button class="undo" data-id="'+esc(x.id)+'">desfazer</button></div>';
-      }).join("");
-      box.querySelectorAll(".undo").forEach(function(b){
-        b.onclick = function(){ undoAdj(b.dataset.id, b); };
-      });
+      if (started <= LAST_WRITE) return;   // saiu antes de uma gravacao: viria sem ela
+      ADJ_LIST = (res.ajustes || []).filter(function(x){ return x.ativo; });
+      renderAdjList();
     })
     .catch(function(e){
-      box.innerHTML = '<div class="empty" style="padding:26px">Não consegui carregar: '+esc(e.message)+'</div>';
+      if (!ADJ_LIST) box.innerHTML = '<div class="empty" style="padding:26px">Não consegui carregar: '+esc(e.message)+'</div>';
       if (/senha/i.test(e.message)) forceLogin();
     });
+}
+
+function renderAdjList(){
+  var box = $("adjList"), list = ADJ_LIST || [];
+  if (!list.length){
+    box.innerHTML = '<div class="empty" style="padding:26px">Nenhum ajuste registrado ainda.</div>';
+    return;
+  }
+  box.innerHTML = list.map(function(x){
+    var txt;
+    if (x.tipo === "loja"){
+      txt = esc(x.agente)+" · "+brDate(x.data)+" · "+esc(x.deLoja)+" → "+esc(x.paraLoja)+
+            (x.qtd ? " ("+nf(x.qtd)+")" : " (todos)");
+    } else {
+      txt = esc(x.agente)+" · "+brDate(x.data)+" · "+esc(x.paraLoja)+" · "+
+            (x.qtd>0?"+":"")+nf(x.qtd);
+    }
+    return '<div class="adj"><div class="adj-main">' +
+      '<span class="adj-tag '+esc(x.tipo)+'">'+esc(x.tipo)+'</span>'+txt +
+      (x.motivo ? '<div class="adj-why">'+esc(x.motivo)+'</div>' : '') +
+      '</div><button class="undo" data-id="'+esc(x.id)+'">desfazer</button></div>';
+  }).join("");
+  box.querySelectorAll(".undo").forEach(function(b){
+    b.onclick = function(){ undoAdj(b.dataset.id, b); };
+  });
 }
 
 function undoAdj(id, btn){
@@ -2888,8 +2976,13 @@ function undoAdj(id, btn){
   apiPost({ action:"delAdjust", id:id })
     .then(function(res){
       if (res.status !== "ok") throw new Error(res.message || "erro");
-      adjMsg("ok","Ajuste desfeito.");
-      loadAdjList(); loadData(true);
+      markWrite();
+      if (ADJ_LIST) ADJ_LIST = ADJ_LIST.filter(function(x){ return x.id !== id; });
+      renderAdjList();
+      // Desfazer nao da para refazer na memoria com seguranca: os emails que o
+      // ajuste moveu ou criou nao sao identificaveis. Os numeros vem da API.
+      adjMsg("ok","Ajuste desfeito. Os números se atualizam em alguns segundos.");
+      loadData(true);
     })
     .catch(function(e){ adjMsg("bad", e.message); btn.disabled=false; btn.textContent="desfazer"; });
 }
@@ -2900,20 +2993,95 @@ function forceLogin(){
   adjMsg("bad","Senha inválida ou expirada. Entre de novo.");
 }
 
+/** As mesmas regras de addAdjust_ no Apps Script, checadas antes de mexer na tela. */
+function validaAjuste(p){
+  var qtd = (p.qtd === "" || p.qtd === null || p.qtd === undefined) ? "" : Number(p.qtd);
+  if (!p.data)   return "Informe a data.";
+  if (!p.agente) return "Informe o agente.";
+  if (qtd !== "" && !isFinite(qtd)) return "Quantidade inválida.";
+  if (p.tipo === "loja"){
+    if (!p.deLoja || !p.paraLoja) return "Informe a loja de origem e a de destino.";
+    if (p.deLoja === p.paraLoja)  return "As lojas de origem e destino são iguais.";
+    if (qtd !== "" && qtd <= 0)   return "Para correção de loja, a quantidade deve ser positiva (ou vazia = todos).";
+  } else {
+    if (!p.paraLoja)              return "Informe a loja.";
+    if (qtd === "" || qtd === 0)  return "Informe uma quantidade diferente de zero (use - para subtrair).";
+  }
+  return "";
+}
+
+/**
+ * Faz na memoria o mesmo que applyAdjustments_ faz no Apps Script, so para o
+ * ajuste novo. A API aplica os ajustes em ordem de criacao, entao aplicar o
+ * mais recente por cima dos dados ja ajustados da o mesmo resultado.
+ * Devolve quantos emails foram afetados.
+ */
+function aplicarAjusteLocal(p){
+  var n = 0, i, r;
+  var qtd = (p.qtd === "" || p.qtd === null || p.qtd === undefined) ? null : Number(p.qtd);
+  var copia = function(r, loja){ return { day:r.day, hour:r.hour, hm:r.hm, agente:r.agente, loja:loja }; };
+
+  if (p.tipo === "loja"){
+    var limite = qtd === null ? Infinity : qtd;
+    for (i = 0; i < RECS.length && n < limite; i++){
+      r = RECS[i];
+      if (r.day === p.data && r.agente === p.agente && r.loja === p.deLoja){ RECS[i] = copia(r, p.paraLoja); n++; }
+    }
+  } else if (qtd > 0){
+    // mesma distribuicao de horario da API: espalha pelos horarios que o agente ja tem no dia
+    var horas = [];
+    RECS.forEach(function(x){ if (x.day === p.data && x.agente === p.agente && x.hm) horas.push(x.hm); });
+    if (!horas.length) horas = ["12:00"];
+    var novos = [];
+    for (i = 0; i < qtd; i++){
+      var hm = horas[Math.floor(i * horas.length / qtd)] || horas[0];
+      novos.push({ day:p.data, hour:+hm.slice(0,2), hm:hm, agente:p.agente, loja:p.paraLoja });
+    }
+    RECS = RECS.concat(novos).sort(function(a, b){
+      if (a.day !== b.day) return a.day < b.day ? -1 : 1;
+      return (a.hm || "") < (b.hm || "") ? -1 : (a.hm || "") > (b.hm || "") ? 1 : 0;
+    });
+    n = qtd;
+  } else if (qtd < 0){
+    var falta = -qtd;
+    for (i = RECS.length - 1; i >= 0 && falta > 0; i--){
+      r = RECS[i];
+      if (r.day === p.data && r.agente === p.agente && (!p.paraLoja || r.loja === p.paraLoja)){ RECS.splice(i, 1); falta--; n++; }
+    }
+  }
+  return n;
+}
+
 function saveAdjust(payload, btn){
+  var erro = validaAjuste(payload);
+  if (erro){ adjMsg("bad", erro); return; }
+
+  // Aplica na tela antes de gravar, como nas metas. Se a API recusar, volta.
+  var antes = { recs: RECS.slice(), count: ADJ_COUNT };
+  var afetados = aplicarAjusteLocal(payload);
+  ADJ_COUNT++;
+  markWrite(); buildFilters(); render(); updatePreviews();
+  adjMsg("ok","Ajuste aplicado ("+nf(afetados)+" email"+(afetados === 1 ? "" : "s")+"). Gravando na planilha…");
+
   var original = btn.textContent;
-  btn.disabled = true; btn.textContent = "Salvando…";
-  adjMsg(null,"");
+  btn.disabled = true; btn.textContent = "Gravando…";
   payload.action = "addAdjust";
   apiPost(payload)
     .then(function(res){
       if (res.status !== "ok") throw new Error(res.message || "erro ao salvar");
-      adjMsg("ok","Ajuste salvo. Atualizando os dados…");
-      return loadData(true);
+      markWrite();
+      if (ADJ_LIST){
+        ADJ_LIST.unshift({ id:res.id, tipo:payload.tipo, data:payload.data, agente:payload.agente,
+          deLoja:payload.deLoja || "", paraLoja:payload.paraLoja || "",
+          qtd:(payload.qtd === "" ? null : Number(payload.qtd)), motivo:String(payload.motivo || "").trim(), ativo:true });
+        renderAdjList();
+      }
+      adjMsg("ok","Ajuste salvo.");
     })
-    .then(function(){ updatePreviews(); })
     .catch(function(e){
-      adjMsg("bad", e.message);
+      RECS = antes.recs; ADJ_COUNT = antes.count;
+      buildFilters(); render(); updatePreviews();
+      adjMsg("bad","Não gravou, o ajuste foi desfeito na tela. " + e.message);
       if (/senha/i.test(e.message)) forceLogin();
     })
     .then(function(){ btn.disabled=false; btn.textContent=original; });
