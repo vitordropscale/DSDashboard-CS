@@ -31,15 +31,18 @@ navegador — não há servidor nem build.
 
 Tudo no painel — filtros, colunas da tabela, gráficos, metas por loja, correções,
 notas, CSV e o report — é gerado a partir de três listas no topo do bloco de
-configuração do `index.html`. Para incluir uma loja nova, edite só estas quatro
-coisas:
+configuração do `index.html`. Para incluir uma loja nova, edite só estas três
+listas:
 
 1. `STORES` — todas as lojas, incluindo `"Sem loja"`, que fica sempre por último.
 2. `LOJAS` — as lojas reais, sem `"Sem loja"`. Define a ordem em que aparecem.
-3. `STORE_COLOR` — a cor da loja nos gráficos e nas etiquetas de meta.
-4. Uma regra CSS `.seg.stores button.on[data-store="Nome"]` com a mesma cor, para
-   o botão do filtro quando selecionado. Em fundo claro, defina também um `color`
-   escuro, senão o texto branco some.
+3. `STORE_COLOR` — a cor da loja. Aparece como um pontinho no filtro e nas metas, e
+   como a cor da série nos gráficos.
+
+A ordem das lojas e as cores andam juntas: cada loja fica ao lado de uma cor que
+continua distinguível para quem tem daltonismo. Acrescente a loja nova **no fim** e
+escolha uma cor que não seja vizinha da anterior (laranja ao lado de amarelo, por
+exemplo, não passa). Vermelho fica de fora: no painel ele só indica estado crítico.
 
 O Apps Script não precisa de alteração: ele grava o valor de `loja` que chegar,
 sem lista fixa. O que precisa mudar é o **script AHK na máquina dos agentes**, que
