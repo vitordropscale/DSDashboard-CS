@@ -8,7 +8,7 @@ Página estática, sem build, publicada pelo GitHub Pages.
 
 ```
 Script AHK (máquina do agente)
-        │  HTTP GET  ?agente=&contador=&loja=
+        │  HTTP GET  ?agente=&contador=&loja=&ticket=
         ▼
 Google Apps Script  ──►  Google Sheets (abas Logs / Ajustes / Metas)
         │  GET ?action=getData
@@ -90,6 +90,14 @@ publicado vê a URL. Os dados expostos são volume de e-mail por agente, dia e l
 - **Payload**: `?compact=1` devolve formato colunar, cerca de 5x menor.
 - **Contagens suspeitas**: o painel sinaliza minutos com 10+ e-mails do mesmo agente,
   padrão típico de contagem acidental. As referências de meta descontam esse excesso.
+- **Ticket na contagem (modo observação)**: o contador v5.1 lê o endereço da aba da frente
+  pela acessibilidade do Windows — só leitura, sem tecla nem área de transferência, porque
+  dispara no instante em que o agente envia o e-mail. Manda só um código (`cs:conta:caixa:ticket`,
+  `rp:ticket` ou `fora`), gravado na coluna H da aba Logs pelo Apps Script v10. A API aberta
+  devolve apenas o resumo por agente e dia (`qualidade`), nunca os tickets. Nada é bloqueado.
+  Próximo passo: cruzar esses tickets com os fechamentos que o projeto do CS Reporting já
+  recebe dos helpdesks (tabela `helpdesk_events`), já que no Commslayer o login é compartilhado
+  e a API não sabe quem fechou.
 - **Metas**: guardadas com data de vigência, então alterar a meta hoje não reescreve
   o atingimento dos dias anteriores.
 - **Gravações na hora**: ao salvar metas ou ajustes, o painel aplica a mudança na tela

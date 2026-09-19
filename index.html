@@ -695,6 +695,14 @@ textarea.inp{resize:vertical;line-height:1.55}
 
     <div class="card">
       <div class="card-h">
+        <div><div class="card-t">Onde o agente estava ao contar</div>
+        <div class="card-sub" id="qualSub">&nbsp;</div></div>
+      </div>
+      <div id="qualBox"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
         <div><div class="card-t">Contagens suspeitas</div>
         <div class="card-sub" id="burstSub">emails demais no mesmo minuto</div></div>
         <div class="mini-seg" id="segBurst">
@@ -989,7 +997,8 @@ var METAS = {};       // {agente: meta TOTAL diaria} — compatibilidade, vem da
 var METAS_HIST = [];  // [{agente, loja, meta, desde}] — historico com data de vigencia
 var META_IDX   = {};  // {"agente|loja": [{desde, meta}, ...]} ordenado por desde
 var NOTAS = [];       // [{id, data, tipo, agente, loja, texto}]
-var NOTAS_DIA = {};   // {"yyyy-MM-dd": [nota, ...]}
+var NOTAS_DIA = {};
+var QUALIDADE = [];  // [{data, agente, ticket, fora, repetidos}] — resumo do Apps Script v10   // {"yyyy-MM-dd": [nota, ...]}
 var API_VERSION = 0;  // versao do Apps Script implantado (metas por loja e notas: 8+)
 var LAST_WRITE  = 0;  // instante da ultima gravacao iniciada ou confirmada (ver loadData)
 function markWrite(){ LAST_WRITE = Date.now(); }
@@ -1262,6 +1271,7 @@ function loadData(manual){
       METAS = (payload.metas && typeof payload.metas === "object") ? payload.metas : {};
       METAS_HIST = Array.isArray(payload.metasHist) ? payload.metasHist : [];
       NOTAS = normalizeNotas(payload.notas);
+      QUALIDADE = Array.isArray(payload.qualidade) ? payload.qualidade : [];
       API_VERSION = Number(payload.version) || 0;
       indexMetas(); indexNotas();
       LAST_OK = new Date();
@@ -1326,6 +1336,7 @@ function loadCache(){
     METAS = (c.payload.metas && typeof c.payload.metas === "object") ? c.payload.metas : {};
     METAS_HIST = Array.isArray(c.payload.metasHist) ? c.payload.metasHist : [];
     NOTAS = normalizeNotas(c.payload.notas);
+    QUALIDADE = Array.isArray(c.payload.qualidade) ? c.payload.qualidade : [];
     API_VERSION = Number(c.payload.version) || 0;
     indexMetas(); indexNotas();
     LAST_OK = new Date(c.at);
@@ -1481,6 +1492,7 @@ function render(){
   renderNotas(r);
   renderProd(rows);
   renderBursts(rows);
+  renderQualidade(r);
   renderTable(A, rows);
   renderAgentCharts(A, rows);
 
@@ -1722,6 +1734,50 @@ function renderProd(rows){
       '<td style="width:70px"><div class="bar"><span style="width:'+w.toFixed(1)+'%;background:'+agColor(a)+'"></span></div></td>' +
     '</tr>';
   }).join("");
+}
+
+/**
+ * Onde o agente estava na hora de cada contagem. O contador v5.1 le o endereco da
+ * aba da frente e manda so um codigo (ticket do Commslayer, ticket do Richpanel ou
+ * "fora"). O Apps Script devolve o resumo por agente e dia — os tickets nao vem.
+ * Por enquanto e so observacao: nenhuma contagem e bloqueada por causa disso.
+ */
+function renderQualidade(r){
+  var box = $("qualBox"), porAg = {};
+  QUALIDADE.forEach(function(q){
+    if (q.data < r.from || q.data > r.to || state.agents[q.agente]) return;
+    if (TEST_AGENTS.indexOf(q.agente) > -1) return;
+    var a = porAg[q.agente] || (porAg[q.agente] = { ticket:0, fora:0, repetidos:0 });
+    a.ticket += +q.ticket || 0; a.fora += +q.fora || 0; a.repetidos += +q.repetidos || 0;
+  });
+  var nomes = Object.keys(porAg).sort(function(a, b){
+    return (porAg[b].ticket + porAg[b].fora) - (porAg[a].ticket + porAg[a].fora);
+  });
+
+  $("qualSub").textContent = r.label + " · todas as lojas (a leitura não separa por loja)";
+  if (!nomes.length){
+    box.innerHTML = '<div class="empty" style="padding:30px">Ainda sem leituras neste período. Os números aparecem ' +
+      'quando o agente estiver com o <b>contador v5.1</b> e o <b>Apps Script v10</b> estiver implantado.</div>';
+    return;
+  }
+
+  box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
+    '<th style="cursor:default">Agente</th><th class="num" style="cursor:default">Contagens lidas</th>' +
+    '<th class="num" style="cursor:default">Num ticket</th><th class="num" style="cursor:default">Fora do helpdesk</th>' +
+    '<th class="num" style="cursor:default">% fora</th><th class="num" style="cursor:default">Repetidas no mesmo ticket</th>' +
+    '</tr></thead><tbody>' + nomes.map(function(n){
+      var a = porAg[n], lidas = a.ticket + a.fora, pct = lidas ? a.fora / lidas * 100 : 0;
+      // so o pontinho leva cor: ambar a partir de 10% fora do helpdesk
+      var dot = pct >= 10 ? "var(--warn)" : "var(--good)";
+      return '<tr><td><div class="ag"><span class="av" style="background:'+agColor(n)+'"></span>'+esc(n)+'</div></td>' +
+        '<td class="num" style="font-weight:650">'+nf(lidas)+'</td>' +
+        '<td class="num">'+nf(a.ticket)+'</td>' +
+        '<td class="num'+(a.fora?"":" zero")+'">'+(a.fora?nf(a.fora):"–")+'</td>' +
+        '<td class="num"><i class="st-dot" style="background:'+dot+';margin-right:7px"></i>'+pct.toFixed(1)+'%</td>' +
+        '<td class="num'+(a.repetidos?"":" zero")+'">'+(a.repetidos?nf(a.repetidos):"–")+'</td></tr>';
+    }).join("") + '</tbody></table></div>' +
+    '<div class="adj-why" style="padding-top:12px">"Repetidas" são contagens a mais no mesmo ticket, no mesmo dia. ' +
+    'Nem sempre é erro: se o cliente respondeu de novo, a segunda resposta conta. Modo observação — nada é bloqueado.</div>';
 }
 
 /** Rajadas: mais de N emails do mesmo agente no mesmo minuto. */

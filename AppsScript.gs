@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas)  v9.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas)  v10.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas"
  * =============================================================
  *
@@ -15,7 +15,7 @@
  *   GET  ?action=getData&compact=1       -> payload ~5x menor
  *   GET  ?action=getData&callback=fn     -> JSONP
  *   GET  ?action=ping                    -> teste de saude
- *   GET  ?agente=Vitor&contador=12&loja=Lumvelle   -> grava 1 email (AHK)
+ *   GET  ?agente=Vitor&contador=12&loja=Lumvelle&ticket=cs:8172:26430:194230   -> grava 1 email (AHK)
  *   POST {action:'setMetas', metas:[{agente,loja,meta},...], desde, base}   (sem senha desde a v9)
  *   POST {action:'delMeta',  agente, loja, desde}                          (sem senha desde a v9)
  *
@@ -32,6 +32,13 @@
  *   daquela loja. Assim o Thiago pode ter 400/dia no total, sendo 200 Lumvelle
  *   e 200 Elevare. Metas antigas (planilha sem a coluna Loja) continuam valendo
  *   como meta total — a coluna e criada sozinha na primeira leitura.
+ *
+ *  TICKET (v10)
+ *   O contador v5.1 manda junto o ticket que estava aberto na hora da contagem:
+ *   "cs:CONTA:CAIXA:TICKET" (Commslayer), "rp:TICKET" (Richpanel), "fora" (a janela
+ *   da frente nao era um ticket) ou vazio (nao deu para ler). Fica na coluna H da
+ *   aba Logs. E so um codigo — nenhum dado de cliente. O getData NAO devolve os
+ *   tickets, so um resumo por agente e dia (campo "qualidade").
  *
  *  NOTAS
  *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
@@ -51,7 +58,8 @@ var ADJ_SHEET   = 'Ajustes';
 var META_SHEET  = 'Metas';
 var NOTA_SHEET  = 'Notas';
 var TZ          = 'America/Sao_Paulo';
-var HEADER      = ['Timestamp', 'Agente', 'Email #', 'Data', 'Hora', 'Dia da Semana', 'Loja'];
+var HEADER      = ['Timestamp', 'Agente', 'Email #', 'Data', 'Hora', 'Dia da Semana', 'Loja', 'Ticket'];
+var TICKET_RE   = /^(cs:\d{1,12}:\d{1,12}:\d{1,15}|rp:\d{1,15}|fora)$/;
 var ADJ_HEADER  = ['ID', 'Registrado em', 'Tipo', 'Data', 'Agente', 'De loja', 'Para loja', 'Qtd', 'Motivo', 'Ativo'];
 var META_HEADER = ['Agente', 'Meta diaria', 'Vigente a partir de', 'Definida em', 'Base', 'Loja'];
 var NOTA_HEADER = ['ID', 'Registrado em', 'Data', 'Tipo', 'Agente', 'Loja', 'Nota', 'Ativo'];
@@ -163,7 +171,8 @@ function logHit_(d) {
       Utilities.formatDate(now, TZ, 'dd/MM/yyyy'),
       Utilities.formatDate(now, TZ, 'HH:mm'),
       Utilities.formatDate(now, TZ, 'EEEE'),
-      String(d.loja || 'Sem loja').trim()
+      String(d.loja || 'Sem loja').trim(),
+      limpaTicket_(d.ticket)
     ]);
     return { status: 'ok', total: Number(d.contador || 0) || 0, at: Utilities.formatDate(now, TZ, 'dd/MM/yyyy HH:mm:ss') };
   } finally {
@@ -171,8 +180,26 @@ function logHit_(d) {
   }
 }
 
+/** So aceita os formatos que o contador manda; qualquer outra coisa vira vazio. */
+function limpaTicket_(t) {
+  t = String(t || '').trim().toLowerCase();
+  return TICKET_RE.test(t) ? t : '';
+}
+
+/**
+ * Aba "Logs" garantindo a coluna "Ticket". Planilhas anteriores a v10 tem 7
+ * colunas: a oitava e criada aqui, sem tocar nas linhas existentes.
+ */
 function getSheet_() {
-  return ensureSheet_(SHEET_NAME, HEADER);
+  var sh = ensureSheet_(SHEET_NAME, HEADER);
+  if (sh.getMaxColumns() < HEADER.length) {
+    sh.insertColumnsAfter(sh.getMaxColumns(), HEADER.length - sh.getMaxColumns());
+  }
+  if (String(sh.getRange(1, HEADER.length).getDisplayValue()).trim() !== HEADER[HEADER.length - 1]) {
+    sh.getRange(1, HEADER.length).setValue(HEADER[HEADER.length - 1])
+      .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('white');
+  }
+  return sh;
 }
 
 function ensureSheet_(name, header) {
@@ -559,7 +586,7 @@ function getData_(p) {
   var sheet = getSheet_();
   var last  = sheet.getLastRow();
   var tz    = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || TZ;
-  var out = [], skipped = 0;
+  var out = [], skipped = 0, qual = {};
 
   if (last >= 2) {
     var range   = sheet.getRange(2, 1, last - 1, HEADER.length);
@@ -580,6 +607,15 @@ function getData_(p) {
       if (!hm && isDate_(vr[4])) hm = parseTime_(Utilities.formatDate(vr[4], tz, 'HH:mm'));
       if (!hm) hm = parseTimeIn_(dr[0]) || parseTimeIn_(dr[3]);
       if (hm) dt.setHours(hm[0], hm[1], 0, 0);
+
+      // Resumo de onde o agente estava ao contar. Os tickets em si nao saem daqui.
+      var tk = String(dr[7] || '').trim();
+      if (tk) {
+        var qk = fmt_(dt, 'yyyy-MM-dd') + '|' + agente;
+        var q = qual[qk] || (qual[qk] = { ticket: 0, fora: 0, vistos: {}, repetidos: 0 });
+        if (tk === 'fora') q.fora++;
+        else { q.ticket++; if (q.vistos[tk]) q.repetidos++; else q.vistos[tk] = 1; }
+      }
 
       out.push({
         data:     fmt_(dt, 'yyyy-MM-dd'),
@@ -609,10 +645,16 @@ function getData_(p) {
   var notas = [];
   try { notas = listNotas_(); } catch (eN) {}
 
+  // So entram os dias em que o contador novo (v5.1) ja estava rodando para o agente.
+  var qualidade = Object.keys(qual).sort().map(function (k) {
+    var p = k.split('|');
+    return { data: p[0], agente: p[1], ticket: qual[k].ticket, fora: qual[k].fora, repetidos: qual[k].repetidos };
+  });
+
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
-    metas: listMetas_(), metasHist: listMetasHist_(), notas: notas,
-    tz: tz, generatedAt: nowStr_(), version: 9
+    metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
+    tz: tz, generatedAt: nowStr_(), version: 10
   };
 
   if (p.compact) {
