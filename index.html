@@ -42,6 +42,13 @@ body{
   font-feature-settings:"tnum" 1,"cv05" 1; -webkit-font-smoothing:antialiased;
 }
 button,input,select,textarea{font-family:inherit}
+/* barras de rolagem no tema: finas, discretas, sem a faixa branca padrao do navegador */
+*{scrollbar-width:thin;scrollbar-color:var(--card3) transparent}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--card3);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+::-webkit-scrollbar-corner{background:transparent}
 svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;
   stroke-linecap:round;stroke-linejoin:round}
 
@@ -177,13 +184,16 @@ th .sw{margin-right:7px;vertical-align:1px}
 .chart-box.xs{height:220px}
 
 /* ---------- tabela ---------- */
-.tbl-wrap{overflow-x:auto;margin:0 -22px;padding:0 22px}
+.tbl-wrap{overflow-x:auto;margin:0 -22px;padding:0 22px 6px}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
 th{text-align:left;padding:8px 9px 12px;color:var(--muted);font-weight:600;font-size:10px;
   text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--line);
   white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s}
 th:hover{color:var(--text2)}
 th.num,td.num{text-align:right}
+/* nome de loja comprido quebra em duas linhas em vez de empurrar a tabela para fora do cartao */
+th{vertical-align:bottom}
+th.num{white-space:normal;line-height:1.35;min-width:44px}
 th .caret{opacity:0;font-size:8px;margin-left:4px}
 th.sorted{color:var(--text2)}
 th.sorted .caret{opacity:1;color:var(--brand-2)}
@@ -945,14 +955,21 @@ var TEST_AGENTS = ["NOME_DO_AGENTE","Sem nome","Teste","Teste1","Teste2","Teste3
 /* A ORDEM e as CORES das lojas andam juntas. As cores sao os passos de modo escuro
    de uma paleta categorica validada, e nesta ordem cada loja fica ao lado de uma cor
    que continua distinguivel para quem tem daltonismo (checado com validate_palette.js
-   contra o fundo do cartao). Laranja ao lado de amarelo, por exemplo, nao passa —
-   por isso a Koda, que quase nao tem movimento, foi para o fim.
-   Loja nova: acrescente no fim e rode o validador de novo. */
-var STORES      = ["Lumvelle","Elevare","Old Harvest","Vigewell","Vellum","Stratum","Koda","Old World Healing","Nouveian","Sem loja"];
-var LOJAS       = ["Lumvelle","Elevare","Old Harvest","Vigewell","Vellum","Stratum","Koda","Old World Healing","Nouveian"];   // sem o "Sem loja"
+   contra o fundo do cartao). Violeta ao lado de ciano, por exemplo, nao passa — por
+   isso a Nouveian vem antes da Old World Healing.
+   Loja nova: acrescente no fim de LOJAS e rode o validador de novo. */
+var LOJAS       = ["Lumvelle","Elevare","Old Harvest","Vigewell","Vellum","Stratum","Nouveian","Old World Healing"];
+
+/* Lojas que sairam de operacao. Somem das metas, das colunas, do CSV e do report, e
+   so aparecem no filtro se houver registro delas. Continuam reconhecidas porque a
+   planilha ainda tem linhas com esse nome — e continuam em Ajustes como origem, para
+   dar para corrigir uma contagem que caiu nelas por engano. */
+var APOSENTADAS = ["Koda"];
+
+var STORES      = LOJAS.concat(APOSENTADAS, ["Sem loja"]);
 var STORE_COLOR = {Lumvelle:"#3987e5", Elevare:"#199e70", "Old Harvest":"#c98500",
-                   Vigewell:"#d55181", Vellum:"#008300", Stratum:"#9085e9", Koda:"#d95926",
-                   "Old World Healing":"#1a9fc4", Nouveian:"#7f9a1a",
+                   Vigewell:"#d55181", Vellum:"#008300", Stratum:"#9085e9",
+                   Nouveian:"#7f9a1a", "Old World Healing":"#1a9fc4", Koda:"#d95926",
                    "Sem loja":"#65708a"};
 
 /* Casa o nome da loja sem depender de maiuscula/minuscula: o AHK manda
@@ -1393,10 +1410,11 @@ function applyFilters(from,to){
 function buildFilters(){
   // As lojas configuradas aparecem sempre, mesmo sem registro ainda — senao uma
   // loja nova so surge no filtro depois do primeiro email, o que confunde.
-  // "Sem loja" e a excecao: so aparece se houver registro sem loja atribuida.
+  // "Sem loja" e as lojas aposentadas sao a excecao: so aparecem se houver registro.
   var present = {};
   RECS.forEach(function(r){ present[r.loja]=1; });
-  var list = LOJAS.concat(present["Sem loja"] ? ["Sem loja"] : []);
+  var list = LOJAS.concat(APOSENTADAS.filter(function(s){ return present[s]; }),
+                          present["Sem loja"] ? ["Sem loja"] : []);
   var seg = $("segStore");
   if (seg.dataset.built === list.join("|")) { /* nada mudou */ }
   else {

@@ -1,7 +1,8 @@
 # CS Dashboard — Email Counter
 
-Painel de KPIs de atendimento por e-mail das operações Lumvelle, Elevare, Koda,
-Old Harvest, Vigewell, Vellum, Stratum, Old World Healing e Nouveian.
+Painel de KPIs de atendimento por e-mail das operações Lumvelle, Elevare, Old Harvest,
+Vigewell, Vellum, Stratum, Nouveian e Old World Healing. A Koda saiu de operação em 21/09/2026:
+fica em `APOSENTADAS`, fora das metas, colunas e report, mas ainda reconhecida nos registros antigos.
 Página estática, sem build, publicada pelo GitHub Pages.
 
 ## Como funciona
