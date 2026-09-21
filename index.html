@@ -948,10 +948,11 @@ var TEST_AGENTS = ["NOME_DO_AGENTE","Sem nome","Teste","Teste1","Teste2","Teste3
    contra o fundo do cartao). Laranja ao lado de amarelo, por exemplo, nao passa —
    por isso a Koda, que quase nao tem movimento, foi para o fim.
    Loja nova: acrescente no fim e rode o validador de novo. */
-var STORES      = ["Lumvelle","Elevare","Old Harvest","Vigewell","Vellum","Stratum","Koda","Sem loja"];
-var LOJAS       = ["Lumvelle","Elevare","Old Harvest","Vigewell","Vellum","Stratum","Koda"];   // sem o "Sem loja"
+var STORES      = ["Lumvelle","Elevare","Old Harvest","Vigewell","Vellum","Stratum","Koda","Old World Healing","Nouveian","Sem loja"];
+var LOJAS       = ["Lumvelle","Elevare","Old Harvest","Vigewell","Vellum","Stratum","Koda","Old World Healing","Nouveian"];   // sem o "Sem loja"
 var STORE_COLOR = {Lumvelle:"#3987e5", Elevare:"#199e70", "Old Harvest":"#c98500",
                    Vigewell:"#d55181", Vellum:"#008300", Stratum:"#9085e9", Koda:"#d95926",
+                   "Old World Healing":"#1a9fc4", Nouveian:"#7f9a1a",
                    "Sem loja":"#65708a"};
 
 /* Casa o nome da loja sem depender de maiuscula/minuscula: o AHK manda
@@ -969,7 +970,14 @@ var STORE_ALIAS = {
   "old_harvest": "Old Harvest",
   "vige well":   "Vigewell",
   "vige-well":   "Vigewell",
-  "vige_well":   "Vigewell"
+  "vige_well":   "Vigewell",
+  "oldworldhealing":   "Old World Healing",
+  "old-world-healing": "Old World Healing",
+  "old_world_healing": "Old World Healing",
+  "old world":         "Old World Healing",
+  "owh":               "Old World Healing",
+  "nouvian":           "Nouveian",
+  "nouveain":          "Nouveian"
 };
 
 function canonStore(v){

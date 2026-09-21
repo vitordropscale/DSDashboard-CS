@@ -1,7 +1,7 @@
 # CS Dashboard — Email Counter
 
 Painel de KPIs de atendimento por e-mail das operações Lumvelle, Elevare, Koda,
-Old Harvest, Vigewell, Vellum e Stratum.
+Old Harvest, Vigewell, Vellum, Stratum, Old World Healing e Nouveian.
 Página estática, sem build, publicada pelo GitHub Pages.
 
 ## Como funciona
