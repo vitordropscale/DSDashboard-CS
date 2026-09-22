@@ -950,6 +950,12 @@ var API_URL = (function(){
   try { return atob(p.join("")); } catch(e){ return ""; }
 })();
 var REFRESH_MS  = 60000;
+/* Quanto esperar pela API. A base cresce ~700 registros por dia e a leitura no
+   Apps Script e proporcional a ela; com 30 s o painel desistia antes da resposta
+   chegar e ficava preso no ultimo cache. */
+var API_TIMEOUT_MS = 90000;
+/* Menor janela que o painel carrega, em dias: o mapa de calor olha 4 semanas. */
+var MIN_LOAD_DAYS = 28;
 var CACHE_KEY   = "emailcounter.cache.v5";
 var TEST_AGENTS = ["NOME_DO_AGENTE","Sem nome","Teste","Teste1","Teste2","Teste3","teste"];
 /* A ORDEM e as CORES das lojas andam juntas. As cores sao os passos de modo escuro
@@ -1026,6 +1032,7 @@ var NOTAS_DIA = {};
 var QUALIDADE = [];  // [{data, agente, ticket, fora, repetidos}] — resumo do Apps Script v10   // {"yyyy-MM-dd": [nota, ...]}
 var API_VERSION = 0;  // versao do Apps Script implantado (metas por loja e notas: 8+)
 var LAST_WRITE  = 0;  // instante da ultima gravacao iniciada ou confirmada (ver loadData)
+var LOADED_SINCE = null;  // primeiro dia carregado ("yyyy-MM-dd"); null = base inteira
 function markWrite(){ LAST_WRITE = Date.now(); }
 
 /* Metas por loja e notas exigem o Apps Script v8. Sem ele a gravacao seria
@@ -1248,7 +1255,7 @@ function fetchJSON(url){
         try { return JSON.parse(txt); }
         catch(e){ throw new Error("resposta não é JSON (a API pode estar pedindo login)"); }
       }),
-    30000, "fetch");
+    API_TIMEOUT_MS, "fetch");
 }
 
 /** JSONP: imune a CORS e a redirect. Último recurso. */
@@ -1264,12 +1271,31 @@ function fetchJSONP(url){
       if (s.parentNode) s.parentNode.removeChild(s);
       fn(arg);
     };
-    var timer = setTimeout(function(){ finish(rej, new Error("JSONP expirou (35s)")); }, 35000);
+    var timer = setTimeout(function(){ finish(rej, new Error("JSONP expirou ("+API_TIMEOUT_MS/1000+"s)")); }, API_TIMEOUT_MS);
     window[cb] = function(data){ finish(res, data); };
     s.onerror = function(){ finish(rej, new Error("JSONP falhou ao carregar")); };
     s.src = url + (url.indexOf("?")>-1 ? "&" : "?") + "callback=" + cb + "&_=" + Date.now();
     document.head.appendChild(s);
   });
+}
+
+/**
+ * Primeiro dia que o periodo atual precisa (inclui o periodo anterior, usado na
+ * comparacao, e as 4 semanas do mapa de calor). null = precisa da base inteira.
+ * Carregar so isso e o que mantem o painel rapido conforme a base cresce.
+ */
+function neededSince(){
+  if (state.period === "tudo") return null;
+  var r = dateRange(), pr = prevRange(r);
+  var minimo = iso(addDays(today(), -(MIN_LOAD_DAYS - 1)));
+  return pr.from < minimo ? pr.from : minimo;
+}
+
+/** Depois de trocar o periodo: se ele pede dias que ainda nao vieram, busca de novo. */
+function ensureCoverage(){
+  if (LOADED_SINCE === null) return;
+  var need = neededSince();
+  if (need === null || need < LOADED_SINCE) loadData(true);
 }
 
 function loadData(manual){
@@ -1278,7 +1304,10 @@ function loadData(manual){
   $("btnRefresh").classList.add("spin");
   if (!RECS.length) setStatus("live","carregando…"); else setStatus("live","atualizando…");
 
-  var base = API_URL + "?action=getData";
+  var since = neededSince();
+  // uma leitura que ja cobre mais do que o pedido continua cobrindo
+  if (since !== null && LOADED_SINCE !== null && LOADED_SINCE < since) since = LOADED_SINCE;
+  var base = API_URL + "?action=getData" + (since ? "&since=" + since : "");
   var errs = [];
   // Uma leitura que saiu antes de uma gravacao terminar volta sem ela, e
   // desfaria na tela o que acabou de ser salvo. Essa e descartada e refeita.
@@ -1291,6 +1320,7 @@ function loadData(manual){
       if (!payload || payload.status === "error")
         throw new Error((payload && payload.message) || "a API retornou erro");
       if (started <= LAST_WRITE){ stale = true; return; }
+      LOADED_SINCE = since;
       RECS = normalize(payload); refreshAgentColors();
       ADJ_COUNT = Number(payload.ajustes) || 0;
       METAS = (payload.metas && typeof payload.metas === "object") ? payload.metas : {};
@@ -1300,7 +1330,7 @@ function loadData(manual){
       API_VERSION = Number(payload.version) || 0;
       indexMetas(); indexNotas();
       LAST_OK = new Date();
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at:LAST_OK.getTime(), payload:payload })); } catch(e){}
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at:LAST_OK.getTime(), since:since, payload:payload })); } catch(e){}
       buildFilters();
       render();
       reportHealth(payload);
@@ -1357,6 +1387,7 @@ function loadCache(){
   try{
     var c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
     if (!c || !c.payload) return;
+    LOADED_SINCE = c.since || null;
     RECS = normalize(c.payload); refreshAgentColors();
     METAS = (c.payload.metas && typeof c.payload.metas === "object") ? c.payload.metas : {};
     METAS_HIST = Array.isArray(c.payload.metasHist) ? c.payload.metasHist : [];
@@ -1385,7 +1416,7 @@ function dateRange(){
     if (from>to){ var x=from; from=to; to=x; }
     label = brDate(iso(from))+" a "+brDate(iso(to));
   }
-  else { from = RECS.length ? new Date(RECS[0].day+"T00:00:00") : addDays(t,-30); label="todo o período"; }
+  else { from = RECS.length ? new Date(RECS[0].day+"T00:00:00") : addDays(t,-30); label = LOADED_SINCE ? "todo o período (carregando o histórico…)" : "todo o período"; }
   return { from:iso(from), to:iso(to), label:label,
            days: Math.round((to-from)/86400000)+1, fromD:from, toD:to };
 }
@@ -3446,10 +3477,11 @@ $("segPeriod").querySelectorAll("button").forEach(function(b){
       $("dFrom").value = state.from; $("dTo").value = state.to;
     }
     render();
+    ensureCoverage();
   };
 });
-$("dFrom").onchange = function(){ state.from = this.value; render(); };
-$("dTo").onchange   = function(){ state.to   = this.value; render(); };
+$("dFrom").onchange = function(){ state.from = this.value; render(); ensureCoverage(); };
+$("dTo").onchange   = function(){ state.to   = this.value; render(); ensureCoverage(); };
 
 $("segTrend").querySelectorAll("button").forEach(function(b){
   b.onclick = function(){

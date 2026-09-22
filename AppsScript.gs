@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas)  v11.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas)  v12.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas"
  * =============================================================
  *
@@ -48,6 +48,13 @@
  *   viram email. O resumo "qualidade" do getData junta as duas abas.
  *   A caixa de entrada do Commslayer (no codigo do ticket) diz a loja de verdade:
  *   INBOX_LOJA traduz, e o resumo conta quantas vezes a loja do widget nao bateu.
+ *
+ *  DESEMPENHO (v12)
+ *   Utilities.formatDate custa ~1 ms por chamada. Com 3 chamadas por linha e 20 mil
+ *   linhas na aba Logs, so isso levava o getData a 40 s — mais que o tempo que o
+ *   dashboard espera. A leitura agora monta data e hora com os getters do Date
+ *   (ymd_ / hm_). Isso assume que o fuso do projeto do Apps Script e
+ *   America/Sao_Paulo (Configuracoes do projeto > Fuso horario), o mesmo TZ daqui.
  *
  *  NOTAS
  *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
@@ -461,7 +468,7 @@ function listNotas_() {
     out.push({
       id:       String(v[i][0]),
       criadoEm: String(v[i][1]),
-      data:     dt ? fmt_(dt, 'yyyy-MM-dd') : String(v[i][2]),
+      data:     dt ? ymd_(dt) : String(v[i][2]),
       tipo:     String(v[i][3] || 'nota').toLowerCase(),
       agente:   String(v[i][4] || ''),
       loja:     String(v[i][5] || ''),
@@ -555,7 +562,7 @@ function listAdjust_() {
       id:       String(v[i][0]),
       criadoEm: String(v[i][1]),
       tipo:     String(v[i][2]),
-      data:     dt ? fmt_(dt, 'yyyy-MM-dd') : String(v[i][3]),
+      data:     dt ? ymd_(dt) : String(v[i][3]),
       agente:   String(v[i][4]),
       deLoja:   String(v[i][5]),
       paraLoja: String(v[i][6]),
@@ -662,7 +669,7 @@ function getData_(p) {
       // Resumo de onde o agente estava ao contar. Os tickets em si nao saem daqui.
       var tk = String(dr[7] || '').trim();
       if (tk) {
-        var qk = fmt_(dt, 'yyyy-MM-dd') + '|' + agente;
+        var qk = ymd_(dt) + '|' + agente;
         var q = qual[qk] || (qual[qk] = { ticket: 0, fora: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
         if (tk === 'fora') q.fora++;
         else {
@@ -675,8 +682,8 @@ function getData_(p) {
       }
 
       out.push({
-        data:     fmt_(dt, 'yyyy-MM-dd'),
-        hora:     fmt_(dt, 'HH:mm'),
+        data:     ymd_(dt),
+        hora:     hm_(dt),
         agente:   agente,
         loja:     loja,
         contador: cont
@@ -711,7 +718,7 @@ function getData_(p) {
         var td = parseAny_(tv[ti][2]) || parseAny_(tv[ti][0]);
         var ta = String(tv[ti][1] || '').trim();
         if (!td || !ta) continue;
-        var tkk = fmt_(td, 'yyyy-MM-dd') + '|' + ta;
+        var tkk = ymd_(td) + '|' + ta;
         var tq = qual[tkk] || (qual[tkk] = { ticket: 0, fora: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
         tq.recusadas++;
       }
@@ -728,7 +735,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tz: tz, generatedAt: nowStr_(), version: 11
+    tz: tz, generatedAt: nowStr_(), version: 12
   };
 
   if (p.compact) {
@@ -862,6 +869,12 @@ function clampHM_(h, mi) {
    ============================================================ */
 
 function fmt_(d, pattern) { return Utilities.formatDate(d, TZ, pattern); }
+
+/* Rapidos, sem Utilities.formatDate (ver DESEMPENHO no cabecalho). So para datas
+   montadas por parseAny_/build_, que ja estao no fuso do script. */
+function pad2_(n) { return (n < 10 ? '0' : '') + n; }
+function ymd_(d)  { return d.getFullYear() + '-' + pad2_(d.getMonth() + 1) + '-' + pad2_(d.getDate()); }
+function hm_(d)   { return pad2_(d.getHours()) + ':' + pad2_(d.getMinutes()); }
 function nowStr_()        { return Utilities.formatDate(new Date(), TZ, "yyyy-MM-dd'T'HH:mm:ss"); }
 
 function respond_(obj, callback) {
@@ -881,7 +894,7 @@ function respond_(obj, callback) {
 /** Mostra passo a passo onde a leitura quebra. Rode e mande o log. */
 function diagnostico() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  Logger.log('1. Planilha: %s | fuso: %s', ss.getName(), ss.getSpreadsheetTimeZone());
+  Logger.log('1. Planilha: %s | fuso: %s | fuso do script: %s (precisa ser %s)', ss.getName(), ss.getSpreadsheetTimeZone(), Session.getScriptTimeZone(), TZ);
 
   var sh = ss.getSheetByName(SHEET_NAME);
   Logger.log('2. Aba "%s": %s', SHEET_NAME, sh ? 'encontrada' : 'NAO ENCONTRADA');
