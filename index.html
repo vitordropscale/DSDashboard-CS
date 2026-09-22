@@ -1769,41 +1769,48 @@ function renderProd(rows){
  * Por enquanto e so observacao: nenhuma contagem e bloqueada por causa disso.
  */
 function renderQualidade(r){
-  var box = $("qualBox"), porAg = {};
+  var box = $("qualBox"), porAg = {}, campos = ["ticket","fora","repetidos","repetidos1min","lojaDiferente","recusadas"];
   QUALIDADE.forEach(function(q){
     if (q.data < r.from || q.data > r.to || state.agents[q.agente]) return;
     if (TEST_AGENTS.indexOf(q.agente) > -1) return;
-    var a = porAg[q.agente] || (porAg[q.agente] = { ticket:0, fora:0, repetidos:0 });
-    a.ticket += +q.ticket || 0; a.fora += +q.fora || 0; a.repetidos += +q.repetidos || 0;
+    var a = porAg[q.agente] || (porAg[q.agente] = { ticket:0, fora:0, repetidos:0, repetidos1min:0, lojaDiferente:0, recusadas:0 });
+    campos.forEach(function(k){ a[k] += +q[k] || 0; });
   });
   var nomes = Object.keys(porAg).sort(function(a, b){
     return (porAg[b].ticket + porAg[b].fora) - (porAg[a].ticket + porAg[a].fora);
   });
 
-  $("qualSub").textContent = r.label + " · todas as lojas (a leitura não separa por loja)";
+  $("qualSub").textContent = r.label + " · todas as lojas";
   if (!nomes.length){
     box.innerHTML = '<div class="empty" style="padding:30px">Ainda sem leituras neste período. Os números aparecem ' +
-      'quando o agente estiver com o <b>contador v5.1</b> e o <b>Apps Script v10</b> estiver implantado.</div>';
+      'quando o agente estiver com o <b>contador v6</b> e o <b>Apps Script v11</b> estiver implantado.</div>';
     return;
   }
 
+  var th = function(t){ return '<th class="num" style="cursor:default">'+t+'</th>'; };
+  var cell = function(v, alerta){
+    if (!v) return '<td class="num zero">–</td>';
+    return '<td class="num">'+(alerta ? '<i class="st-dot" style="background:var(--warn);margin-right:7px"></i>' : '')+nf(v)+'</td>';
+  };
   box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
-    '<th style="cursor:default">Agente</th><th class="num" style="cursor:default">Contagens lidas</th>' +
-    '<th class="num" style="cursor:default">Num ticket</th><th class="num" style="cursor:default">Fora do helpdesk</th>' +
-    '<th class="num" style="cursor:default">% fora</th><th class="num" style="cursor:default">Repetidas no mesmo ticket</th>' +
+    '<th style="cursor:default">Agente</th>' + th("Contagens lidas") + th("Num ticket") + th("Fora do helpdesk") +
+    th("% fora") + th("Repetidas em 1 min") + th("Mesmo ticket no dia") + th("Loja diferente da caixa") + th("Recusadas") +
     '</tr></thead><tbody>' + nomes.map(function(n){
       var a = porAg[n], lidas = a.ticket + a.fora, pct = lidas ? a.fora / lidas * 100 : 0;
-      // so o pontinho leva cor: ambar a partir de 10% fora do helpdesk
       var dot = pct >= 10 ? "var(--warn)" : "var(--good)";
       return '<tr><td><div class="ag"><span class="av" style="background:'+agColor(n)+'"></span>'+esc(n)+'</div></td>' +
         '<td class="num" style="font-weight:650">'+nf(lidas)+'</td>' +
         '<td class="num">'+nf(a.ticket)+'</td>' +
-        '<td class="num'+(a.fora?"":" zero")+'">'+(a.fora?nf(a.fora):"–")+'</td>' +
+        cell(a.fora) +
         '<td class="num"><i class="st-dot" style="background:'+dot+';margin-right:7px"></i>'+pct.toFixed(1)+'%</td>' +
-        '<td class="num'+(a.repetidos?"":" zero")+'">'+(a.repetidos?nf(a.repetidos):"–")+'</td></tr>';
+        cell(a.repetidos1min, a.repetidos1min >= 5) + cell(a.repetidos) + cell(a.lojaDiferente, a.lojaDiferente >= 5) + cell(a.recusadas) +
+      '</tr>';
     }).join("") + '</tbody></table></div>' +
-    '<div class="adj-why" style="padding-top:12px">"Repetidas" são contagens a mais no mesmo ticket, no mesmo dia. ' +
-    'Nem sempre é erro: se o cliente respondeu de novo, a segunda resposta conta. Modo observação — nada é bloqueado.</div>';
+    '<div class="adj-why" style="padding-top:12px;line-height:1.6">' +
+    '<b>Repetidas em 1 min</b>: o mesmo ticket contado de novo em menos de um minuto — é o que o modo bloquear recusa. ' +
+    '<b>Mesmo ticket no dia</b>: nem sempre é erro; se o cliente respondeu de novo, a segunda resposta conta. ' +
+    '<b>Loja diferente da caixa</b>: a caixa do Commslayer no endereço dizia outra loja — o agente esqueceu de trocar no widget. ' +
+    '<b>Recusadas</b>: só existe em modo bloquear.</div>';
 }
 
 /** Rajadas: mais de N emails do mesmo agente no mesmo minuto. */

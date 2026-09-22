@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas)  v10.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas)  v11.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas"
  * =============================================================
  *
@@ -15,7 +15,8 @@
  *   GET  ?action=getData&compact=1       -> payload ~5x menor
  *   GET  ?action=getData&callback=fn     -> JSONP
  *   GET  ?action=ping                    -> teste de saude
- *   GET  ?agente=Vitor&contador=12&loja=Lumvelle&ticket=cs:8172:26430:194230   -> grava 1 email (AHK)
+ *   GET  ?agente=Vitor&contador=12&loja=Lumvelle&ticket=cs:8172:26430:194230&situacao=ticket  -> grava 1 email (AHK)
+ *   GET  ...&recusado=1   -> contador v6 em modo bloquear recusou; vai para a aba Tentativas, nao conta
  *   POST {action:'setMetas', metas:[{agente,loja,meta},...], desde, base}   (sem senha desde a v9)
  *   POST {action:'delMeta',  agente, loja, desde}                          (sem senha desde a v9)
  *
@@ -40,6 +41,14 @@
  *   aba Logs. E so um codigo — nenhum dado de cliente. O getData NAO devolve os
  *   tickets, so um resumo por agente e dia (campo "qualidade").
  *
+ *  SITUACAO E TENTATIVAS (v11)
+ *   O contador v6 manda tambem a situacao da contagem: ticket | repetido (mesmo
+ *   ticket em 1 minuto) | fora | semleitura. Fica na coluna I da aba Logs. Em modo
+ *   bloquear ele manda as recusas com recusado=1: entram na aba "Tentativas" e nao
+ *   viram email. O resumo "qualidade" do getData junta as duas abas.
+ *   A caixa de entrada do Commslayer (no codigo do ticket) diz a loja de verdade:
+ *   INBOX_LOJA traduz, e o resumo conta quantas vezes a loja do widget nao bateu.
+ *
  *  NOTAS
  *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
  *   sistema, promocao, elogio). Sao lidas junto com getData e entram no report
@@ -58,7 +67,13 @@ var ADJ_SHEET   = 'Ajustes';
 var META_SHEET  = 'Metas';
 var NOTA_SHEET  = 'Notas';
 var TZ          = 'America/Sao_Paulo';
-var HEADER      = ['Timestamp', 'Agente', 'Email #', 'Data', 'Hora', 'Dia da Semana', 'Loja', 'Ticket'];
+var HEADER      = ['Timestamp', 'Agente', 'Email #', 'Data', 'Hora', 'Dia da Semana', 'Loja', 'Ticket', 'Situacao'];
+var TENT_SHEET  = 'Tentativas';
+var TENT_HEADER = ['Timestamp', 'Agente', 'Data', 'Loja', 'Ticket', 'Situacao'];
+var SITUACOES   = ['ticket', 'repetido', 'fora', 'semleitura'];
+/* Caixa de entrada do Commslayer -> loja. Fonte: README do CS Reporting (10/09/2026).
+   Old World Healing e Nouveian: preencher quando o usuario mandar o endereco de um ticket. */
+var INBOX_LOJA  = { '26430': 'Vellum', '26575': 'Vigewell', '27261': 'Stratum', '10077': 'Elevare' };
 var TICKET_RE   = /^(cs:\d{1,12}:\d{1,12}:\d{1,15}|rp:\d{1,15}|fora)$/;
 var ADJ_HEADER  = ['ID', 'Registrado em', 'Tipo', 'Data', 'Agente', 'De loja', 'Para loja', 'Qtd', 'Motivo', 'Ativo'];
 var META_HEADER = ['Agente', 'Meta diaria', 'Vigente a partir de', 'Definida em', 'Base', 'Loja'];
@@ -158,7 +173,40 @@ function livre_(d) {
    GRAVACAO DO CONTADOR (AHK)
    ============================================================ */
 
+function limpaSituacao_(v) {
+  v = String(v || '').trim().toLowerCase();
+  return SITUACOES.indexOf(v) > -1 ? v : '';
+}
+
+/** Loja que a caixa do Commslayer indica, ou '' quando o ticket nao diz (Richpanel, fora, vazio). */
+function lojaDoTicket_(tk) {
+  var m = /^cs:\d+:(\d+):/.exec(tk || '');
+  return m && INBOX_LOJA[m[1]] ? INBOX_LOJA[m[1]] : '';
+}
+
+/** Recusa do contador em modo bloquear: registra e NAO conta. */
+function logTentativa_(d) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (ignore) {}
+  try {
+    var sh = ensureSheet_(TENT_SHEET, TENT_HEADER);
+    var now = new Date();
+    sh.appendRow([
+      Utilities.formatDate(now, TZ, 'dd/MM/yyyy HH:mm:ss'),
+      String(d.agente || 'Sem nome').trim(),
+      Utilities.formatDate(now, TZ, 'dd/MM/yyyy'),
+      String(d.loja || 'Sem loja').trim(),
+      limpaTicket_(d.ticket),
+      limpaSituacao_(d.situacao)
+    ]);
+    return { status: 'ok', recusado: true };
+  } finally {
+    try { lock.releaseLock(); } catch (ignore) {}
+  }
+}
+
 function logHit_(d) {
+  if (String(d.recusado || '') === '1') return logTentativa_(d);
   var lock = LockService.getScriptLock();
   try { lock.waitLock(15000); } catch (ignore) {}
   try {
@@ -172,7 +220,8 @@ function logHit_(d) {
       Utilities.formatDate(now, TZ, 'HH:mm'),
       Utilities.formatDate(now, TZ, 'EEEE'),
       String(d.loja || 'Sem loja').trim(),
-      limpaTicket_(d.ticket)
+      limpaTicket_(d.ticket),
+      limpaSituacao_(d.situacao)
     ]);
     return { status: 'ok', total: Number(d.contador || 0) || 0, at: Utilities.formatDate(now, TZ, 'dd/MM/yyyy HH:mm:ss') };
   } finally {
@@ -195,9 +244,11 @@ function getSheet_() {
   if (sh.getMaxColumns() < HEADER.length) {
     sh.insertColumnsAfter(sh.getMaxColumns(), HEADER.length - sh.getMaxColumns());
   }
-  if (String(sh.getRange(1, HEADER.length).getDisplayValue()).trim() !== HEADER[HEADER.length - 1]) {
-    sh.getRange(1, HEADER.length).setValue(HEADER[HEADER.length - 1])
-      .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('white');
+  // colunas H (Ticket, v10) e I (Situacao, v11) — cria o cabecalho que faltar
+  for (var c = 8; c <= HEADER.length; c++) {
+    if (String(sh.getRange(1, c).getDisplayValue()).trim() !== HEADER[c - 1]) {
+      sh.getRange(1, c).setValue(HEADER[c - 1]).setFontWeight('bold').setBackground('#1a1a2e').setFontColor('white');
+    }
   }
   return sh;
 }
@@ -612,9 +663,15 @@ function getData_(p) {
       var tk = String(dr[7] || '').trim();
       if (tk) {
         var qk = fmt_(dt, 'yyyy-MM-dd') + '|' + agente;
-        var q = qual[qk] || (qual[qk] = { ticket: 0, fora: 0, vistos: {}, repetidos: 0 });
+        var q = qual[qk] || (qual[qk] = { ticket: 0, fora: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
         if (tk === 'fora') q.fora++;
-        else { q.ticket++; if (q.vistos[tk]) q.repetidos++; else q.vistos[tk] = 1; }
+        else {
+          q.ticket++;
+          if (q.vistos[tk]) q.repetidos++; else q.vistos[tk] = 1;
+          var lj = lojaDoTicket_(tk);
+          if (lj && lj !== loja) q.lojaDiferente++;
+        }
+        if (String(dr[8] || '').trim() === 'repetido') q.repetidos1min++;
       }
 
       out.push({
@@ -645,16 +702,33 @@ function getData_(p) {
   var notas = [];
   try { notas = listNotas_(); } catch (eN) {}
 
-  // So entram os dias em que o contador novo (v5.1) ja estava rodando para o agente.
+  // recusas do modo bloquear (aba Tentativas) entram no mesmo resumo
+  try {
+    var ts = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TENT_SHEET);
+    if (ts && ts.getLastRow() >= 2) {
+      var tv = ts.getRange(2, 1, ts.getLastRow() - 1, TENT_HEADER.length).getDisplayValues();
+      for (var ti = 0; ti < tv.length; ti++) {
+        var td = parseAny_(tv[ti][2]) || parseAny_(tv[ti][0]);
+        var ta = String(tv[ti][1] || '').trim();
+        if (!td || !ta) continue;
+        var tkk = fmt_(td, 'yyyy-MM-dd') + '|' + ta;
+        var tq = qual[tkk] || (qual[tkk] = { ticket: 0, fora: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
+        tq.recusadas++;
+      }
+    }
+  } catch (eT) {}
+
+  // So entram os dias em que o contador novo ja estava rodando para o agente.
   var qualidade = Object.keys(qual).sort().map(function (k) {
-    var p = k.split('|');
-    return { data: p[0], agente: p[1], ticket: qual[k].ticket, fora: qual[k].fora, repetidos: qual[k].repetidos };
+    var p = k.split('|'), q = qual[k];
+    return { data: p[0], agente: p[1], ticket: q.ticket, fora: q.fora, repetidos: q.repetidos,
+             repetidos1min: q.repetidos1min, lojaDiferente: q.lojaDiferente, recusadas: q.recusadas };
   });
 
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tz: tz, generatedAt: nowStr_(), version: 10
+    tz: tz, generatedAt: nowStr_(), version: 11
   };
 
   if (p.compact) {

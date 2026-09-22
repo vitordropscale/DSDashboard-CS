@@ -91,7 +91,11 @@ publicado vê a URL. Os dados expostos são volume de e-mail por agente, dia e l
 - **Payload**: `?compact=1` devolve formato colunar, cerca de 5x menor.
 - **Contagens suspeitas**: o painel sinaliza minutos com 10+ e-mails do mesmo agente,
   padrão típico de contagem acidental. As referências de meta descontam esse excesso.
-- **Ticket na contagem (modo observação)**: o contador v5.1 lê o endereço da aba da frente
+- **Ticket na contagem**: o contador v6 tem `MODO := "observar"` (conta sempre, anota a situação:
+  em ticket, fora, sem leitura, repetido em 1 min) ou `"bloquear"` (só conta com ticket aberto e recusa
+  o mesmo ticket em 1 min; recusas vão para a aba Tentativas, sem virar e-mail). O Apps Script v11
+  traduz a caixa do Commslayer em loja (`INBOX_LOJA`) e conta quando a loja do widget não bate.
+  Começamos em observar. O contador v5.1 lê o endereço da aba da frente
   pela acessibilidade do Windows — só leitura, sem tecla nem área de transferência, porque
   dispara no instante em que o agente envia o e-mail. Manda só um código (`cs:conta:caixa:ticket`,
   `rp:ticket` ou `fora`), gravado na coluna H da aba Logs pelo Apps Script v10. A API aberta
