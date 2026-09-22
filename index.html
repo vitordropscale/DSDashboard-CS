@@ -61,7 +61,7 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 /* o pontinho no canto do logo e o estado da conexao com a API */
 .brand-dot{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;
   background:var(--good);border:2px solid var(--side)}
-.side-lab{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-weight:600;
+.side-lab{font-size:11.5px;color:var(--muted);font-weight:500;
   padding:0 12px 8px}
 .nav + .side-lab{margin-top:26px}
 .brand h1{font-family:var(--font-d);font-size:17px;font-weight:700;letter-spacing:-.2px;line-height:1.2;white-space:nowrap}
@@ -76,10 +76,8 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .stat{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);padding:3px 10px}
 .stat b{color:var(--text);font-weight:600}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--good);flex:none}
-.dot.live{animation:pulse 2.2s ease-in-out infinite}
-.dot.warn{background:var(--warn);animation:none}
-.dot.err{background:var(--crit);animation:none}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.82)}}
+.dot.warn{background:var(--warn)}
+.dot.err{background:var(--crit)}
 
 /* ---------- conteudo ---------- */
 .main{margin-left:var(--side-w);min-width:0}
@@ -94,11 +92,11 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
   cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
 .btn svg.ic{width:15px;height:15px}
 .btn:hover{color:var(--text);background:var(--card2)}
-.btn:active{transform:translateY(1px)}
 .btn.spin svg{animation:rot .9s linear infinite}
 .side-foot .btn{justify-content:center;background:rgba(255,255,255,.04);border-color:transparent}
 .side-foot .btn:hover{background:rgba(255,255,255,.08)}
 @keyframes rot{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 .btn.cta{background:var(--brand);color:#fff}
 .btn.cta:hover{background:var(--brand);color:#fff;filter:brightness(1.1)}
 .btn.soft{background:var(--off)}
@@ -143,15 +141,13 @@ th .sw{margin-right:7px;vertical-align:1px}
 .view{display:none}
 .view.on{display:block}
 
-/* ---------- indicadores ---------- */
-.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:14px}
-.kpi{border-radius:var(--r);padding:18px 20px 20px;min-width:0;border:1px solid var(--line);
-  background:linear-gradient(140deg,rgba(var(--veil),.15) 0%,rgba(var(--veil),.05) 70%),var(--card)}
-.kpi-h{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.kpi-ic{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:none;
-  background:rgba(var(--veil),.16);color:rgb(var(--veil))}
-.kpi-ic svg.ic{width:15px;height:15px}
-.kpi-l{font-size:13px;color:var(--text);font-weight:600}
+/* ---------- indicadores: um painel so, dividido por fios ---------- */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;margin-bottom:14px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kpi{background:var(--card);padding:18px 20px 20px;min-width:0}
+.kpi-h{margin-bottom:12px}
+.kpi-ic{display:none}
+.kpi-l{font-size:12.5px;color:var(--muted);font-weight:500}
 .kpi-v{font-family:var(--font-d);font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1;
   color:var(--text);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;min-height:34px}
 .kpi-v small{font-family:var(--font);font-size:12px;font-weight:500;letter-spacing:0;color:var(--text2)}
@@ -186,8 +182,8 @@ th .sw{margin-right:7px;vertical-align:1px}
 /* ---------- tabela ---------- */
 .tbl-wrap{overflow-x:auto;margin:0 -22px;padding:0 22px 6px}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
-th{text-align:left;padding:8px 9px 12px;color:var(--muted);font-weight:600;font-size:10px;
-  text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--line);
+th{text-align:left;padding:8px 9px 12px;color:var(--muted);font-weight:500;font-size:11.5px;
+  border-bottom:1px solid var(--line);
   white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s}
 th:hover{color:var(--text2)}
 th.num,td.num{text-align:right}
@@ -218,8 +214,8 @@ tbody tr:last-child td{border-bottom:none}
 .hist-row .meta-ag{flex:0 0 200px;min-width:0;flex-wrap:wrap}
 .hist-meta{color:var(--muted);font-weight:400;font-size:11px;margin-left:2px}
 .hist-dots{flex:1 1 auto;display:flex;gap:4px;flex-wrap:wrap;min-width:0}
-.hd{width:14px;height:14px;border-radius:3px;flex:none;transition:transform .12s;position:relative}
-.hd:hover{transform:scale(1.3)}
+.hd{width:14px;height:14px;border-radius:3px;flex:none;position:relative}
+.hd:hover{outline:1px solid var(--text2)}
 /* dia com nota registrada: anel claro em volta do quadradinho */
 .hd.note{box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--text2)}
 .hist-num{flex:none;text-align:right;min-width:130px}
@@ -266,7 +262,7 @@ tbody tr:last-child td{border-bottom:none}
 .me-top{display:flex;align-items:center;gap:12px}
 .me-top .meta-ag{flex:1 1 auto;font-size:14px}
 .me-tot{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
-.me-lab{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+.me-lab{font-size:11px;color:var(--muted);font-weight:500}
 .me-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:10px;padding:14px 0 0 15px}
 .me-cell{display:flex;flex-direction:column;gap:5px}
 .me-cell .me-lab{display:flex;align-items:center;gap:6px}
@@ -290,7 +286,7 @@ tbody tr:last-child td{border-bottom:none}
 .nt-main{flex:1 1 auto;min-width:0;word-break:break-word;color:var(--text2)}
 .nt-meta{color:var(--muted);font-size:11px;margin-top:4px}
 .nt-act{flex:none;display:flex;gap:6px}
-.nt-tag,.adj-tag{display:inline-block;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+.nt-tag,.adj-tag{display:inline-block;font-size:11px;font-weight:500;
   padding:3px 8px;border-radius:5px;margin-right:9px;vertical-align:1px;
   background:var(--off);color:var(--text2)}
 .nt-tag.bom{background:var(--good-soft);color:#7fe0b4}
@@ -311,7 +307,7 @@ tbody tr:last-child td{border-bottom:none}
 /* ---------- report ---------- */
 .rp{border-radius:var(--r-sm);margin-bottom:12px;overflow:hidden;background:rgba(0,0,0,.2)}
 .rp-h{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px}
-.rp-h b{font-size:10.5px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.12em}
+.rp-h b{font-size:12px;font-weight:600;color:var(--text)}
 .rp pre{margin:0;padding:2px 16px 16px;font-family:'Consolas','Courier New',monospace;font-size:11.5px;
   line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:290px;overflow-y:auto}
 
@@ -340,8 +336,8 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
 .heat .hl{color:var(--muted);font-size:9.5px;text-align:center;padding-bottom:4px}
 .heat .rl{color:var(--muted);font-size:10.5px;display:flex;align-items:center;padding-right:8px;
   justify-content:flex-end;white-space:nowrap}
-.heat .cell{height:30px;border-radius:4px;background:var(--off);transition:transform .12s}
-.heat .cell:hover{transform:scale(1.08);z-index:2;position:relative}
+.heat .cell{height:30px;border-radius:4px;background:var(--off)}
+.heat .cell:hover{outline:1px solid var(--text2)}
 .legend{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:16px;
   justify-content:flex-end;flex-wrap:wrap}
 .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
@@ -349,10 +345,7 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
 .legend.ramp i{margin-left:0}
 
 /* ---------- skeleton ---------- */
-.sk{background:linear-gradient(90deg,rgba(255,255,255,.05) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.05) 75%);
-  background-size:200% 100%;animation:sh 1.3s infinite;border-radius:6px;color:transparent!important;
-  min-width:90px;display:inline-block}
-@keyframes sh{to{background-position:-200% 0}}
+.sk{background:rgba(255,255,255,.06);border-radius:6px;color:transparent!important;min-width:90px;display:inline-block}
 
 .foot{text-align:center;padding:28px 0 0;color:var(--muted);font-size:11.5px;line-height:1.8}
 
@@ -370,9 +363,8 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
 .x:hover{color:var(--text);background:var(--card3)}
 .modal-b{padding:18px 24px 24px}
 .field{margin-bottom:16px}
-.field label{display:block;font-size:10.5px;color:var(--text2);margin-bottom:8px;font-weight:600;
-  text-transform:uppercase;letter-spacing:.12em}
-.field .hint{font-size:11.5px;color:var(--muted);margin-top:7px;text-transform:none;letter-spacing:0;font-weight:400;
+.field label{display:block;font-size:12px;color:var(--text2);margin-bottom:7px;font-weight:500}
+.field .hint{font-size:11.5px;color:var(--muted);margin-top:7px;font-weight:400;
   line-height:1.5}
 .inp{width:100%;padding:11px 14px;border-radius:var(--r-sm);border:1px solid transparent;
   background:rgba(255,255,255,.05);color:var(--text);font-size:13.5px;color-scheme:dark;transition:.15s}
@@ -407,7 +399,7 @@ textarea.inp{resize:vertical;line-height:1.55}
 .preview b{color:var(--text)}
 
 /* ---------- telas menores ---------- */
-@media(max-width:1240px){.kpis{grid-template-columns:repeat(3,1fr)}.g-2,.g-2b{grid-template-columns:1fr}}
+@media(max-width:1240px){.kpis{grid-template-columns:repeat(3,1fr)}.kpis .kpi:nth-child(n+4){grid-column:span 1}.g-2,.g-2b{grid-template-columns:1fr}}
 @media(max-width:900px){
   /* o menu lateral vira uma faixa no topo, so com icones */
   .side{position:sticky;top:0;inset:auto;width:auto;flex-direction:row;align-items:center;gap:8px;
@@ -426,8 +418,8 @@ textarea.inp{resize:vertical;line-height:1.55}
   .page-t{font-size:21px}
 }
 @media(max-width:680px){
-  .kpis{grid-template-columns:repeat(2,1fr);gap:12px}
-  .kpi{padding:16px 18px 18px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi{padding:14px 16px 16px}
   .kpi-v{font-size:32px} .kpi-v.sm{font-size:22px}
   .card{padding:20px 18px}
   .tbl-wrap{margin:0 -18px;padding:0 18px}
@@ -525,41 +517,36 @@ textarea.inp{resize:vertical;line-height:1.55}
   <section class="view on" data-view="geral">
 
     <div class="kpis">
-      <div class="kpi" style="--veil:91,155,255">
+      <div class="kpi">
         <div class="kpi-h">
-          <div class="kpi-ic"><svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="m4.5 8 7.5 5.5L19.5 8"/></svg></div>
           <div class="kpi-l">Total de emails</div>
         </div>
         <div class="kpi-v"><span class="sk" id="kTotal">0</span><small>emails</small></div>
         <div class="kpi-s" id="kTotalS">&nbsp;</div>
       </div>
-      <div class="kpi" style="--veil:91,155,255">
+      <div class="kpi">
         <div class="kpi-h">
-          <div class="kpi-ic"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8.5 3.5v3M15.5 3.5v3"/></svg></div>
           <div class="kpi-l">Média por dia</div>
         </div>
         <div class="kpi-v"><span class="sk" id="kDia">0</span><small>por dia</small></div>
         <div class="kpi-s" id="kDiaS">&nbsp;</div>
       </div>
-      <div class="kpi" style="--veil:91,155,255">
+      <div class="kpi">
         <div class="kpi-h">
-          <div class="kpi-ic"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c.8-3.5 3.5-5.5 7-5.5s6.2 2 7 5.5"/></svg></div>
           <div class="kpi-l">Agentes ativos</div>
         </div>
         <div class="kpi-v"><span class="sk" id="kAg">0</span><small>agentes</small></div>
         <div class="kpi-s" id="kAgS">&nbsp;</div>
       </div>
-      <div class="kpi" style="--veil:91,155,255">
+      <div class="kpi">
         <div class="kpi-h">
-          <div class="kpi-ic"><svg class="ic" viewBox="0 0 24 24"><path d="M7 4.5h10v4a5 5 0 0 1-10 0z"/><path d="M7 6H4.5v1.5A3 3 0 0 0 7.5 10.5M17 6h2.5v1.5a3 3 0 0 1-3 3M12 13.5v3.5M8.5 19.5h7"/></svg></div>
           <div class="kpi-l">Top agente</div>
         </div>
         <div class="kpi-v sm"><span class="sk" id="kTop">—</span></div>
         <div class="kpi-s" id="kTopS">&nbsp;</div>
       </div>
-      <div class="kpi" style="--veil:91,155,255">
+      <div class="kpi">
         <div class="kpi-h">
-          <div class="kpi-ic"><svg class="ic" viewBox="0 0 24 24"><path d="M3.5 17.5 9 11l4 3.5 7.5-8.5"/><path d="M15.5 6h5v5"/></svg></div>
           <div class="kpi-l">Horário de pico</div>
         </div>
         <div class="kpi-v sm"><span class="sk" id="kPico">—</span></div>
@@ -882,9 +869,9 @@ textarea.inp{resize:vertical;line-height:1.55}
               </select></div>
           </div>
           <div class="row2">
-            <div class="field"><label for="ntAgente">Agente <span style="text-transform:none;font-weight:400">(opcional)</span></label>
+            <div class="field"><label for="ntAgente">Agente <span style="font-weight:400">(opcional)</span></label>
               <select class="inp" id="ntAgente"></select></div>
-            <div class="field"><label for="ntLoja">Loja <span style="text-transform:none;font-weight:400">(opcional)</span></label>
+            <div class="field"><label for="ntLoja">Loja <span style="font-weight:400">(opcional)</span></label>
               <select class="inp" id="ntLoja"></select></div>
           </div>
           <div class="field">
@@ -925,7 +912,7 @@ textarea.inp{resize:vertical;line-height:1.55}
 
   <div class="foot">
     <div id="footInfo">—</div>
-    <div style="margin-top:4px">Atualiza sozinho a cada 60s · pausa quando a aba fica em segundo plano</div>
+    <div style="margin-top:4px">Atualiza sozinho a cada 60 s e pausa quando a aba fica em segundo plano.</div>
   </div>
 </div>
 </main>
@@ -1339,7 +1326,7 @@ function loadData(manual){
       errs.push("jsonp: " + e.message);
       setStatus("err","falha ao carregar");
       showBanner("err","Não consegui buscar os dados da API",
-        "Tentativas: " + esc(errs.join(" · ")) +
+        "Tentativas: " + esc(errs.join("; ")) +
         ". Verifique se a implantação do Apps Script está como <code>Quem tem acesso: Qualquer pessoa</code>." +
         (RECS.length ? " Mostrando o último resultado em cache." : ""));
     })
@@ -1553,7 +1540,7 @@ function render(){
   renderTable(A, rows);
   renderAgentCharts(A, rows);
 
-  $("pageSub").textContent = r.label.charAt(0).toUpperCase() + r.label.slice(1) + " · " +
+  $("pageSub").textContent = r.label.charAt(0).toUpperCase() + r.label.slice(1) + ", " +
     (state.store === "__all" ? "todas as lojas" : state.store);
 
   var parts = [nf(RECS.length)+" registros na base"];
@@ -1561,7 +1548,7 @@ function render(){
   if (SKIPPED)     parts.push(nf(SKIPPED)+" de teste ignorados");
   if (DATE_BROKEN) parts.push(nf(DATE_BROKEN)+" com data ilegível");
   if (LAST_OK)     parts.push("última leitura às "+pad(LAST_OK.getHours())+":"+pad(LAST_OK.getMinutes()));
-  $("footInfo").textContent = parts.join(" · ");
+  $("footInfo").textContent = parts.join(", ") + ".";
   $("stRows").textContent   = nf(rows.length) + " no filtro";
 }
 
@@ -1580,7 +1567,7 @@ function renderKPIs(A, rows, prows, r){
 
   var daysWith = Object.keys(A.byDay).length || 1;
   $("kDia").textContent = nf(Math.round(total/daysWith));
-  $("kDiaS").textContent = daysWith+" dia"+(daysWith>1?"s":"")+" com movimento · "+r.label;
+  $("kDiaS").textContent = daysWith+" dia"+(daysWith>1?"s":"")+" com movimento";
 
   var names = Object.keys(A.byAgent).sort(function(a,b){ return A.byAgent[b]-A.byAgent[a]; });
   $("kAg").textContent  = names.length;
@@ -1588,7 +1575,7 @@ function renderKPIs(A, rows, prows, r){
 
   if (names.length){
     $("kTop").textContent  = names[0];
-    $("kTopS").textContent = nf(A.byAgent[names[0]])+" emails · "+Math.round(A.byAgent[names[0]]/total*100)+"% do total";
+    $("kTopS").textContent = nf(A.byAgent[names[0]])+" emails, "+Math.round(A.byAgent[names[0]]/total*100)+"% do total";
   } else { $("kTop").textContent="—"; $("kTopS").innerHTML="&nbsp;"; }
 
   var hk = Object.keys(A.byHour).sort(function(a,b){ return A.byHour[b]-A.byHour[a]; });
@@ -1604,7 +1591,7 @@ function trendAxis(rows, r){
     var h = activeHours(rows), ks=[];
     for (var i=h.from;i<=h.to;i++) ks.push(i);
     return { order:ks, labels:ks.map(function(k){ return pad(k)+"h"; }),
-             keyOf:function(rec){ return rec.hour; }, sub:"por hora · "+r.label };
+             keyOf:function(rec){ return rec.hour; }, sub:"por hora, "+r.label };
   }
   var days = dayList(r.from, r.to);
   if (days.length > 92){                       // período longo -> agrega por semana
@@ -1615,10 +1602,10 @@ function trendAxis(rows, r){
     });
     return { order:worder, labels:worder.map(function(w){ return "sem. "+brDate(w); }),
              keyOf:function(rec){ var dt=new Date(rec.day+"T00:00:00"); return iso(addDays(dt,-dt.getDay())); },
-             sub:"por semana · "+r.label };
+             sub:"por semana, "+r.label };
   }
   return { order:days, labels:days.map(brDate),
-           keyOf:function(rec){ return rec.day; }, sub:"por dia · "+r.label };
+           keyOf:function(rec){ return rec.day; }, sub:"por dia, "+r.label };
 }
 
 function renderTrend(rows, r){
@@ -1811,7 +1798,7 @@ function renderQualidade(r){
     return (porAg[b].ticket + porAg[b].fora) - (porAg[a].ticket + porAg[a].fora);
   });
 
-  $("qualSub").textContent = r.label + " · todas as lojas";
+  $("qualSub").textContent = r.label + ", todas as lojas";
   if (!nomes.length){
     box.innerHTML = '<div class="empty" style="padding:30px">Ainda sem leituras neste período. Os números aparecem ' +
       'quando o agente estiver com o <b>contador v6</b> e o <b>Apps Script v11</b> estiver implantado.</div>';
@@ -1868,12 +1855,12 @@ function renderBursts(rows){
   var totalExc = 0;
   Object.keys(excess).forEach(function(a){ totalExc += excess[a]; });
   $("burstSub").textContent = totalExc
-    ? nf(totalExc)+" registro(s) em excesso · limite "+at+"/minuto"
+    ? nf(totalExc)+" registro"+(totalExc===1?"":"s")+" em excesso, limite de "+at+" por minuto"
     : "nenhum minuto com "+at+" ou mais emails";
 
   var box = $("burstBox");
   if (!list.length){
-    box.innerHTML = '<div class="empty" style="padding:30px">Nada suspeito no período. 👍</div>';
+    box.innerHTML = '<div class="empty" style="padding:30px">Nada suspeito no período.</div>';
     return;
   }
 
@@ -1885,7 +1872,7 @@ function renderBursts(rows){
   }).join("") + '</div>';
 
   html += '<div class="burst-list">' + list.slice(0,8).map(function(b){
-    return '<div class="bl"><div><b>'+nf(b.n)+'</b> em 1 minuto · '+esc(b.agente)+
+    return '<div class="bl"><div><b>'+nf(b.n)+'</b> em 1 minuto, '+esc(b.agente)+
       '<div class="adj-why">'+brDate(b.day)+" às "+esc(b.hm)+'</div></div>' +
       '<button class="fixbtn" data-ag="'+esc(b.agente)+'" data-day="'+esc(b.day)+
       '" data-over="'+b.over+'" data-hm="'+esc(b.hm)+'">corrigir −'+b.over+'</button></div>';
@@ -1910,9 +1897,9 @@ function renderHeat(A, rows){
   if (r.days < 7){
     rows = applyFilters(iso(addDays(r.toD, -27)), r.to);
     A = aggregate(rows);
-    $("heatSub").textContent = "dia da semana × hora · últimas 4 semanas, porque o período escolhido tem menos de 7 dias";
+    $("heatSub").textContent = "dia da semana × hora, últimas 4 semanas (o período escolhido tem menos de 7 dias)";
   } else {
-    $("heatSub").textContent = "dia da semana × hora · " + r.label;
+    $("heatSub").textContent = "dia da semana × hora, " + r.label;
   }
   var h = activeHours(rows), hours=[];
   for (var i=h.from;i<=h.to;i++) hours.push(i);
@@ -2041,14 +2028,12 @@ if (hasChart()){
   Chart.defaults.color = THEME.text2;
 }
 
-/** Preenchimento em veu: a cor some em direcao a base do grafico. */
+/** Preenchimento chapado e discreto sob a linha unica. */
 function veilFill(rgb){
   return function(ctx){
     var a = ctx.chart.chartArea;
     if (!a) return "rgba("+rgb+",.12)";
-    var g = ctx.chart.ctx.createLinearGradient(0, a.top, 0, a.bottom);
-    g.addColorStop(0, "rgba("+rgb+",.30)"); g.addColorStop(1, "rgba("+rgb+",0)");
-    return g;
+    return "rgba("+rgb+",.10)";
   };
 }
 
@@ -2224,8 +2209,8 @@ function renderMetas(){
   var umaLoja = (state.store !== "__all" && state.store !== "Sem loja") ? state.store : "";
 
   $("metaSub").textContent = (day === hoje ? "hoje" : brDate(day)) +
-    (day === hoje ? " · dia em andamento" : "") +
-    (umaLoja ? " · meta de " + umaLoja : "");
+    (day === hoje ? ", dia em andamento" : "") +
+    (umaLoja ? ", meta de " + umaLoja : "");
 
   var nomes = {};
   RECS.forEach(function(r){ nomes[r.agente]=1; });
@@ -2378,12 +2363,12 @@ function renderMetaHistory(){
   h.agentes.forEach(function(a){ totB += a.bateu; totT += a.trabalhou; });
   var nota = "";
   if (h.loja){
-    if (h.porLoja === h.agentes.length) nota = " \u00b7 medido contra a meta de "+h.loja;
-    else if (h.porLoja)                 nota = " \u00b7 quem tem meta de "+h.loja+" \u00e9 medido nela; o resto, no total";
-    else                                nota = " \u00b7 sem meta de "+h.loja+": metas medidas em todas as lojas";
+    if (h.porLoja === h.agentes.length) nota = ", medido contra a meta de "+h.loja;
+    else if (h.porLoja)                 nota = ". Quem tem meta de "+h.loja+" \u00e9 medido nela; o resto, no total";
+    else                                nota = ". Sem meta de "+h.loja+": metas medidas em todas as lojas";
   }
   $("histSub").textContent = brDate(h.dias[0])+" a "+brDate(h.dias[h.dias.length-1]) +
-    " \u00b7 " + (totT ? Math.round(totB/totT*100) : 0) + "% de atingimento geral" + nota;
+    ", " + (totT ? Math.round(totB/totT*100) : 0) + "% de atingimento geral" + nota;
 
   h.agentes.sort(function(a,b){
     return (b.trabalhou?b.bateu/b.trabalhou:0) - (a.trabalhou?a.bateu/a.trabalhou:0);
@@ -2403,14 +2388,14 @@ function renderMetaHistory(){
       return '<i class="hd'+(nt.length?" note":"")+'" style="background:'+bg+'" title="'+esc(t)+'"></i>';
     }).join("");
     var rot = a.metasNoPeriodo.length>1 ? "metas "+a.metasNoPeriodo.map(nf).join(" → ") : "meta "+nf(a.meta);
-    if (a.naLoja) rot += " · " + h.loja;
+    if (a.naLoja) rot += " em " + h.loja;
     return '<div class="hist-row">' +
       '<div class="meta-ag"><span class="av" style="background:'+agColor(a.agente)+'">' +
         esc(initials(a.agente))+'</span>'+esc(a.agente) +
         '<span class="hist-meta">'+rot+'</span></div>' +
       '<div class="hist-dots">'+dots+'</div>' +
       '<div class="hist-num"><b><i class="st-dot" style="background:'+c+'"></i>'+a.bateu+'/'+a.trabalhou+'</b>' +
-        '<i>'+pct+'% \u00b7 sequência '+a.seq+(a.melhor>a.seq?" (melhor "+a.melhor+")":"")+'</i></div>' +
+        '<i>'+pct+'%, sequência '+a.seq+(a.melhor>a.seq?" (melhor "+a.melhor+")":"")+'</i></div>' +
     '</div>';
   }).join("");
 }
@@ -2439,8 +2424,8 @@ function fillMetasForm(){
   $("metasList").innerHTML = nomes.map(function(a){
     var st  = stats(dailyTotals(a));
     var ref = st
-      ? "histórico: média <b>"+nf(st.media)+"</b> · mediana <b>"+nf(st.mediana)+"</b> · " +
-        "melhor "+nf(st.melhor)+" · pior "+nf(st.pior)+" · "+st.dias+" dia"+(st.dias>1?"s":"")
+      ? "histórico: média <b>"+nf(st.media)+"</b>, mediana <b>"+nf(st.mediana)+"</b>, " +
+        "melhor "+nf(st.melhor)+", pior "+nf(st.pior)+", "+st.dias+" dia"+(st.dias>1?"s":"")
       : "sem histórico ainda";
 
     var campos = LOJAS.map(function(l){
@@ -2620,10 +2605,10 @@ function renderMetasHistBox(){
       }).map(function(m){
         var alvo = m.loja ? esc(m.loja) : "total";
         return '<div class="adj"><div class="adj-main">' +
-          '<span class="adj-tag '+(m.loja?"loja":"total")+'">'+esc(a)+' · '+alvo+'</span>' +
+          '<span class="adj-tag '+(m.loja?"loja":"total")+'">'+esc(a)+': '+alvo+'</span>' +
           (m.meta > 0 ? nf(m.meta) + '/dia' : 'sem meta') +
           '<div class="adj-why">desde '+(m.desde==="0000-01-01"?"sempre":brDate(m.desde))+
-            (m.criadaEm?" · registrada em "+esc(m.criadaEm):"")+'</div></div>' +
+            (m.criadaEm?", registrada em "+esc(m.criadaEm):"")+'</div></div>' +
           (m.desde==="0000-01-01" ? '' :
             '<button class="undo" data-ag="'+esc(a)+'" data-loja="'+esc(m.loja||"")+
               '" data-desde="'+esc(m.desde)+'">remover</button>') +
@@ -2702,7 +2687,7 @@ function renderNotas(r){
       '<div class="nt-when">'+brDate(n.data)+
         '<i>'+(n.data===hoje ? "hoje" : WD[dowOf(n.data)])+'</i></div>' +
       '<div class="nt-main">'+notaTagHTML(n.tipo)+esc(n.texto) +
-        (quem.length ? '<div class="nt-meta">'+quem.join(" · ")+'</div>' : '') + '</div>' +
+        (quem.length ? '<div class="nt-meta">'+quem.join(", ")+'</div>' : '') + '</div>' +
       '<div class="nt-act"><button class="nt-edit" data-id="'+esc(n.id)+'">editar</button></div>' +
     '</div>';
   }).join("");
@@ -2789,7 +2774,7 @@ function renderNotaList(){
       if (n.loja)   quem.push(esc(n.loja));
       return '<div class="adj"><div class="adj-main">' +
         notaTagHTML(n.tipo) + brDate(n.data) + " — " + esc(n.texto) +
-        (quem.length ? '<div class="adj-why">'+quem.join(" · ")+'</div>' : '') +
+        (quem.length ? '<div class="adj-why">'+quem.join(", ")+'</div>' : '') +
         '</div>' +
         '<div class="nt-act">' +
           '<button class="nt-edit" data-edit="'+esc(n.id)+'">editar</button>' +
@@ -2999,7 +2984,7 @@ function buildReport(qual){
               feito += v;
               if (v > 0 && ml > 0){ tl++; if (v >= ml) bl++; }
             });
-            return "   " + l + ": " + nf(feito) + " na semana · bateu em " + bl + " de " + tl +
+            return "   " + l + ": " + nf(feito) + " na semana, bateu em " + bl + " de " + tl +
                    " dia" + (tl===1?"":"s") + " — meta " + nf(metaFor(a, ultimoDia, l)) + "/dia";
           }).join("\n");
         }
@@ -3088,7 +3073,7 @@ function buildReport(qual){
       notasSem.forEach(function(n){ (porDia[n.data]=porDia[n.data]||[]).push(n); });
       return Object.keys(porDia).sort().map(function(d){
         return brDate(d)+" ("+WD[dowOf(d)]+")\n" + porDia[d].map(function(n){
-          var quem = [n.agente, n.loja].filter(Boolean).join(" · ");
+          var quem = [n.agente, n.loja].filter(Boolean).join(", ");
           return "• ["+NOTA_TIPOS[n.tipo]+"] "+n.texto+(quem?" — "+quem:"");
         }).join("\n");
       }).join("\n\n");
@@ -3101,8 +3086,8 @@ function renderReport(){
   var qual = $("segWeek").querySelector("button.on").dataset.w;
   var r = buildReport(qual);
   $("reportBox").innerHTML =
-    '<div class="adj-why" style="margin-bottom:12px">Semana '+esc(r.w.label)+' · '+nf(r.rows)+' emails' +
-    (state.store!=="__all" ? ' · filtrado por '+esc(state.store) : '') + '</div>' +
+    '<div class="adj-why" style="margin-bottom:12px">Semana '+esc(r.w.label)+', '+nf(r.rows)+' emails' +
+    (state.store!=="__all" ? ', filtrado por '+esc(state.store) : '') + '</div>' +
     r.blocos.map(function(b,i){
       return '<div class="rp"><div class="rp-h"><b>'+esc(b.t)+'</b>' +
         '<button class="copybtn" data-i="'+i+'">copiar</button></div>' +
@@ -3282,10 +3267,10 @@ function renderAdjList(){
   box.innerHTML = list.map(function(x){
     var txt;
     if (x.tipo === "loja"){
-      txt = esc(x.agente)+" · "+brDate(x.data)+" · "+esc(x.deLoja)+" → "+esc(x.paraLoja)+
+      txt = esc(x.agente)+", "+brDate(x.data)+": "+esc(x.deLoja)+" → "+esc(x.paraLoja)+
             (x.qtd ? " ("+nf(x.qtd)+")" : " (todos)");
     } else {
-      txt = esc(x.agente)+" · "+brDate(x.data)+" · "+esc(x.paraLoja)+" · "+
+      txt = esc(x.agente)+", "+brDate(x.data)+": "+esc(x.paraLoja)+" "+
             (x.qtd>0?"+":"")+nf(x.qtd);
     }
     return '<div class="adj"><div class="adj-main">' +
