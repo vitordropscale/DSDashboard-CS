@@ -56,10 +56,10 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .side{position:fixed;inset:0 auto 0 0;width:var(--side-w);z-index:50;background:var(--side);
   border-right:1px solid var(--line);display:flex;flex-direction:column;padding:22px 12px 18px}
 .brand{display:flex;align-items:center;gap:12px;padding:0 8px 26px}
-.logo{width:34px;height:34px;border-radius:9px;background:var(--brand);display:grid;place-items:center;
+.logo{width:34px;height:34px;border-radius:50%;background:var(--brand);display:grid;place-items:center;
   font-family:var(--font-d);font-weight:700;font-size:13px;color:#fff;position:relative;flex:none}
 /* o pontinho no canto do logo e o estado da conexao com a API */
-.brand-dot{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;
+.brand-dot{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;
   background:var(--good);border:2px solid var(--side)}
 .side-lab{font-size:11.5px;color:var(--muted);font-weight:500;
   padding:0 12px 8px}
@@ -348,6 +348,18 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
 .sk{background:rgba(255,255,255,.06);border-radius:6px;color:transparent!important;min-width:90px;display:inline-block}
 
 .foot{text-align:center;padding:28px 0 0;color:var(--muted);font-size:11.5px;line-height:1.8}
+
+/* ---------- lista de tickets repetidos ---------- */
+.linkish{background:none;border:none;padding:0;font:inherit;color:var(--brand-2);cursor:pointer;
+  text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+.linkish:hover{color:#fff}
+.tk-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 2px;border-bottom:1px solid var(--line2)}
+.tk-row:last-child{border-bottom:none}
+.tk-row a{color:var(--brand-2);text-decoration:none;font-weight:600}
+.tk-row a:hover{text-decoration:underline}
+.tk-n{font-size:12px;color:var(--muted);white-space:nowrap}
+.tk-tag{font-size:11px;color:var(--text2);background:var(--off);border-radius:999px;padding:2px 8px;margin-left:8px}
 
 /* ---------- modais ---------- */
 .ov{position:fixed;inset:0;z-index:90;background:rgba(3,5,9,.74);backdrop-filter:blur(6px);
@@ -711,6 +723,19 @@ textarea.inp{resize:vertical;line-height:1.55}
       <div id="burstBox"></div>
     </div>
   </section>
+
+  <div class="ov" id="ovTk">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-h">
+        <div>
+          <h2>Contados mais de uma vez</h2>
+          <p id="tkSub"></p>
+        </div>
+        <button class="x" id="tkClose" title="Fechar">×</button>
+      </div>
+      <div class="modal-b"><div id="tkBox"></div></div>
+    </div>
+  </div>
 
   <div class="ov" id="ovAdj">
     <div class="modal">
@@ -1787,12 +1812,14 @@ function renderProd(rows){
  * Por enquanto e so observacao: nenhuma contagem e bloqueada por causa disso.
  */
 function renderQualidade(r){
-  var box = $("qualBox"), porAg = {}, campos = ["ticket","fora","repetidos","repetidos1min","lojaDiferente","recusadas"];
+  var box = $("qualBox"), porAg = {}, campos = ["ticket","fora","outras","repetidos","repetidos1min","lojaDiferente","recusadas"];
   QUALIDADE.forEach(function(q){
     if (q.data < r.from || q.data > r.to || state.agents[q.agente]) return;
     if (TEST_AGENTS.indexOf(q.agente) > -1) return;
-    var a = porAg[q.agente] || (porAg[q.agente] = { ticket:0, fora:0, repetidos:0, repetidos1min:0, lojaDiferente:0, recusadas:0 });
+    var a = porAg[q.agente] || (porAg[q.agente] = { ticket:0, fora:0, outras:0, repetidos:0, repetidos1min:0, lojaDiferente:0, recusadas:0, reps:{} });
     campos.forEach(function(k){ a[k] += +q[k] || 0; });
+    // os códigos dos tickets repetidos, somados pelos dias do período
+    (q.repetidosLista||[]).forEach(function(x){ a.reps[x.t] = (a.reps[x.t]||0) + (+x.n||0); });
   });
   var nomes = Object.keys(porAg).sort(function(a, b){
     return (porAg[b].ticket + porAg[b].fora) - (porAg[a].ticket + porAg[a].fora);
@@ -1811,25 +1838,75 @@ function renderQualidade(r){
     return '<td class="num">'+(alerta ? '<i class="st-dot" style="background:var(--warn);margin-right:7px"></i>' : '')+nf(v)+'</td>';
   };
   box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
-    '<th style="cursor:default">Agente</th>' + th("Contagens lidas") + th("Num ticket") + th("Fora do helpdesk") +
-    th("% fora") + th("Repetidas em 1 min") + th("Mesmo ticket no dia") + th("Loja diferente da caixa") + th("Recusadas") +
+    '<th style="cursor:default">Agente</th>' + th("Contagens lidas") + th("Num ticket") + th("Outras conversas") +
+    th("Fora do helpdesk") + th("% fora") + th("Repetidas em 1 min") + th("Mesmo ticket no dia") +
+    th("Loja diferente da caixa") + th("Recusadas") +
     '</tr></thead><tbody>' + nomes.map(function(n){
       var a = porAg[n], lidas = a.ticket + a.fora, pct = lidas ? a.fora / lidas * 100 : 0;
       var dot = pct >= 10 ? "var(--warn)" : "var(--good)";
       return '<tr><td><div class="ag"><span class="av" style="background:'+agColor(n)+'"></span>'+esc(n)+'</div></td>' +
         '<td class="num" style="font-weight:650">'+nf(lidas)+'</td>' +
         '<td class="num">'+nf(a.ticket)+'</td>' +
+        cell(a.outras) +
         cell(a.fora) +
         '<td class="num"><i class="st-dot" style="background:'+dot+';margin-right:7px"></i>'+pct.toFixed(1)+'%</td>' +
-        cell(a.repetidos1min, a.repetidos1min >= 5) + cell(a.repetidos) + cell(a.lojaDiferente, a.lojaDiferente >= 5) + cell(a.recusadas) +
+        cell(a.repetidos1min, a.repetidos1min >= 5) + celulaRepetidos(a, n) + cell(a.lojaDiferente, a.lojaDiferente >= 5) + cell(a.recusadas) +
       '</tr>';
     }).join("") + '</tbody></table></div>' +
     '<div class="adj-why" style="padding-top:12px;line-height:1.6">' +
     '<b>Repetidas em 1 min</b>: o mesmo ticket contado de novo em menos de um minuto — é o que o modo bloquear recusa. ' +
     '<b>Mesmo ticket no dia</b>: nem sempre é erro; se o cliente respondeu de novo, a segunda resposta conta. ' +
+    'Clique no número para ver quais foram e abrir cada um no helpdesk. ' +
     '<b>Loja diferente da caixa</b>: a caixa do Commslayer no endereço dizia outra loja — o agente esqueceu de trocar no widget. ' +
+    '<b>Outras conversas</b>: o agente entrou pela ficha do cliente para fechar outra conversa pendente dele. ' +
+    'Conta como ticket — está dentro de "Num ticket" — e aparece aqui só para se saber quanto do dia é isso. ' +
     '<b>Recusadas</b>: só existe em modo bloquear.</div>';
+
+  [].forEach.call(box.querySelectorAll(".tk-btn"), function(b){
+    b.onclick = function(){ abrirTicketsRepetidos(b.dataset.ag, porAg[b.dataset.ag], r.label); };
+  });
 }
+
+/* A célula de "mesmo ticket no dia": vira botão quando existe a lista dos
+   códigos (Apps Script v13 em diante). */
+function celulaRepetidos(a, nome){
+  if (!a.repetidos) return '<td class="num zero">–</td>';
+  if (!Object.keys(a.reps || {}).length) return '<td class="num">'+nf(a.repetidos)+'</td>';
+  return '<td class="num"><button class="linkish tk-btn" data-ag="'+esc(nome)+'">'+nf(a.repetidos)+'</button></td>';
+}
+
+/** Endereço do ticket no helpdesk, a partir do código gravado pelo contador. */
+function ticketUrl(code){
+  var m = /^cs:(\d+):(\d+):(\d+)$/.exec(code);
+  if (!m) return "";
+  return m[2] === "0"
+    ? "https://app.commslayer.com/app/accounts/"+m[1]+"/conversations/"+m[3]
+    : "https://app.commslayer.com/app/accounts/"+m[1]+"/inbox/"+m[2]+"/conversations/"+m[3];
+}
+
+/** Abre a lista dos tickets que o agente contou mais de uma vez no período. */
+function abrirTicketsRepetidos(nome, a, label){
+  var itens = Object.keys(a.reps||{}).map(function(t){ return { t:t, n:a.reps[t] }; })
+                    .sort(function(x, y){ return y.n - x.n; });
+  $("tkSub").textContent = nome + ", " + label + ". " + itens.length +
+    (itens.length === 1 ? " ticket contado mais de uma vez." : " tickets contados mais de uma vez.");
+  $("tkBox").innerHTML = itens.length ? itens.map(function(i){
+    var url = ticketUrl(i.t);
+    var num = i.t.replace(/^cs:\d+:\d+:/, "#").replace(/^rp:/, "Richpanel #");
+    var fora = /^cs:\d+:0:/.test(i.t) ? '<span class="tk-tag">fora da caixa</span>' : "";
+    return '<div class="tk-row"><div>' +
+      (url ? '<a href="'+url+'" target="_blank" rel="noopener">'+esc(num)+'</a>' : '<span>'+esc(num)+'</span>') +
+      fora + '</div><span class="tk-n">contado '+i.n+'×</span></div>';
+  }).join("") : '<div class="empty" style="padding:22px">Sem os códigos neste período. ' +
+      'Eles passam a vir quando o <b>Apps Script v13</b> estiver implantado.</div>';
+  $("ovTk").classList.add("show");
+}
+
+$("tkClose").onclick = function(){ $("ovTk").classList.remove("show"); };
+$("ovTk").onclick    = function(e){ if (e.target === $("ovTk")) $("ovTk").classList.remove("show"); };
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape" && $("ovTk").classList.contains("show")) $("ovTk").classList.remove("show");
+});
 
 /** Rajadas: mais de N emails do mesmo agente no mesmo minuto. */
 function renderBursts(rows){

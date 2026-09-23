@@ -39,11 +39,14 @@
  *   "cs:CONTA:CAIXA:TICKET" (Commslayer), "rp:TICKET" (Richpanel), "fora" (a janela
  *   da frente nao era um ticket) ou vazio (nao deu para ler). Fica na coluna H da
  *   aba Logs. E so um codigo — nenhum dado de cliente. O getData NAO devolve os
- *   tickets, so um resumo por agente e dia (campo "qualidade").
+ *   tickets, so um resumo por agente e dia (campo "qualidade"). A unica excecao
+ *   sao os tickets contados MAIS DE UMA VEZ no mesmo dia: esses vao na lista
+ *   "repetidosLista", para dar para conferir no helpdesk qual foi.
  *
  *  SITUACAO E TENTATIVAS (v11)
  *   O contador v6 manda tambem a situacao da contagem: ticket | repetido (mesmo
- *   ticket em 1 minuto) | fora | semleitura. Fica na coluna I da aba Logs. Em modo
+ *   ticket em 1 minuto) | fora | semleitura | outra (conversa do cliente aberta
+ *   fora da caixa, pelo perfil dele: conta como ticket e fica marcada). Fica na coluna I da aba Logs. Em modo
  *   bloquear ele manda as recusas com recusado=1: entram na aba "Tentativas" e nao
  *   viram email. O resumo "qualidade" do getData junta as duas abas.
  *   A caixa de entrada do Commslayer (no codigo do ticket) diz a loja de verdade:
@@ -77,7 +80,7 @@ var TZ          = 'America/Sao_Paulo';
 var HEADER      = ['Timestamp', 'Agente', 'Email #', 'Data', 'Hora', 'Dia da Semana', 'Loja', 'Ticket', 'Situacao'];
 var TENT_SHEET  = 'Tentativas';
 var TENT_HEADER = ['Timestamp', 'Agente', 'Data', 'Loja', 'Ticket', 'Situacao'];
-var SITUACOES   = ['ticket', 'repetido', 'fora', 'semleitura'];
+var SITUACOES   = ['ticket', 'repetido', 'fora', 'semleitura', 'outra'];
 /* Caixa de entrada do Commslayer -> loja. Fonte: README do CS Reporting (10/09/2026).
    Old World Healing e Nouveian: preencher quando o usuario mandar o endereco de um ticket. */
 var INBOX_LOJA  = { '26430': 'Vellum', '26575': 'Vigewell', '27261': 'Stratum', '10077': 'Elevare' };
@@ -670,15 +673,20 @@ function getData_(p) {
       var tk = String(dr[7] || '').trim();
       if (tk) {
         var qk = ymd_(dt) + '|' + agente;
-        var q = qual[qk] || (qual[qk] = { ticket: 0, fora: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
+        var q = qual[qk] || (qual[qk] = { ticket: 0, fora: 0, outras: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
         if (tk === 'fora') q.fora++;
         else {
           q.ticket++;
-          if (q.vistos[tk]) q.repetidos++; else q.vistos[tk] = 1;
+          if (q.vistos[tk]) q.repetidos++;
+          q.vistos[tk] = (q.vistos[tk] || 0) + 1;
           var lj = lojaDoTicket_(tk);
           if (lj && lj !== loja) q.lojaDiferente++;
         }
-        if (String(dr[8] || '').trim() === 'repetido') q.repetidos1min++;
+        var sit = String(dr[8] || '').trim();
+        if (sit === 'repetido') q.repetidos1min++;
+        // Fechamento de conversa paralela: ja foi contado como ticket acima;
+        // aqui so fica registrado quantos dos tickets foram desses.
+        if (sit === 'outra') q.outras++;
       }
 
       out.push({
@@ -719,7 +727,7 @@ function getData_(p) {
         var ta = String(tv[ti][1] || '').trim();
         if (!td || !ta) continue;
         var tkk = ymd_(td) + '|' + ta;
-        var tq = qual[tkk] || (qual[tkk] = { ticket: 0, fora: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
+        var tq = qual[tkk] || (qual[tkk] = { ticket: 0, fora: 0, outras: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
         tq.recusadas++;
       }
     }
@@ -728,14 +736,22 @@ function getData_(p) {
   // So entram os dias em que o contador novo ja estava rodando para o agente.
   var qualidade = Object.keys(qual).sort().map(function (k) {
     var p = k.split('|'), q = qual[k];
-    return { data: p[0], agente: p[1], ticket: q.ticket, fora: q.fora, repetidos: q.repetidos,
-             repetidos1min: q.repetidos1min, lojaDiferente: q.lojaDiferente, recusadas: q.recusadas };
+    // Os tickets contados mais de uma vez no dia, para dar para conferir no
+    // helpdesk. E so o codigo (conta, caixa, numero) — nada do cliente. Os
+    // demais tickets continuam sem sair daqui.
+    var reps = [];
+    for (var t in q.vistos) if (q.vistos[t] > 1) reps.push({ t: t, n: q.vistos[t] });
+    reps.sort(function (a, b) { return b.n - a.n; });
+    if (reps.length > 80) reps = reps.slice(0, 80);
+    return { data: p[0], agente: p[1], ticket: q.ticket, fora: q.fora, outras: q.outras,
+             repetidos: q.repetidos, repetidos1min: q.repetidos1min,
+             lojaDiferente: q.lojaDiferente, recusadas: q.recusadas, repetidosLista: reps };
   });
 
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tz: tz, generatedAt: nowStr_(), version: 12
+    tz: tz, generatedAt: nowStr_(), version: 13
   };
 
   if (p.compact) {
