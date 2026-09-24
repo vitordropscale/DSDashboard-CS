@@ -1,7 +1,7 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas)  v12.0
- *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas"
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas)  v14.0
+ *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas"
  * =============================================================
  *
  *  COMO ATUALIZAR
@@ -17,6 +17,8 @@
  *   GET  ?action=ping                    -> teste de saude
  *   GET  ?agente=Vitor&contador=12&loja=Lumvelle&ticket=cs:8172:26430:194230&situacao=ticket  -> grava 1 email (AHK)
  *   GET  ...&recusado=1   -> contador v6 em modo bloquear recusou; vai para a aba Tentativas, nao conta
+ *   GET  ?action=addTarefa&id=..&quem=Vitor&tarefa=Reembolsos&loja=Lumvelle&qtd=37&data=2026-09-24&inicio=09:12&fim=10:20&pausa=10
+ *        -> grava 1 sessao do Contador de Tarefas (aba Tarefas). O mesmo id de novo nao duplica.
  *   POST {action:'setMetas', metas:[{agente,loja,meta},...], desde, base}   (sem senha desde a v9)
  *   POST {action:'delMeta',  agente, loja, desde}                          (sem senha desde a v9)
  *
@@ -59,6 +61,19 @@
  *   (ymd_ / hm_). Isso assume que o fuso do projeto do Apps Script e
  *   America/Sao_Paulo (Configuracoes do projeto > Fuso horario), o mesmo TZ daqui.
  *
+ *  TAREFAS (v14)
+ *   O Contador de Tarefas (widget AHK separado do contador de emails) conta
+ *   tarefas avulsas: o agente digita o nome da tarefa, escolhe a loja e digita
+ *   o horario de inicio; conta +1 por atalho; ao finalizar digita o fim e os
+ *   minutos de pausa. Cada sessao finalizada vira uma linha na aba "Tarefas" e
+ *   volta no getData, no campo "tarefas". O tempo e recalculado na leitura a
+ *   partir de inicio, fim e pausa: corrigir um horario direto na planilha ja
+ *   vale. Fim antes do inicio = a tarefa passou da meia-noite.
+ *   O widget manda o agente em "quem", nunca em "agente": numa implantacao
+ *   antiga, sem a rota addTarefa, um GET com "agente" cairia no gravador de
+ *   emails e viraria um email a mais. Sem "agente", a versao antiga so devolve
+ *   o "usage", e o widget guarda a sessao e tenta de novo mais tarde.
+ *
  *  NOTAS
  *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
  *   sistema, promocao, elogio). Sao lidas junto com getData e entram no report
@@ -89,6 +104,9 @@ var ADJ_HEADER  = ['ID', 'Registrado em', 'Tipo', 'Data', 'Agente', 'De loja', '
 var META_HEADER = ['Agente', 'Meta diaria', 'Vigente a partir de', 'Definida em', 'Base', 'Loja'];
 var NOTA_HEADER = ['ID', 'Registrado em', 'Data', 'Tipo', 'Agente', 'Loja', 'Nota', 'Ativo'];
 var NOTA_TIPOS  = ['nota', 'bom', 'ruim', 'ausencia', 'sistema'];
+var TAREFA_SHEET  = 'Tarefas';
+var TAREFA_HEADER = ['ID', 'Registrado em', 'Agente', 'Data', 'Tarefa', 'Loja', 'Quantidade', 'Inicio', 'Fim', 'Pausa (min)', 'Tempo (min)'];
+var TAREFA_ID_RE  = /^[A-Za-z0-9_.:-]{6,80}$/;
 
 /* ============================================================
    SENHA
@@ -130,6 +148,8 @@ function doGet(e) {
   try {
     if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_() }, p.callback);
     if (p.action === 'getData') return respond_(getData_(p), p.callback);
+    // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
+    if (p.action === 'addTarefa') return respond_(addTarefa_(p), p.callback);
 
     // Fallback por GET (usado se o POST falhar no redirect do Apps Script)
     if (LIVRES.indexOf(p.action) > -1)     return respond_(livre_(p), p.callback);
@@ -155,6 +175,7 @@ function doPost(e) {
     for (var b in body) d[b] = body[b];
 
     if (d.action === 'getData') return respond_(getData_(d), p.callback);
+    if (d.action === 'addTarefa') return respond_(addTarefa_(d), p.callback);
     if (LIVRES.indexOf(d.action) > -1)     return respond_(livre_(d), p.callback);
     if (PROTEGIDAS.indexOf(d.action) > -1) return respond_(protegida_(d), p.callback);
     return respond_(logHit_(d), p.callback);
@@ -640,6 +661,109 @@ function delAdjust_(id) {
 }
 
 /* ============================================================
+   TAREFAS (Contador de Tarefas, v14)
+   ============================================================ */
+
+/**
+ * Minutos entre inicio e fim ([h, m]), menos a pausa. Fim antes do inicio =
+ * passou da meia-noite. Pode dar zero ou negativo; quem chama decide.
+ */
+function minutosTarefa_(ini, fim, pausa) {
+  var a = ini[0] * 60 + ini[1], b = fim[0] * 60 + fim[1];
+  var bruto = b >= a ? b - a : b + 1440 - a;
+  return bruto - (Number(pausa) || 0);
+}
+
+/** Uma sessao finalizada no widget. Reenvio do mesmo id (resposta perdida) nao duplica. */
+function addTarefa_(d) {
+  var id = String(d.id || '').trim();
+  if (!TAREFA_ID_RE.test(id)) return { status: 'error', message: 'ID da sessao invalido.' };
+  var agente = String(d.quem || '').trim();
+  if (!agente) return { status: 'error', message: 'Informe o agente.' };
+  var tarefa = String(d.tarefa || '').replace(/\s+/g, ' ').trim();
+  if (!tarefa) return { status: 'error', message: 'Informe a tarefa.' };
+  if (tarefa.length > 80) tarefa = tarefa.slice(0, 80);
+
+  var qtd = Number(d.qtd);
+  if (String(d.qtd === undefined ? '' : d.qtd).trim() === '' || !isFinite(qtd) || qtd < 0 || qtd !== Math.floor(qtd))
+    return { status: 'error', message: 'Quantidade invalida.' };
+  var dt = parseAny_(d.data);
+  if (!dt) return { status: 'error', message: 'Data invalida.' };
+  var ini = parseTime_(d.inicio), fim = parseTime_(d.fim);
+  if (!ini || !fim) return { status: 'error', message: 'Horario invalido (use HH:mm).' };
+  var pausa = String(d.pausa === undefined || d.pausa === null ? '' : d.pausa).trim() === '' ? 0 : Number(d.pausa);
+  if (!isFinite(pausa) || pausa < 0 || pausa !== Math.floor(pausa)) return { status: 'error', message: 'Pausa invalida.' };
+  var tempo = minutosTarefa_(ini, fim, pausa);
+  if (tempo <= 0) return { status: 'error', message: 'O tempo da tarefa ficou zerado (confira inicio, fim e pausa).' };
+
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (ignore) {}
+  try {
+    var sh = ensureSheet_(TAREFA_SHEET, TAREFA_HEADER);
+    var last = sh.getLastRow();
+    var ids = last > 1 ? sh.getRange(2, 1, last - 1, 1).getDisplayValues() : [];
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === id) return { status: 'ok', tarefa: true, id: id, duplicado: true };
+    }
+    sh.appendRow([
+      id,
+      Utilities.formatDate(new Date(), TZ, 'dd/MM/yyyy HH:mm:ss'),
+      agente,
+      ymd_(dt),
+      tarefa,
+      String(d.loja || '').trim() || 'Sem loja',
+      qtd,
+      pad2_(ini[0]) + ':' + pad2_(ini[1]),
+      pad2_(fim[0]) + ':' + pad2_(fim[1]),
+      pausa,
+      tempo
+    ]);
+    return { status: 'ok', tarefa: true, id: id, tempo: tempo };
+  } finally {
+    try { lock.releaseLock(); } catch (ignore) {}
+  }
+}
+
+/** Sessoes da aba Tarefas a partir de `desde` ("yyyy-MM-dd"; vazio = todas). */
+function listTarefas_(desde) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TAREFA_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, TAREFA_HEADER.length).getDisplayValues();
+  var num = function (x) { return Number(String(x || '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0; };
+  var out = [];
+  for (var i = 0; i < v.length; i++) {
+    var r = v[i];
+    var dt = parseAny_(r[3]);
+    var agente = String(r[2] || '').trim(), tarefa = String(r[4] || '').trim();
+    if (!dt || !agente || !tarefa) continue;
+    var data = ymd_(dt);
+    if (desde && data < desde) continue;
+    var ini = parseTime_(r[7]), fim = parseTime_(r[8]);
+    var pausa = num(r[9]);
+    // os horarios mandam; a coluna "Tempo" so vale se eles estiverem ilegiveis
+    var min = ini && fim ? minutosTarefa_(ini, fim, pausa) : 0;
+    if (min <= 0) min = num(r[10]);
+    out.push({
+      id:      String(r[0] || ''),
+      data:    data,
+      agente:  agente,
+      tarefa:  tarefa,
+      loja:    String(r[5] || '').trim(),
+      qtd:     Math.max(0, Math.round(num(r[6]))),
+      inicio:  ini ? pad2_(ini[0]) + ':' + pad2_(ini[1]) : '',
+      fim:     fim ? pad2_(fim[0]) + ':' + pad2_(fim[1]) : '',
+      pausa:   pausa,
+      minutos: min
+    });
+  }
+  out.sort(function (a, b) {
+    var ka = a.data + a.inicio, kb = b.data + b.inicio;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+  return out;
+}
+
+/* ============================================================
    LEITURA (API do dashboard)
    ============================================================ */
 
@@ -717,6 +841,13 @@ function getData_(p) {
   var notas = [];
   try { notas = listNotas_(); } catch (eN) {}
 
+  // sessoes do Contador de Tarefas (v14), na mesma janela do "since"
+  var tarefas = [];
+  try {
+    var sinceT = p.since ? parseAny_(p.since) : null;
+    tarefas = listTarefas_(sinceT ? ymd_(sinceT) : '');
+  } catch (eTa) {}
+
   // recusas do modo bloquear (aba Tentativas) entram no mesmo resumo
   try {
     var ts = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TENT_SHEET);
@@ -751,7 +882,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tz: tz, generatedAt: nowStr_(), version: 13
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 14
   };
 
   if (p.compact) {
@@ -941,6 +1072,7 @@ function testarLeitura() {
   Logger.log('Metas (total por agente): %s', JSON.stringify(r.metas));
   Logger.log('Metas com loja: %s', JSON.stringify(r.metasHist));
   Logger.log('Notas: %s', (r.notas || []).length);
+  Logger.log('Sessoes de tarefas: %s', (r.tarefas || []).length);
   if (r.total) {
     Logger.log('Primeira: %s', JSON.stringify(r.rows[0]));
     Logger.log('Ultima:   %s', JSON.stringify(r.rows[r.total - 1]));

@@ -11,7 +11,7 @@ Página estática, sem build, publicada pelo GitHub Pages.
 Script AHK (máquina do agente)
         │  HTTP GET  ?agente=&contador=&loja=&ticket=
         ▼
-Google Apps Script  ──►  Google Sheets (abas Logs / Ajustes / Metas)
+Google Apps Script  ──►  Google Sheets (abas Logs / Ajustes / Metas / Tarefas)
         │  GET ?action=getData
         ▼
 index.html (GitHub Pages)
@@ -20,6 +20,15 @@ index.html (GitHub Pages)
 Um script AutoHotkey roda na máquina de cada agente e conta os e-mails respondidos.
 Cada contagem vira uma linha na planilha. O dashboard lê a API e calcula tudo no
 navegador — não há servidor nem build.
+
+Um segundo widget, o **Contador de Tarefas** (`ContadorTarefas.ahk`, na pasta de cada
+agente), conta tarefas avulsas: o agente digita o nome da tarefa, escolhe a loja e digita
+o horário de início; conta +1 com Ctrl+Espaço (só com tarefa aberta); ao finalizar digita
+o fim e os minutos de pausa. Cada tarefa finalizada vira uma linha na aba **Tarefas**
+(`?action=addTarefa`, Apps Script v14) e aparece na tela **Tarefas** do painel. O widget
+manda o agente em `quem`, nunca em `agente`: numa implantação antiga, `agente` cairia no
+gravador de e-mails. Sem a v14, a tarefa fica na fila da máquina (`pendentes.txt`) e vai
+sozinha depois; o mesmo id não é gravado duas vezes.
 
 ## Arquivos
 

@@ -125,6 +125,10 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 input[type=date]{padding:8px 12px;border-radius:var(--pill);border:1px solid var(--line);background:var(--side);
   color:var(--text);font-size:12.5px;color-scheme:dark}
 th .sw{margin-right:7px;vertical-align:1px}
+td .sw{margin-right:8px;vertical-align:1px}
+#tarResumo td.num,#tarSessoes td.num{white-space:nowrap}
+.tar-ag{display:inline-flex;align-items:center;gap:6px;margin-right:12px;white-space:nowrap;color:var(--text2)}
+.tar-ag i{width:3px;height:12px;border-radius:2px;flex:none}
 
 /* ---------- banner ---------- */
 .banner{display:none;gap:13px;align-items:flex-start;padding:16px 20px;border-radius:var(--r);
@@ -467,6 +471,9 @@ textarea.inp{resize:vertical;line-height:1.55}
     <button data-view="qualidade">
       <svg class="ic" viewBox="0 0 24 24"><path d="M12 3.5 19.5 6v6c0 4.2-3 7.2-7.5 8.5C7.5 19.2 4.5 16.2 4.5 12V6z"/><path d="m9 12 2.2 2.2L15.2 10"/></svg>
       <span>Qualidade</span></button>
+    <button data-view="tarefas">
+      <svg class="ic" viewBox="0 0 24 24"><path d="m4.5 7.6 1.8 1.8 3.2-3.3"/><path d="M12.5 8h7"/><path d="m4.5 15.6 1.8 1.8 3.2-3.3"/><path d="M12.5 16h7"/></svg>
+      <span>Tarefas</span></button>
   </nav>
 
   <div class="side-lab">Ações</div>
@@ -721,6 +728,26 @@ textarea.inp{resize:vertical;line-height:1.55}
         </div>
       </div>
       <div id="burstBox"></div>
+    </div>
+  </section>
+
+  <!-- ===================== TAREFAS ===================== -->
+  <section class="view" data-view="tarefas">
+
+    <div class="card">
+      <div class="card-h">
+        <div><div class="card-t">Por tarefa</div>
+        <div class="card-sub" id="tarSub">&nbsp;</div></div>
+      </div>
+      <div id="tarResumo"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <div><div class="card-t">Sessões</div>
+        <div class="card-sub" id="tarSessSub">&nbsp;</div></div>
+      </div>
+      <div id="tarSessoes"></div>
     </div>
   </section>
 
@@ -1042,6 +1069,7 @@ var META_IDX   = {};  // {"agente|loja": [{desde, meta}, ...]} ordenado por desd
 var NOTAS = [];       // [{id, data, tipo, agente, loja, texto}]
 var NOTAS_DIA = {};
 var QUALIDADE = [];  // [{data, agente, ticket, fora, repetidos}] — resumo do Apps Script v10   // {"yyyy-MM-dd": [nota, ...]}
+var TAREFAS = [];    // sessões do Contador de Tarefas (Apps Script v14) — ver normalizeTarefas
 var API_VERSION = 0;  // versao do Apps Script implantado (metas por loja e notas: 8+)
 var LAST_WRITE  = 0;  // instante da ultima gravacao iniciada ou confirmada (ver loadData)
 var LOADED_SINCE = null;  // primeiro dia carregado ("yyyy-MM-dd"); null = base inteira
@@ -1217,6 +1245,30 @@ function normalizeNotas(raw){
   return out;
 }
 
+/** Sessões do Contador de Tarefas: descarta o que não tem dia, agente ou tarefa. */
+function normalizeTarefas(raw){
+  if (Object.prototype.toString.call(raw) !== "[object Array]") return [];
+  var out = [];
+  raw.forEach(function(t){
+    if (!t) return;
+    var day = parseDay(t.data), agente = String(t.agente || "").trim(), nome = String(t.tarefa || "").trim();
+    if (!day || !agente || !nome || TEST_AGENTS.indexOf(agente) > -1) return;
+    out.push({
+      id: String(t.id || ""), day: day, agente: agente, tarefa: nome, chave: chaveTarefa(nome),
+      loja: canonStore(t.loja), qtd: Math.max(0, Math.round(+t.qtd || 0)),
+      inicio: parseHM(t.inicio) || "", fim: parseHM(t.fim) || "",
+      pausa: Math.max(0, +t.pausa || 0), min: Math.max(0, +t.minutos || 0)
+    });
+  });
+  return out;
+}
+
+/* O nome da tarefa é digitado livre no widget: "Reembolsos", "reembolsos " e
+   "Reembolsós" caem na mesma linha do resumo. */
+function chaveTarefa(s){
+  return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+}
+
 /** Devolve "yyyy-MM-dd" a partir de vários formatos, ou null. */
 function parseDay(v){
   if (v === null || v === undefined) return null;
@@ -1339,6 +1391,7 @@ function loadData(manual){
       METAS_HIST = Array.isArray(payload.metasHist) ? payload.metasHist : [];
       NOTAS = normalizeNotas(payload.notas);
       QUALIDADE = Array.isArray(payload.qualidade) ? payload.qualidade : [];
+      TAREFAS = normalizeTarefas(payload.tarefas);
       API_VERSION = Number(payload.version) || 0;
       indexMetas(); indexNotas();
       LAST_OK = new Date();
@@ -1405,6 +1458,7 @@ function loadCache(){
     METAS_HIST = Array.isArray(c.payload.metasHist) ? c.payload.metasHist : [];
     NOTAS = normalizeNotas(c.payload.notas);
     QUALIDADE = Array.isArray(c.payload.qualidade) ? c.payload.qualidade : [];
+    TAREFAS = normalizeTarefas(c.payload.tarefas);
     API_VERSION = Number(c.payload.version) || 0;
     indexMetas(); indexNotas();
     LAST_OK = new Date(c.at);
@@ -1562,6 +1616,7 @@ function render(){
   renderProd(rows);
   renderBursts(rows);
   renderQualidade(r);
+  renderTarefas(r);
   renderTable(A, rows);
   renderAgentCharts(A, rows);
 
@@ -1865,6 +1920,114 @@ function renderQualidade(r){
   [].forEach.call(box.querySelectorAll(".tk-btn"), function(b){
     b.onclick = function(){ abrirTicketsRepetidos(b.dataset.ag, porAg[b.dataset.ag], r.label); };
   });
+}
+
+/**
+ * Contador de Tarefas (widget à parte do contador de emails). Cada sessão é uma
+ * tarefa avulsa: o agente digita o nome, escolhe a loja e digita o início; conta
+ * com Ctrl+Espaço; ao finalizar digita o fim e a pausa. O tempo já vem líquido
+ * (sem a pausa) do Apps Script v14. Respeita o período, a loja e os agentes do filtro.
+ */
+function renderTarefas(r){
+  var lista = TAREFAS.filter(function(t){
+    if (t.day < r.from || t.day > r.to) return false;
+    if (state.store !== "__all" && t.loja !== state.store) return false;
+    return !state.agents[t.agente];
+  });
+  var onde = r.label + ", " + (state.store === "__all" ? "todas as lojas" : state.store);
+  $("tarSub").textContent = onde;
+  $("tarSessSub").textContent = onde;
+
+  if (!lista.length){
+    $("tarResumo").innerHTML = '<div class="empty" style="padding:30px">' + (API_VERSION && API_VERSION < 14
+      ? 'O Apps Script publicado ainda é a versão ' + API_VERSION + '. Cole o <b>AppsScript.gs</b> novo no editor ' +
+        'da planilha e reimplante (Implantar › Gerenciar implantações › Nova versão, em todas as implantações). ' +
+        'Até lá o widget guarda as tarefas finalizadas e manda sozinho depois.'
+      : 'Nenhuma tarefa finalizada neste período. Elas aparecem aqui quando o agente finaliza ' +
+        'uma tarefa no <b>Contador de Tarefas</b>.') + '</div>';
+    $("tarSessoes").innerHTML = '<div class="empty" style="padding:30px">Sem sessões no período.</div>';
+    return;
+  }
+
+  var th = function(t, num){ return '<th' + (num ? ' class="num"' : '') + ' style="cursor:default">' + t + '</th>'; };
+
+  // resumo por tarefa; o nome mostrado é a grafia mais usada
+  var grupos = {};
+  lista.forEach(function(t){
+    var g = grupos[t.chave] || (grupos[t.chave] = { nomes:{}, sessoes:0, qtd:0, min:0, agentes:{} });
+    g.nomes[t.tarefa] = (g.nomes[t.tarefa] || 0) + 1;
+    g.sessoes++; g.qtd += t.qtd; g.min += t.min; g.agentes[t.agente] = 1;
+  });
+  var linhas = Object.keys(grupos).map(function(k){
+    var g = grupos[k];
+    var nome = Object.keys(g.nomes).sort(function(a, b){ return g.nomes[b] - g.nomes[a] || (a < b ? -1 : 1); })[0];
+    return { nome:nome, g:g };
+  }).sort(function(a, b){ return b.g.qtd - a.g.qtd; });
+
+  $("tarResumo").innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
+    th("Tarefa") + th("Sessões", 1) + th("Feitas", 1) + th("Tempo", 1) + th("Por tarefa", 1) + th("Por hora", 1) + th("Agentes") +
+    '</tr></thead><tbody>' + linhas.map(function(l){
+      var g = l.g;
+      return '<tr><td style="font-weight:600">' + esc(l.nome) + '</td>' +
+        '<td class="num">' + nf(g.sessoes) + '</td>' +
+        '<td class="num" style="font-weight:650">' + nf(g.qtd) + '</td>' +
+        '<td class="num">' + fmtDur(g.min) + '</td>' +
+        '<td class="num">' + porTarefa(g.min, g.qtd) + '</td>' +
+        '<td class="num">' + porHora(g.min, g.qtd) + '</td>' +
+        '<td>' + agentesTarefa(Object.keys(g.agentes)) + '</td></tr>';
+    }).join("") + '</tbody></table></div>' +
+    '<div class="adj-why" style="padding-top:12px;line-height:1.6">' +
+    '<b>Tempo</b>: do início ao fim digitados, menos a pausa. <b>Por tarefa</b>: tempo dividido pelas feitas. ' +
+    'Nomes escritos com maiúscula, acento ou espaço diferentes contam como a mesma tarefa.</div>';
+
+  // sessões, da mais recente para a mais antiga
+  var sess = lista.slice().sort(function(a, b){
+    var ka = a.day + a.inicio, kb = b.day + b.inicio;
+    return ka < kb ? 1 : ka > kb ? -1 : 0;
+  });
+  $("tarSessSub").textContent = onde + ", " + nf(sess.length) + (sess.length === 1 ? " sessão" : " sessões");
+  $("tarSessoes").innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
+    th("Dia") + th("Agente") + th("Tarefa") + th("Loja") + th("Feitas", 1) + th("Início", 1) + th("Fim", 1) +
+    th("Pausa", 1) + th("Tempo", 1) + th("Por tarefa", 1) +
+    '</tr></thead><tbody>' + sess.map(function(t){
+      return '<tr>' +
+        '<td style="white-space:nowrap">' + brDate(t.day) + ' <span class="zero">' + WD[dowOf(t.day)] + '</span></td>' +
+        '<td><div class="ag"><span class="av" style="background:' + agColor(t.agente) + '"></span>' + esc(t.agente) + '</div></td>' +
+        '<td>' + esc(t.tarefa) + '</td>' +
+        '<td style="white-space:nowrap"><i class="sw" style="background:' + (STORE_COLOR[t.loja] || THEME.muted) + '"></i>' + esc(t.loja) + '</td>' +
+        '<td class="num" style="font-weight:650">' + nf(t.qtd) + '</td>' +
+        '<td class="num">' + (t.inicio || '<span class="zero">–</span>') + '</td>' +
+        '<td class="num">' + (t.fim || '<span class="zero">–</span>') + '</td>' +
+        (t.pausa ? '<td class="num">' + nf(t.pausa) + ' min</td>' : '<td class="num zero">–</td>') +
+        '<td class="num">' + fmtDur(t.min) + '</td>' +
+        '<td class="num">' + porTarefa(t.min, t.qtd) + '</td>' +
+      '</tr>';
+    }).join("") + '</tbody></table></div>';
+}
+
+/* Mesmos formatos do widget: 45 -> "45 min", 68 -> "1h 08", 120 -> "2h". */
+function fmtDur(min){
+  min = Math.round(min || 0);
+  if (min < 60) return min + " min";
+  var h = Math.floor(min / 60), m = min % 60;
+  return h + "h" + (m ? " " + pad(m) : "");
+}
+/* Tempo médio de cada tarefa: "45 s", "1 min 50 s". */
+function porTarefa(min, qtd){
+  if (!qtd || !min) return '<span class="zero">–</span>';
+  var s = Math.round(min * 60 / qtd);
+  if (s < 60) return s + " s";
+  var m = Math.floor(s / 60), r = s % 60;
+  return m + " min" + (r ? " " + r + " s" : "");
+}
+function porHora(min, qtd){
+  if (!qtd || !min) return '<span class="zero">–</span>';
+  return (qtd / (min / 60)).toLocaleString("pt-BR", { maximumFractionDigits:1 });
+}
+function agentesTarefa(nomes){
+  return nomes.sort().map(function(a){
+    return '<span class="tar-ag"><i style="background:' + agColor(a) + '"></i>' + esc(a) + '</span>';
+  }).join("");
 }
 
 /* A célula de "mesmo ticket no dia": vira botão quando existe a lista dos
@@ -3610,7 +3773,7 @@ document.addEventListener("visibilitychange", function(){
 /* =============================================================================
    TELAS — o menu lateral escolhe qual bloco de cartoes aparece
    ========================================================================== */
-var VIEWS = { geral:"Visão geral", metas:"Metas", horarios:"Horários", agentes:"Agentes", qualidade:"Qualidade" };
+var VIEWS = { geral:"Visão geral", metas:"Metas", horarios:"Horários", agentes:"Agentes", qualidade:"Qualidade", tarefas:"Tarefas" };
 
 function setView(v){
   if (!VIEWS[v]) v = "geral";
