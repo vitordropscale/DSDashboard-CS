@@ -98,7 +98,10 @@ aparece "Primeiro acesso", que pede a senha do Apps Script (`ADMIN_TOKEN`). Alte
 
 **Trustpilot**: os reviews vêm da aba **Reviews** da planilha do Review Desk. O ID dessa
 planilha fica na propriedade do script `REVIEWS_SHEET_ID` (Configurações do projeto ›
-Propriedades do script). Sem ela, o painel mostra o aviso no lugar dos reviews.
+Propriedades do script). Sem ela, o painel mostra o aviso no lugar dos reviews. Depois de
+criar a propriedade, rode `testarReviews()` uma vez no editor: ler outra planilha pede uma
+autorização nova do Google, e a função confere o ID e conta os reviews. Se a leitura falhar,
+o painel mostra o motivo ao admin.
 
 **As duas implantações vão juntas para a v15.** O `getData` existe na implantação do
 painel e na dos contadores (a URL que está nos `.ahk`). Se a dos contadores ficar numa

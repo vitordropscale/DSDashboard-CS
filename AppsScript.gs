@@ -1091,6 +1091,7 @@ function getDataAuth_(p) {
   base.usuario = u;
   base.reviews = listReviews_();
   base.reviewsOk = !!PropertiesService.getScriptProperties().getProperty('REVIEWS_SHEET_ID');
+  base.reviewsErro = REVIEWS_ERRO_;
   return base;
 }
 
@@ -1108,11 +1109,30 @@ function restringe_(base, u, compact) {
   base.skipped = 0;
 }
 
+var REVIEWS_ERRO_ = '';   // motivo da ultima falha ao ler o Review Desk (vai para o painel)
+
+/**
+ * Rode UMA VEZ no editor depois de criar a propriedade REVIEWS_SHEET_ID. Ler outra
+ * planilha pede uma autorizacao nova do Google; sem ela, o painel mostra o erro no
+ * lugar dos reviews. No fim, o log diz quantos reviews achou.
+ */
+function testarReviews() {
+  var id = PropertiesService.getScriptProperties().getProperty('REVIEWS_SHEET_ID');
+  if (!id) throw new Error('Crie a propriedade REVIEWS_SHEET_ID com o ID da planilha do Review Desk.');
+  var sh = SpreadsheetApp.openById(id).getSheetByName('Reviews');
+  if (!sh) throw new Error('A planilha ' + id + ' nao tem a aba "Reviews".');
+  try { CacheService.getScriptCache().remove('reviews'); } catch (eC) {}
+  var n = listReviews_().length;
+  if (REVIEWS_ERRO_) throw new Error(REVIEWS_ERRO_);
+  Logger.log('Tudo certo: ' + n + ' reviews encontrados na aba Reviews.');
+}
+
 /**
  * Reviews do Trustpilot: aba "Reviews" da planilha do Review Desk (propriedade
  * REVIEWS_SHEET_ID). So os campos do painel; cache de 2 minutos.
  */
 function listReviews_() {
+  REVIEWS_ERRO_ = '';
   var id = PropertiesService.getScriptProperties().getProperty('REVIEWS_SHEET_ID');
   if (!id) return [];
   var cache = null;
@@ -1120,7 +1140,8 @@ function listReviews_() {
   var out = [];
   try {
     var sh = SpreadsheetApp.openById(id).getSheetByName('Reviews');
-    if (sh && sh.getLastRow() >= 2) {
+    if (!sh) { REVIEWS_ERRO_ = 'a planilha do Review Desk nao tem a aba "Reviews"'; return []; }
+    if (sh.getLastRow() >= 2) {
       var h = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0].map(function (x) { return String(x).trim().toLowerCase(); });
       var col = function (n) { return h.indexOf(n); };
       var v = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getDisplayValues();
@@ -1141,6 +1162,7 @@ function listReviews_() {
       }
     }
   } catch (e) {
+    REVIEWS_ERRO_ = String((e && e.message) || e);
     return [];
   }
   try { cache && cache.put('reviews', JSON.stringify(out), 120); } catch (eP) {}
