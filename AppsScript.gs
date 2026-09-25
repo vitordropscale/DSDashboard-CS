@@ -1,7 +1,7 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos)  v15.0
- *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes"
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v16.0
+ *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
  *  COMO ATUALIZAR
@@ -21,12 +21,23 @@
  *   Primeiro admin: rode criarAdmin() no editor OU, na tela de login, "Primeiro
  *   acesso" com a senha do Apps Script (ADMIN_TOKEN). So funciona enquanto nao
  *   existe nenhum usuario.
- *   Reviews: le pela API do proprio Review Desk (propriedades REVIEWS_API_URL e
- *   REVIEWS_SECRET, as mesmas do site dele), servidor a servidor: a senha fica so
- *   nas Propriedades do script, nunca no navegador nem no repositorio. Alternativa:
- *   REVIEWS_SHEET_ID le a aba Reviews direto (precisa de acesso a planilha). Sem
- *   nenhuma das duas, o campo "reviews" volta vazio e o painel avisa. Depois de
- *   configurar, rode testarReviews() uma vez no editor (pede a autorizacao nova).
+ *
+ *  REVIEWS DO TRUSTPILOT (v16)
+ *   Os reviews moram na aba "Reviews" desta planilha e sao cadastrados pelo painel
+ *   por quem tem login (admin ou agente). Link do review obrigatorio (so link de
+ *   review do Trustpilot, /reviews/...), o mesmo review nao entra duas vezes.
+ *   Status: Investigando, Contatado, Follow up, Resolvendo, Resolvido. "Status desde",
+ *   "Contatado em" e "Follow up em" sao gravados sozinhos na troca de status; o
+ *   painel lista em Follow up quem esta Contatado (ou em Follow up) ha mais de
+ *   FOLLOW_UP_DIAS dias sem resposta. Excluir e so para admin.
+ *   Na primeira leitura a aba e criada e recebe tudo o que estava no Review Desk
+ *   (propriedades REVIEWS_API_URL + REVIEWS_SECRET, ou REVIEWS_SHEET_ID). Depois
+ *   disso o Review Desk so e lido quando o admin pede "Trazer do Review Desk"
+ *   (acrescenta o que faltar, pelo ID). testarReviews() no editor confere a conexao.
+ *   POST {action:'addReview', token, link, data, loja, nota, status, responsavel, risco, notas, ticket}
+ *   POST {action:'updateReview', token, id, versao, [campos acima] | followUp:true}
+ *   POST {action:'delReview', token, id}          (admin)
+ *   POST {action:'importReviews', token}          (admin)
  *   POST {action:'login', email, senha}                 -> {token, usuario}
  *   POST {action:'logout', token}
  *   POST {action:'me', token}                           -> {usuario}
@@ -35,7 +46,7 @@
  *   POST {action:'saveUser', token, email, nome, papel, agente, ativo [, senha]}  (admin)
  *
  *  ENDPOINTS DE LEITURA
- *   GET  ?action=getData&token=SESSAO    -> {status,total,rows,ajustes,metas,metasHist,notas,reviews,usuario}
+ *   GET  ?action=getData&token=SESSAO    -> {status,total,rows,ajustes,metas,metasHist,notas,reviews,usuario,followUpDias,equipeNomes}
  *   GET  ?action=getData&compact=1       -> payload ~5x menor
  *   GET  ?action=getData&callback=fn     -> JSONP
  *   GET  ?action=ping                    -> teste de saude
@@ -45,6 +56,11 @@
  *        -> grava 1 sessao do Contador de Tarefas (aba Tarefas). O mesmo id de novo nao duplica.
  *   POST {action:'setMetas', metas:[{agente,loja,meta},...], desde, base}   (sem senha desde a v9)
  *   POST {action:'delMeta',  agente, loja, desde}                          (sem senha desde a v9)
+ *
+ *  PEDIDO SEM ACAO CONHECIDA (v16)
+ *   So vira contagem o pedido sem "action" que traz agente ou contador (o widget).
+ *   Qualquer outra acao desconhecida volta erro e NAO grava nada: antes, um pedido
+ *   que nao era para este script virava uma linha falsa na aba Logs.
  *
  *  ENDPOINTS PROTEGIDOS (token de sessao de admin, ou a senha ADMIN_TOKEN)
  *   POST {action:'setMetas' | 'delMeta', token, ...}   (voltaram a ser protegidos na v15)
@@ -138,6 +154,14 @@ var SESS_SHEET    = 'Sessoes';
 var SESS_HEADER   = ['Token', 'Email', 'Criado em', 'Expira em'];
 var SESSAO_HORAS  = 14;
 var PAPEIS        = ['admin', 'agente'];
+var REVIEW_SHEET  = 'Reviews';
+var REVIEW_HEADER = ['ID', 'Criado em', 'Atualizado em', 'Criado por', 'Atualizado por', 'Data do review', 'Loja', 'Nota',
+                     'Status', 'Responsavel', 'Risco', 'Notas', 'Link do review', 'Ticket', 'Status desde',
+                     'Contatado em', 'Follow up em', 'Follow ups', 'Origem'];
+var RV = { id: 0, criado: 1, atualizado: 2, criadoPor: 3, atualizadoPor: 4, data: 5, loja: 6, nota: 7, status: 8,
+           resp: 9, risco: 10, notas: 11, link: 12, ticket: 13, desde: 14, contatado: 15, followEm: 16, follows: 17, origem: 18 };
+var REVIEW_STATUS = ['Investigando', 'Contatado', 'Follow up', 'Resolvendo', 'Resolvido'];
+var FOLLOW_UP_DIAS = 3;   // contatado ha mais de 3 dias sem resposta -> lista de follow up
 
 /* ============================================================
    SENHA
@@ -200,11 +224,12 @@ function adminTokenOk_(t) {
 var PROTEGIDAS = ['listAdjust', 'addAdjust', 'delAdjust', 'addNota', 'delNota', 'setMetas', 'delMeta', 'listUsers', 'saveUser'];
 var LIVRES     = [];   // metas voltaram a exigir admin na v15 (agentes nao podem ve-las)
 var ACESSO     = ['login', 'logout', 'me', 'setupAdmin'];
+var REVIEW_ACOES = ['addReview', 'updateReview', 'delReview', 'importReviews'];
 
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 15 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 16 }, p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
     // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
@@ -213,6 +238,9 @@ function doGet(e) {
     // Fallback por GET (usado se o POST falhar no redirect do Apps Script)
     if (LIVRES.indexOf(p.action) > -1)     return respond_(livre_(p), p.callback);
     if (PROTEGIDAS.indexOf(p.action) > -1) return respond_(protegida_(p), p.callback);
+    if (REVIEW_ACOES.indexOf(p.action) > -1) return respond_(reviewAcao_(p), p.callback);
+    // acao que este script nao conhece: erro, e nada vira contagem
+    if (p.action) return respond_({ status: 'error', message: 'Acao desconhecida: ' + String(p.action).slice(0, 40) }, p.callback);
 
     // O AHK grava via GET simples: ?agente=X&contador=N&loja=Y
     if (p.agente || p.contador) return respond_(logHit_(p), p.callback);
@@ -238,6 +266,11 @@ function doPost(e) {
     if (d.action === 'addTarefa') return respond_(addTarefa_(d), p.callback);
     if (LIVRES.indexOf(d.action) > -1)     return respond_(livre_(d), p.callback);
     if (PROTEGIDAS.indexOf(d.action) > -1) return respond_(protegida_(d), p.callback);
+    if (REVIEW_ACOES.indexOf(d.action) > -1) return respond_(reviewAcao_(d), p.callback);
+    // So vira contagem o pedido do widget (sem acao, com agente ou contador). Antes,
+    // qualquer POST desconhecido virava uma linha falsa na aba Logs.
+    if (d.action) return respond_({ status: 'error', message: 'Acao desconhecida: ' + String(d.action).slice(0, 40) }, p.callback);
+    if (!(d.agente || d.contador)) return respond_({ status: 'error', message: 'Pedido sem agente: nada foi gravado.' }, p.callback);
     return respond_(logHit_(d), p.callback);
   } catch (err2) {
     return respond_({ status: 'error', message: String((err2 && err2.message) || err2) }, p.callback);
@@ -1093,8 +1126,11 @@ function getDataAuth_(p) {
   if (u.papel !== 'admin') restringe_(base, u, !!p.compact);
   base.usuario = u;
   base.reviews = listReviews_();
-  base.reviewsOk = !!fonteReviews_();
-  base.reviewsErro = REVIEWS_ERRO_;
+  base.reviewsOk = true;
+  // falha da importacao do Review Desk: so o admin ve (e so ele pode tentar de novo)
+  base.reviewsErro = u.papel === 'admin' ? (PropertiesService.getScriptProperties().getProperty('REVIEWS_IMPORT_ERRO') || '') : '';
+  base.followUpDias = FOLLOW_UP_DIAS;
+  base.equipeNomes = nomesEquipe_();
   return base;
 }
 
@@ -1112,13 +1148,239 @@ function restringe_(base, u, compact) {
   base.skipped = 0;
 }
 
-var REVIEWS_ERRO_ = '';   // motivo da ultima falha ao ler o Review Desk (vai para o painel)
+/* ============================================================
+   REVIEWS DO TRUSTPILOT (v16): aba Reviews, cadastro pelo painel, follow up
+   ============================================================ */
+
+/** Nomes da equipe para o campo Responsavel (so nomes: nada de e-mail ou papel). */
+function nomesEquipe_() {
+  var vistos = {}, out = [];
+  readUsers_().forEach(function (u) {
+    var n = String(u.agente || u.nome || '').trim();
+    if (u.ativo && n && !vistos[n.toLowerCase()]) { vistos[n.toLowerCase()] = true; out.push(n); }
+  });
+  return out.sort();
+}
+
+/** Carimbo com milissegundos: e a versao do review (duas edicoes no mesmo segundo nao se confundem). */
+function isoMs_(d) { return iso_(d) + "." + ("00" + d.getMilliseconds()).slice(-3); }
+
+function limpa_(v, max) { return String(v === null || v === undefined ? '' : v).trim().slice(0, max); }
+function simNao_(v) { var t = String(v === undefined || v === null ? '' : v).trim().toUpperCase(); return (v === true || t === 'TRUE' || t === 'SIM' || t === '1') ? 'SIM' : 'NAO'; }
 
 /**
- * De onde vem os reviews. Preferencia: API do Review Desk (REVIEWS_API_URL +
- * REVIEWS_SECRET, os mesmos valores do CONFIG do site dele). Alternativa:
- * REVIEWS_SHEET_ID, lendo a aba Reviews direto.
+ * Link de um review do Trustpilot: www, pais (br., uk.) ou o app Business, sempre
+ * com /reviews/ (o link do review em si, nao o da pagina da loja). Devolve o link
+ * limpo (sem ?query e sem barra no fim) ou '' se nao for um.
  */
+function linkTrustpilot_(v) {
+  var m = String(v || '').trim().match(/^https?:[/][/]([^/?#]+)([/][^?#]*)?/i);
+  if (!m) return '';
+  var host = m[1].toLowerCase(), caminho = m[2] || '';
+  if (!(host === 'trustpilot.com' || host.slice(-15) === '.trustpilot.com')) return '';
+  if (caminho.toLowerCase().indexOf('/reviews/') !== 0 || caminho.length < 12) return '';
+  return 'https://' + host + caminho.replace(/[/]+$/, '');
+}
+/** Chave para achar o mesmo review escrito de outro jeito (outro dominio, ?query, maiusculas). */
+function chaveLink_(v) {
+  var m = String(v || '').trim().match(/^https?:[/][/]([^/?#]+)([/][^?#]*)?/i);
+  if (m && /trustpilot[.]com$/i.test(m[1])) return (m[2] || '').toLowerCase().replace(/[/]+$/, '');
+  return String(v || '').trim().toLowerCase();
+}
+
+/** A aba Reviews; na primeira vez cria e traz o que ja existia no Review Desk. */
+function garantirAbaReviews_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REVIEW_SHEET);
+  if (sh) return sh;
+  return comLock_(function () {
+    var sh2 = ss.getSheetByName(REVIEW_SHEET);   // outra execucao pode ter criado enquanto esperava
+    if (sh2) return sh2;
+    sh2 = ensureSheet_(REVIEW_SHEET, REVIEW_HEADER);
+    importarReviewDesk_();
+    return sh2;
+  });
+}
+
+function linhasReviews_(sh) {
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, REVIEW_HEADER.length).getDisplayValues();
+}
+
+/** Uma linha da aba no formato do painel. */
+function reviewObj_(r) {
+  var tk = String(r[RV.ticket] || '');
+  return {
+    id: String(r[RV.id]), created_at: String(r[RV.criado]), updated_at: String(r[RV.atualizado]),
+    created_by: String(r[RV.criadoPor]), updated_by: String(r[RV.atualizadoPor]),
+    date: String(r[RV.data]), store: String(r[RV.loja]), stars: Number(r[RV.nota]) || 0,
+    status: String(r[RV.status]), owner: String(r[RV.resp]), risk: String(r[RV.risco]).toUpperCase() === 'SIM',
+    notes: String(r[RV.notas]), review_link: String(r[RV.link]), ticket: tk,
+    ticket_link: /^https?:[/][/]/i.test(tk) ? tk : '',   // painel antigo (v15) so entende link
+    status_since: String(r[RV.desde]), contacted_at: String(r[RV.contatado]),
+    follow_up_at: String(r[RV.followEm]), follow_ups: Number(r[RV.follows]) || 0, origin: String(r[RV.origem])
+  };
+}
+
+function listReviews_() {
+  var v = linhasReviews_(garantirAbaReviews_());
+  var out = [];
+  for (var i = 0; i < v.length; i++) if (String(v[i][RV.id]).trim()) out.push(reviewObj_(v[i]));
+  return out;
+}
+
+/** Confere e normaliza os campos de um review. Devolve {erro} ou {campos}. */
+function camposReview_(d, parcial) {
+  var c = {};
+  var tem = function (k) { return !parcial || Object.prototype.hasOwnProperty.call(d, k); };
+  if (tem('link')) {
+    if (!String(d.link || '').trim()) return { erro: 'Cole o link do review no Trustpilot. Sem ele nao da para salvar.' };
+    c.link = linkTrustpilot_(d.link);
+    if (!c.link) return { erro: 'Esse link nao e de um review do Trustpilot. Abra o review e copie o link que tem /reviews/ no endereco.' };
+  }
+  if (tem('data')) {
+    var dt = parseAny_(d.data);
+    if (!dt) return { erro: 'Informe a data do review.' };
+    var amanha = new Date(agora_().getTime() + 86400000);
+    if (dt > amanha || dt.getFullYear() < 2015) return { erro: 'A data do review esta fora do esperado.' };
+    c.data = ymd_(dt);
+  }
+  if (tem('loja')) { c.loja = limpa_(d.loja, 40); if (!c.loja) return { erro: 'Escolha a loja.' }; }
+  if (tem('nota')) {
+    c.nota = Number(d.nota);
+    if (!(c.nota >= 1 && c.nota <= 5 && Math.round(c.nota) === c.nota)) return { erro: 'Escolha a nota, de 1 a 5 estrelas.' };
+  }
+  if (tem('status')) {
+    c.status = limpa_(d.status, 20) || 'Investigando';
+    if (REVIEW_STATUS.indexOf(c.status) < 0) return { erro: 'Status invalido.' };
+  }
+  if (tem('responsavel')) c.responsavel = limpa_(d.responsavel, 40);
+  if (tem('risco')) c.risco = simNao_(d.risco);
+  if (tem('notas')) c.notas = limpa_(d.notas, 2000);
+  if (tem('ticket')) {
+    c.ticket = limpa_(d.ticket, 300);
+    if (/^https?:/i.test(c.ticket) && /[ ]/.test(c.ticket)) return { erro: 'O link do ticket tem espacos. Confira o endereco.' };
+  }
+  return { campos: c };
+}
+
+/** Outro review com o mesmo link (ignora o proprio, na edicao). */
+function reviewRepetido_(linhas, link, menosId) {
+  var k = chaveLink_(link);
+  for (var i = 0; i < linhas.length; i++) {
+    if (menosId && linhas[i][RV.id] === menosId) continue;
+    if (chaveLink_(linhas[i][RV.link]) === k) return linhas[i];
+  }
+  return null;
+}
+
+function reviewAcao_(d) {
+  var u = sessao_(d.token);
+  if (!u) return { status: 'error', code: 'auth', message: 'Sessao vencida. Entre de novo.' };
+  if ((d.action === 'delReview' || d.action === 'importReviews') && u.papel !== 'admin') {
+    return { status: 'error', code: 'permissao', message: 'So o admin pode fazer isso.' };
+  }
+  var quem = u.nome || u.email;
+  garantirAbaReviews_();   // fora do lock: a criacao da aba pega o lock sozinha
+  if (d.action === 'addReview')     return comLock_(function () { return addReview_(d, u, quem); });
+  if (d.action === 'updateReview')  return comLock_(function () { return updateReview_(d, quem); });
+  if (d.action === 'delReview')     return comLock_(function () { return delReview_(d); });
+  if (d.action === 'importReviews') return comLock_(function () { return importarReviewDesk_(); });
+  return { status: 'error', message: 'Acao desconhecida.' };
+}
+
+function addReview_(d, u, quem) {
+  var r = camposReview_(d, false);
+  if (r.erro) return { status: 'error', message: r.erro };
+  var c = r.campos;
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REVIEW_SHEET);
+  var linhas = linhasReviews_(sh);
+  var dup = reviewRepetido_(linhas, c.link, '');
+  if (dup) {
+    return { status: 'error', code: 'repetido', id: dup[RV.id],
+             message: 'Esse review ja foi cadastrado (' + dup[RV.loja] + ', ' + dup[RV.status] + (dup[RV.resp] ? ', com ' + dup[RV.resp] : '') + ').' };
+  }
+  var ids = {};
+  linhas.forEach(function (l) { ids[l[RV.id]] = true; });
+  var agora = agora_(), agoraIso = iso_(agora), id;
+  do { id = 'R-' + ymd_(agora).replace(/-/g, '').slice(2) + '-' + (1000 + Math.floor(Math.random() * 9000)); } while (ids[id]);
+
+  var linha = new Array(REVIEW_HEADER.length);
+  linha[RV.id] = id; linha[RV.criado] = agoraIso; linha[RV.atualizado] = isoMs_(agora);
+  linha[RV.criadoPor] = quem; linha[RV.atualizadoPor] = quem;
+  linha[RV.data] = c.data; linha[RV.loja] = c.loja; linha[RV.nota] = String(c.nota);
+  linha[RV.status] = c.status; linha[RV.resp] = c.responsavel || String(u.agente || u.nome || '');
+  linha[RV.risco] = c.risco; linha[RV.notas] = c.notas; linha[RV.link] = c.link; linha[RV.ticket] = c.ticket;
+  linha[RV.desde] = agoraIso;
+  linha[RV.contatado] = c.status === 'Contatado' ? agoraIso : '';
+  linha[RV.followEm] = c.status === 'Follow up' ? agoraIso : '';
+  linha[RV.follows] = c.status === 'Follow up' ? '1' : '0';
+  linha[RV.origem] = 'Painel';
+  sh.appendRow(linha.map(txt_));
+  return { status: 'ok', review: reviewObj_(linha) };
+}
+
+function updateReview_(d, quem) {
+  var id = limpa_(d.id, 40);
+  if (!id) return { status: 'error', message: 'Review sem ID.' };
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REVIEW_SHEET);
+  var linhas = linhasReviews_(sh);
+  var idx = -1;
+  for (var i = 0; i < linhas.length; i++) if (linhas[i][RV.id] === id) { idx = i; break; }
+  if (idx < 0) return { status: 'error', code: 'sumiu', message: 'Esse review nao existe mais (pode ter sido excluido).' };
+  var linha = linhas[idx].slice();
+  // duas pessoas editando o mesmo review: a segunda nao apaga a primeira sem ver
+  if (d.versao && String(d.versao) !== linha[RV.atualizado]) {
+    return { status: 'error', code: 'conflito', review: reviewObj_(linha),
+             message: 'Alguem alterou esse review agora ha pouco. Abra de novo para ver a versao nova.' };
+  }
+  var r = camposReview_(d, true);
+  if (r.erro) return { status: 'error', message: r.erro };
+  var c = r.campos;
+  if (c.link) {
+    var dup = reviewRepetido_(linhas, c.link, id);
+    if (dup) return { status: 'error', code: 'repetido', id: dup[RV.id], message: 'Esse link ja esta em outro review (' + dup[RV.loja] + ', ' + dup[RV.status] + ').' };
+    linha[RV.link] = c.link;
+  }
+  if (c.data !== undefined) linha[RV.data] = c.data;
+  if (c.loja !== undefined) linha[RV.loja] = c.loja;
+  if (c.nota !== undefined) linha[RV.nota] = String(c.nota);
+  if (c.responsavel !== undefined) linha[RV.resp] = c.responsavel;
+  if (c.risco !== undefined) linha[RV.risco] = c.risco;
+  if (c.notas !== undefined) linha[RV.notas] = c.notas;
+  if (c.ticket !== undefined) linha[RV.ticket] = c.ticket;
+
+  var agora = agora_(), agoraIso = iso_(agora);
+  var fez = d.followUp === true || String(d.followUp) === 'true' || String(d.followUp) === '1';
+  var novo = fez ? 'Follow up' : (c.status !== undefined ? c.status : linha[RV.status]);
+  var mudou = novo !== linha[RV.status];
+  if (mudou || fez) linha[RV.desde] = agoraIso;
+  if (novo === 'Contatado' && mudou) linha[RV.contatado] = agoraIso;
+  if (novo === 'Follow up' && (mudou || fez)) {
+    linha[RV.followEm] = agoraIso;
+    linha[RV.follows] = String((Number(linha[RV.follows]) || 0) + 1);
+  }
+  linha[RV.status] = novo;
+  linha[RV.atualizado] = isoMs_(agora);
+  linha[RV.atualizadoPor] = quem;
+  sh.getRange(idx + 2, 1, 1, REVIEW_HEADER.length).setValues([linha.map(txt_)]);
+  return { status: 'ok', review: reviewObj_(linha) };
+}
+
+function delReview_(d) {
+  var id = limpa_(d.id, 40);
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REVIEW_SHEET);
+  var linhas = linhasReviews_(sh);
+  for (var i = 0; i < linhas.length; i++) {
+    if (linhas[i][RV.id] === id) { sh.deleteRow(i + 2); return { status: 'ok', apagado: id }; }
+  }
+  return { status: 'error', code: 'sumiu', message: 'Esse review nao existe mais.' };
+}
+
+/* ---------- Review Desk: de onde vieram os reviews antes do painel ---------- */
+
+/** API do Review Desk (REVIEWS_API_URL + REVIEWS_SECRET) ou a planilha dele (REVIEWS_SHEET_ID). */
 function fonteReviews_() {
   var pr = PropertiesService.getScriptProperties();
   var url = String(pr.getProperty('REVIEWS_API_URL') || '').trim();
@@ -1130,53 +1392,83 @@ function fonteReviews_() {
 }
 
 /**
- * Rode UMA VEZ no editor depois de criar as propriedades. Chamar outro servico
- * (ou ler outra planilha) pede uma autorizacao nova do Google; sem ela, o painel
- * mostra o erro no lugar dos reviews. No fim, o log diz quantos reviews achou.
+ * Rode no editor para conferir a conexao com o Review Desk. Tambem reabre a tela
+ * de autorizacao do Google se "Conectar a um servico externo" ficou desmarcado
+ * (consentimento granular). Nao grava nada.
  */
 function testarReviews() {
   var f = fonteReviews_();
   if (!f) throw new Error('Crie as propriedades REVIEWS_API_URL e REVIEWS_SECRET (ou REVIEWS_SHEET_ID).');
-  // Consentimento granular do Google: se "Conectar a um servico externo" ficou
-  // desmarcado numa autorizacao anterior, o editor nao pergunta de novo sozinho e
-  // o UrlFetchApp falha com "You do not have permission". Isto reabre a tela de
-  // autorizacao so para o que falta. Marque tudo nela.
   if (f.tipo === 'api' && typeof ScriptApp.requireScopes === 'function') {
     ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ['https://www.googleapis.com/auth/script.external_request']);
   }
-  try { CacheService.getScriptCache().remove('reviews'); } catch (eC) {}
-  var n = listReviews_().length;
-  if (REVIEWS_ERRO_) throw new Error(REVIEWS_ERRO_);
-  Logger.log('Tudo certo (' + (f.tipo === 'api' ? 'API do Review Desk' : 'planilha') + '): ' + n + ' reviews encontrados.');
+  var brutos = f.tipo === 'api' ? reviewsDaApi_(f) : reviewsDaPlanilha_(f.id);
+  Logger.log('Tudo certo (' + (f.tipo === 'api' ? 'API do Review Desk' : 'planilha') + '): ' + brutos.length + ' reviews encontrados.');
 }
 
-/** Reviews do Trustpilot, so com os campos do painel. Cache de 2 minutos. */
-function listReviews_() {
-  REVIEWS_ERRO_ = '';
+/**
+ * Traz do Review Desk o que ainda nao esta na aba Reviews (pelo ID). Nao mexe no
+ * que ja esta aqui. Chamar com o lock (comLock_ ou garantirAbaReviews_).
+ */
+function importarReviewDesk_() {
+  var pr = PropertiesService.getScriptProperties();
   var f = fonteReviews_();
-  if (!f) return [];
-  var cache = null;
-  try { cache = CacheService.getScriptCache(); var hit = cache.get('reviews'); if (hit) return JSON.parse(hit); } catch (eC) {}
+  if (!f) return { status: 'ok', importados: 0, jaExistiam: 0, aviso: 'Review Desk nao configurado.' };
   var brutos;
   try {
     brutos = f.tipo === 'api' ? reviewsDaApi_(f) : reviewsDaPlanilha_(f.id);
   } catch (e) {
-    REVIEWS_ERRO_ = String((e && e.message) || e);
-    return [];
+    var msg = String((e && e.message) || e);
+    pr.setProperty('REVIEWS_IMPORT_ERRO', msg);
+    return { status: 'error', message: 'Nao consegui ler o Review Desk: ' + msg };
   }
-  var out = [];
+  pr.deleteProperty('REVIEWS_IMPORT_ERRO');
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REVIEW_SHEET) || ensureSheet_(REVIEW_SHEET, REVIEW_HEADER);
+  var ids = {};
+  linhasReviews_(sh).forEach(function (l) { ids[l[RV.id]] = true; });
+  var novas = [], ja = 0;
   for (var i = 0; i < brutos.length; i++) {
-    var r = reviewDe_(brutos[i]);
-    if (r) out.push(r);
+    var id = String(brutos[i].id === undefined || brutos[i].id === null ? '' : brutos[i].id).trim();
+    if (!id) continue;
+    if (ids[id]) { ja++; continue; }
+    ids[id] = true;
+    novas.push(linhaImportada_(brutos[i]).map(txt_));
   }
-  try { cache && cache.put('reviews', JSON.stringify(out), 120); } catch (eP) {}
-  return out;
+  if (novas.length) sh.getRange(sh.getLastRow() + 1, 1, novas.length, REVIEW_HEADER.length).setValues(novas);
+  return { status: 'ok', importados: novas.length, jaExistiam: ja };
+}
+
+/** Datas do Review Desk: ISO em UTC ("...Z") ou texto da planilha. Devolve ISO local ou ''. */
+function quandoRd_(v) {
+  var t = String(v === undefined || v === null ? '' : v).trim();
+  if (!t) return '';
+  var d = t.charAt(t.length - 1) === 'Z' ? new Date(t) : parseAny_(t);
+  return d && !isNaN(d.getTime()) ? iso_(d) : '';
+}
+
+function linhaImportada_(o) {
+  var criado = quandoRd_(o.created_at) || iso_(agora_());
+  var atual = quandoRd_(o.updated_at) || criado;
+  var st = String(o.status || '').trim();
+  if (REVIEW_STATUS.indexOf(st) < 0) st = 'Investigando';
+  var dr = quandoRd_(o.review_date);
+  var nota = Number(String(o.stars === undefined || o.stars === null ? '' : o.stars).replace(/[^0-9]/g, '')) || 0;
+  var l = new Array(REVIEW_HEADER.length);
+  l[RV.id] = String(o.id).trim(); l[RV.criado] = criado; l[RV.atualizado] = atual;
+  l[RV.criadoPor] = 'Review Desk'; l[RV.atualizadoPor] = '';
+  l[RV.data] = (dr || criado).slice(0, 10); l[RV.loja] = String(o.store || '').trim();
+  l[RV.nota] = nota ? String(nota) : ''; l[RV.status] = st; l[RV.resp] = String(o.owner || '').trim();
+  l[RV.risco] = simNao_(o.risk); l[RV.notas] = String(o.notes || '');
+  l[RV.link] = String(o.review_link || '').trim(); l[RV.ticket] = String(o.ticket_link || '').trim();
+  // o Review Desk nao guarda quando o status mudou: a ultima alteracao e a melhor pista
+  l[RV.desde] = atual; l[RV.contatado] = st === 'Contatado' ? atual : '';
+  l[RV.followEm] = ''; l[RV.follows] = '0'; l[RV.origem] = 'Review Desk';
+  return l;
 }
 
 /**
- * A mesma chamada que o site do Review Desk faz (GET ?action=list&secret=), mas
- * daqui, servidor a servidor: a senha nao passa pelo navegador de ninguem. So
- * leitura — este script nunca chama add/update.
+ * A mesma leitura que o site do Review Desk faz (GET ?action=list&secret=), mas
+ * daqui, servidor a servidor: a senha nao passa pelo navegador de ninguem.
  */
 function reviewsDaApi_(f) {
   var url = f.url + (f.url.indexOf('?') > -1 ? '&' : '?') + 'action=list&secret=' + encodeURIComponent(f.segredo);
@@ -1193,7 +1485,7 @@ function reviewsDaApi_(f) {
   return j.rows || [];
 }
 
-/** Aba Reviews lida direto (precisa de acesso a planilha): objetos com o cabecalho como chave. */
+/** Aba Reviews do Review Desk lida direto (precisa de acesso a planilha). */
 function reviewsDaPlanilha_(id) {
   var sh = SpreadsheetApp.openById(id).getSheetByName('Reviews');
   if (!sh) throw new Error('a planilha do Review Desk nao tem a aba "Reviews"');
@@ -1205,27 +1497,6 @@ function reviewsDaPlanilha_(id) {
     h.forEach(function (k, i) { o[k] = row[i]; });
     return o;
   });
-}
-
-/** Um review no formato do painel, venha da API ou da planilha. Sem id, fica de fora. */
-function reviewDe_(o) {
-  if (!o) return null;
-  var id = String(o.id === undefined || o.id === null ? '' : o.id).trim();
-  if (!id) return null;
-  var dt = parseAny_(o.review_date);
-  return {
-    id: id,
-    store: String(o.store || '').trim(),
-    stars: Number(String(o.stars === undefined || o.stars === null ? '' : o.stars).replace(/[^0-9]/g, '')) || 0,
-    date: dt ? ymd_(dt) : '',
-    review_link: String(o.review_link || ''),
-    ticket_link: String(o.ticket_link || ''),
-    status: String(o.status || '').trim(),
-    owner: String(o.owner || '').trim(),
-    risk: o.risk === true || String(o.risk || '').toUpperCase() === 'TRUE',
-    notes: String(o.notes || ''),
-    created_at: String(o.created_at || '')
-  };
 }
 
 /* ============================================================
@@ -1347,7 +1618,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 15
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 16
   };
 
   if (p.compact) {
