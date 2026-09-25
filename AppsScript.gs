@@ -1137,6 +1137,13 @@ function fonteReviews_() {
 function testarReviews() {
   var f = fonteReviews_();
   if (!f) throw new Error('Crie as propriedades REVIEWS_API_URL e REVIEWS_SECRET (ou REVIEWS_SHEET_ID).');
+  // Consentimento granular do Google: se "Conectar a um servico externo" ficou
+  // desmarcado numa autorizacao anterior, o editor nao pergunta de novo sozinho e
+  // o UrlFetchApp falha com "You do not have permission". Isto reabre a tela de
+  // autorizacao so para o que falta. Marque tudo nela.
+  if (f.tipo === 'api' && typeof ScriptApp.requireScopes === 'function') {
+    ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ['https://www.googleapis.com/auth/script.external_request']);
+  }
   try { CacheService.getScriptCache().remove('reviews'); } catch (eC) {}
   var n = listReviews_().length;
   if (REVIEWS_ERRO_) throw new Error(REVIEWS_ERRO_);
