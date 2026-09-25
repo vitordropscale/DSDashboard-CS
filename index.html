@@ -427,7 +427,6 @@ body.role-agente .kpis{grid-template-columns:repeat(3,1fr)}
 .login-box .logo img{width:100%;height:100%;display:block}
 /* Trustpilot nao depende do periodo; Equipe nao depende de filtro nenhum */
 body[data-tela=trustpilot] .page-ctl,body[data-tela=trustpilot] #chipAgents,
-body[data-tela=followup] .page-ctl,body[data-tela=followup] #chipAgents,
 body[data-tela=equipe] .page-ctl,body[data-tela=equipe] .filters{display:none!important}
 .login-box h2{font-family:var(--font-d);font-size:20px;font-weight:700;text-align:center;letter-spacing:-.3px}
 .login-box p.sub{font-size:12.5px;color:var(--muted);text-align:center;margin:6px 0 22px}
@@ -494,6 +493,20 @@ body:not(.api-v16) .v16-only{display:none!important}
 .btn.perigo{color:#f7a3ad}
 .btn.perigo.armado{background:var(--crit);color:#fff}
 .rv-topo{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rv-barra{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:-4px 0 16px}
+.seg-badge{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:600;font-style:normal;padding:0 6px;
+  border-radius:8px;background:var(--crit-soft);color:#f9bcc3;line-height:16px}
+.mini-seg button.on .seg-badge{background:var(--crit);color:#fff}
+.chk.rv-meus{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:12.5px;color:var(--text2);position:relative}
+.fu-sec + .fu-sec{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.fu-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.fu-h b{font-family:var(--font-d);font-size:14px;font-weight:600;color:var(--text)}
+.fu-h span{font-size:12px;color:var(--muted)}
+.msg-acao{background:none;border:none;padding:0;margin-left:4px;color:inherit;font:inherit;font-weight:600;
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.msg-acao:disabled{opacity:.6;cursor:default}
+.mini-kpis [data-ir]{cursor:pointer}
+.mini-kpis [data-ir]:hover b{color:var(--brand-2)}
 tr.rv-row{cursor:pointer}
 tr.rv-row:focus-visible td{background:rgba(91,155,255,.08)}
 tr.rv-row:focus{outline:none}
@@ -586,10 +599,7 @@ tr.rv-row:focus{outline:none}
       <span>Tarefas</span></button>
     <button data-view="trustpilot">
       <svg class="ic" viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9-4.3-4.1 5.9-.8z"/></svg>
-      <span>Trustpilot</span></button>
-    <button data-view="followup" class="v16-only">
-      <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
-      <span>Follow up</span><b class="badge" id="fuBadge" hidden></b></button>
+      <span>Trustpilot</span><b class="badge" id="fuBadge" hidden></b></button>
     <button data-view="equipe" class="admin-only">
       <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.6 3.4-5.5 7-5.5s6.3 1.9 7 5.5"/></svg>
       <span>Equipe</span></button>
@@ -895,36 +905,32 @@ tr.rv-row:focus{outline:none}
       <div class="card-h">
         <div><div class="card-t">Reviews</div><div class="card-sub" id="rvSub">&nbsp;</div></div>
         <div class="rv-topo">
-          <div class="mini-seg" id="segRv">
-            <button data-m="abertos" class="on">Em aberto</button>
-            <button data-m="risco">Com risco</button>
-            <button data-m="todos">Todos</button>
-          </div>
           <button class="btn v16-only admin-only" id="btnImportRd" title="Acrescenta o que foi cadastrado no Review Desk e ainda não está aqui">Trazer do Review Desk</button>
           <button class="btn cta v16-only" id="btnNovoReview">Novo review</button>
         </div>
       </div>
+      <div class="rv-barra">
+        <div class="mini-seg" id="segRv">
+          <button data-m="abertos" class="on">Em aberto</button>
+          <button data-m="followup" class="v16-only">Follow up<b class="seg-badge" id="fuSegBadge" hidden></b></button>
+          <button data-m="risco">Com risco</button>
+          <button data-m="todos">Todos</button>
+        </div>
+        <label class="chk rv-meus v16-only"><input type="checkbox" id="rvMeus"><span class="sw2"></span>Só os meus</label>
+      </div>
+      <div class="msg" id="rvAviso"></div>
       <div class="msg" id="rvCardMsg"></div>
       <div id="rvBox"></div>
-    </div>
-  </section>
-
-  <!-- ===================== FOLLOW UP ===================== -->
-  <section class="view" data-view="followup">
-    <div class="card">
-      <div class="card-h">
-        <div><div class="card-t">Precisam de follow up</div><div class="card-sub" id="fuSub">&nbsp;</div></div>
-        <div class="mini-seg" id="segFu">
-          <button data-m="todos" class="on">Todos</button>
-          <button data-m="meus">Só os meus</button>
+      <div id="fuArea" hidden>
+        <div class="fu-sec">
+          <div class="fu-h"><b>Precisam de follow up</b><span id="fuSub"></span></div>
+          <div id="fuBox"></div>
+        </div>
+        <div class="fu-sec">
+          <div class="fu-h"><b>Aguardando resposta</b><span id="fuEsperaSub"></span></div>
+          <div id="fuEspera"></div>
         </div>
       </div>
-      <div class="msg" id="fuMsg"></div>
-      <div id="fuBox"></div>
-    </div>
-    <div class="card">
-      <div class="card-h"><div><div class="card-t">Aguardando resposta</div><div class="card-sub" id="fuEsperaSub">&nbsp;</div></div></div>
-      <div id="fuEspera"></div>
     </div>
   </section>
 
@@ -1361,7 +1367,7 @@ var RV_STATUS = ["Investigando", "Contatado", "Follow up", "Resolvendo", "Resolv
 var SESSAO_KEY = "emailcounter.sessao";
 var SESSAO = null;   // {token, email, nome, papel, agente}
 var USUARIOS = [];   // tela Equipe (admin)
-var VISTAS_AGENTE = ["geral", "tarefas", "trustpilot", "followup"];
+var VISTAS_AGENTE = ["geral", "tarefas", "trustpilot"];
 /* LEGADO: o Apps Script no ar ainda nao tem login (v14 ou antes). O painel
    funciona como antes, sem login, ate a v15 ser implantada — ai a API passa a
    recusar o getData sem sessao e o login aparece sozinho. */
@@ -4171,7 +4177,7 @@ document.addEventListener("visibilitychange", function(){
 /* =============================================================================
    TELAS — o menu lateral escolhe qual bloco de cartoes aparece
    ========================================================================== */
-var VIEWS = { geral:"Visão geral", metas:"Metas", horarios:"Horários", agentes:"Agentes", qualidade:"Qualidade", tarefas:"Tarefas", trustpilot:"Trustpilot", followup:"Follow up", equipe:"Equipe" };
+var VIEWS = { geral:"Visão geral", metas:"Metas", horarios:"Horários", agentes:"Agentes", qualidade:"Qualidade", tarefas:"Tarefas", trustpilot:"Trustpilot", equipe:"Equipe" };
 
 /* =============================================================================
    SESSAO E PAPEIS
@@ -4363,6 +4369,15 @@ function reviewsFiltrados(){
   return REVIEWS.filter(function(r){ return state.store === "__all" || r.store === state.store; });
 }
 
+/** Reviews da tela Trustpilot: filtro de loja e, se ligado, so os do proprio usuario. */
+function rvDaTela(){
+  var eu = meuNome().toLowerCase();
+  return reviewsFiltrados().filter(function(x){ return !state.rvMeus || String(x.owner).toLowerCase() === eu; });
+}
+function rvSetModo(m){
+  state.rvMode = m;
+  $("segRv").querySelectorAll("button").forEach(function(x){ x.classList.toggle("on", x.dataset.m === m); });
+}
 function renderReviews(r){
   var todos = reviewsFiltrados();
   var abertos = todos.filter(rvAberto), risco = todos.filter(function(x){ return x.risk && rvAberto(x); });
@@ -4386,7 +4401,7 @@ function renderReviews(r){
       (v16 ? ' Use <b>Novo review</b> na tela Trustpilot.' : '') + '</div>';
   } else {
     ov.innerHTML = '<div class="mini-kpis"><div><b>' + nf(abertos.length) + '</b><span>em aberto</span></div>' +
-      (v16 ? '<div><b>' + nf(fuVenc.length) + '</b><span>' + (fuVenc.length === 1 ? "precisa" : "precisam") + ' de follow up</span></div>'
+      (v16 ? '<div data-ir="followup" title="Abrir a lista de follow up"><b>' + nf(fuVenc.length) + '</b><span>' + (fuVenc.length === 1 ? "precisa" : "precisam") + ' de follow up</span></div>'
            : '<div><b>' + nf(novos.length) + '</b><span>novos, ' + esc(r.label) + '</span></div>') +
       '<div><b>' + nf(risco.length) + '</b><span>com risco de chargeback</span></div></div>' +
       '<div class="rv-list">' + abertos.slice(0, 5).map(function(x){
@@ -4396,17 +4411,30 @@ function renderReviews(r){
       }).join("") + (abertos.length > 5 ? '<div class="adj-why" style="padding-top:10px">+ ' + nf(abertos.length - 5) + ' em aberto</div>' : '') + '</div>';
   }
 
-  // tela Trustpilot
+  // falha ao trazer do Review Desk: o admin ve o aviso mesmo com reviews na tela
+  var av = $("rvAviso");
+  if (isAdmin() && REVIEWS_ERRO && todos.length){ av.className = "msg show bad"; av.innerHTML = rvErroTxt(); }
+  else { av.className = "msg"; av.textContent = ""; }
+
+  // tela Trustpilot: tabela nas abas Em aberto, Com risco e Todos; listas na aba Follow up
   var modo = state.rvMode || "abertos";
-  var lista = modo === "abertos" ? abertos : modo === "risco" ? risco : todos;
-  var reps = todos.filter(function(x){ return x.dup; }).length;
-  $("rvSub").textContent = lojaTxt + ", " + nf(lista.length) + (lista.length === 1 ? " review" : " reviews") +
+  if (modo === "followup" && !v16) rvSetModo(modo = "abertos");
+  var fu = modo === "followup";
+  $("rvBox").hidden = fu;
+  $("fuArea").hidden = !fu;
+  if (fu) return;   // renderFollowUp (chamado logo depois) desenha a aba
+  var tela = rvDaTela();
+  var tAbertos = tela.filter(rvAberto), tRisco = tela.filter(function(x){ return x.risk && rvAberto(x); });
+  var lista = modo === "abertos" ? tAbertos : modo === "risco" ? tRisco : tela;
+  var reps = tela.filter(function(x){ return x.dup; }).length;
+  $("rvSub").textContent = lojaTxt + (state.rvMeus ? ", só os seus" : "") + ", " + nf(lista.length) + (lista.length === 1 ? " review" : " reviews") +
     (reps && isAdmin() ? ", " + nf(reps) + " com link repetido" : "");
   var box = $("rvBox");
   if (!lista.length){
     box.innerHTML = '<div class="empty" style="padding:30px">' + (LEGADO ? "Os reviews aparecem aqui depois que o Apps Script v15 for implantado."
       : REVIEWS_OK && REVIEWS_ERRO && !todos.length ? rvErroTxt()
       : !REVIEWS_OK ? rvSemConfigTxt()
+      : state.rvMeus && !tela.length && todos.length ? "Nenhum review com você como responsável" + (state.store === "__all" ? "" : " em " + esc(state.store)) + "."
       : todos.length ? "Nenhum review nesta lista."
       : "Nenhum review cadastrado ainda." + (v16 ? " Use <b>Novo review</b> e cole o link do review no Trustpilot." : "")) + '</div>';
     return;
@@ -4426,18 +4454,15 @@ function renderReviews(r){
     }).join("") + '</tbody></table></div>';
 }
 $("segRv").querySelectorAll("button").forEach(function(b){
-  b.onclick = function(){
-    $("segRv").querySelectorAll("button").forEach(function(x){ x.classList.remove("on"); });
-    b.classList.add("on"); state.rvMode = b.dataset.m; render();
-  };
+  b.onclick = function(){ rvCardMsg(null, ""); rvSetModo(b.dataset.m); render(); };
 });
+$("rvMeus").onchange = function(){ state.rvMeus = this.checked; render(); };
 
 /* =============================================================================
    REVIEWS: cadastro, edicao e follow up (Apps Script v16)
    ========================================================================== */
 var rvEditando = null;   // review aberto no modal (null = novo)
 var rvNotaSel = 0;
-var fuModo = "todos";
 
 function hojeISO(){ var d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
 /** "2026-09-25T10:12:00" (hora de Brasilia, como o Apps Script grava) -> Date */
@@ -4460,15 +4485,33 @@ function rvUpsert(raw){
   REVIEWS.sort(rvOrdem); marcarRepetidos(REVIEWS);
   return n;
 }
+/** ID de review novo, escolhido aqui: P- + data + 5 digitos (o Review Desk usa R-). */
+function rvNovoId(){
+  var d = new Date();
+  return "P-" + String(d.getFullYear()).slice(2) + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + (10000 + Math.floor(Math.random() * 90000));
+}
+/** Marca unica de cada edicao (o mesmo pedido repetido nao grava duas vezes). */
+function rvOp(){ return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10); }
 function rvRemove(id){ REVIEWS = REVIEWS.filter(function(r){ return r.id !== id; }); marcarRepetidos(REVIEWS); }
+/** Mensagem num .msg; acao opcional vira um botao no fim do texto (ex.: Desfazer). */
 function msgEm(idEl){
-  return function(kind, text){
+  return function(kind, text, acao){
     var m = $(idEl);
     if (!text){ m.className = "msg"; m.textContent = ""; return; }
-    m.className = "msg show " + (kind === "ok" ? "ok" : "bad"); m.textContent = text;
+    m.className = "msg show " + (kind === "ok" ? "ok" : "bad");
+    m.textContent = text;
+    if (acao){
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "msg-acao"; b.textContent = acao.rotulo;
+      b.onclick = function(){ b.disabled = true; acao.fn(b); };
+      m.appendChild(document.createTextNode(" "));
+      m.appendChild(b);
+    }
+    var t = m.getBoundingClientRect().top;
+    if (t < 0 || t > window.innerHeight - 40) m.scrollIntoView({ block: "nearest" });
   };
 }
-var rvMsg = msgEm("rvMsg"), rvCardMsg = msgEm("rvCardMsg"), fuMsg = msgEm("fuMsg");
+var rvMsg = msgEm("rvMsg"), rvCardMsg = msgEm("rvCardMsg"), fuMsg = rvCardMsg;
 
 /**
  * Situacao de follow up de um review: null se ele nao esta esperando resposta do
@@ -4509,37 +4552,58 @@ function fuLinha(x, fi){
       '<button class="btn" data-fu="respondeu">Cliente respondeu</button><button class="btn" data-fu="abrir">Abrir</button></div></div>';
 }
 
+/** Aba Follow up (dentro do Trustpilot) e os contadores do menu e da aba. */
 function renderFollowUp(){
+  var v16 = API_VERSION >= 16;
   var bd = $("fuBadge");
-  var total = API_VERSION >= 16 ? REVIEWS.filter(function(x){ var fi = fuInfo(x); return fi && fi.venceu; }).length : 0;
+  var total = v16 ? REVIEWS.filter(function(x){ var fi = fuInfo(x); return fi && fi.venceu; }).length : 0;
   bd.hidden = !total; bd.textContent = total; bd.title = total + (total === 1 ? " review precisa" : " reviews precisam") + " de follow up";
-  if (API_VERSION < 16){
-    $("fuSub").textContent = "";
-    $("fuBox").innerHTML = '<div class="empty" style="padding:26px">O follow up aparece depois que o Apps Script v16 for implantado.</div>';
-    $("fuEspera").innerHTML = ""; $("fuEsperaSub").textContent = "";
-    return;
-  }
-  var base = reviewsFiltrados(), eu = meuNome().toLowerCase();
-  if (fuModo === "meus") base = base.filter(function(x){ return String(x.owner).toLowerCase() === eu; });
   var venc = [], esp = [];
-  base.forEach(function(x){ var fi = fuInfo(x); if (fi) (fi.venceu ? venc : esp).push({ x: x, fi: fi }); });
+  if (v16) rvDaTela().forEach(function(x){ var fi = fuInfo(x); if (fi) (fi.venceu ? venc : esp).push({ x: x, fi: fi }); });
+  var sb = $("fuSegBadge");
+  sb.hidden = !venc.length; sb.textContent = venc.length;
+  if (!v16 || state.rvMode !== "followup") return;
   venc.sort(function(a, b){ return b.fi.horas - a.fi.horas; });
   esp.sort(function(a, b){ return b.fi.horas - a.fi.horas; });
-  var loja = state.store === "__all" ? "" : ", " + state.store;
-  $("fuSub").textContent = venc.length
-    ? nf(venc.length) + (venc.length === 1 ? " review contatado" : " reviews contatados") + " há mais de " + FOLLOW_UP_DIAS + " dias sem resposta" + loja
-    : "Ninguém esperando há mais de " + FOLLOW_UP_DIAS + " dias" + loja;
+  var lojaTxt = state.store === "__all" ? "todas as lojas" : state.store;
+  $("rvSub").textContent = lojaTxt + (state.rvMeus ? ", só os seus" : "") + ", " + nf(venc.length) + " para fazer follow up, " +
+    nf(esp.length) + " aguardando resposta";
+  $("fuSub").textContent = "contatados há mais de " + FOLLOW_UP_DIAS + " dias sem resposta";
   $("fuBox").innerHTML = venc.length ? venc.map(function(o){ return fuLinha(o.x, o.fi); }).join("")
-    : '<div class="empty" style="padding:26px">Nenhum follow up pendente' + (fuModo === "meus" ? " com você" : "") +
+    : '<div class="empty" style="padding:22px">Nenhum follow up pendente' + (state.rvMeus ? " com você" : "") +
       '. Quem for contatado e não responder em ' + FOLLOW_UP_DIAS + ' dias aparece aqui.</div>';
-  $("fuEsperaSub").textContent = esp.length ? nf(esp.length) + " dentro dos " + FOLLOW_UP_DIAS + " dias" : "ninguém dentro do prazo";
+  $("fuEsperaSub").textContent = "ainda dentro dos " + FOLLOW_UP_DIAS + " dias";
   $("fuEspera").innerHTML = esp.length ? esp.map(function(o){ return fuLinha(o.x, o.fi); }).join("")
-    : '<div class="empty" style="padding:22px">Nenhum review esperando resposta' + (fuModo === "meus" ? " com você" : "") + '.</div>';
+    : '<div class="empty" style="padding:22px">Nenhum review esperando resposta' + (state.rvMeus ? " com você" : "") + '.</div>';
+}
+
+/** Dia em que um review em follow up volta para a lista, se o cliente nao responder. */
+function voltaEm(n){
+  var d = quando(n.follow_up_at || n.contacted_at || n.status_since);
+  if (!d) return "";
+  d.setDate(d.getDate() + FOLLOW_UP_DIAS);
+  return pad(d.getDate()) + "/" + pad(d.getMonth() + 1);
+}
+/** O que o clique fez, dito com clareza, e o botao Desfazer (Apps Script v17). */
+function msgFollowUp(n){ return "Follow up registrado: " + n.store + ", " + n.follow_ups + "º. Ele foi para Aguardando resposta e volta para Precisam de follow up em " + voltaEm(n) + " se o cliente não responder."; }
+function msgRespondeu(n){ return n.store + " foi para Resolvendo e saiu do follow up. Continua na aba Em aberto."; }
+function rvDesfazerAcao(n, msg){
+  if (API_VERSION < 17) return null;
+  return { rotulo: "Desfazer", fn: function(){
+    markWrite();
+    apiPost({ action: "updateReview", id: n.id, versao: n.updated_at, desfazer: true, op: rvOp() }).then(function(res){
+      if (res.status !== "ok"){ if (res.review) rvUpsert(res.review); throw new Error(res.message || "não deu para desfazer"); }
+      var v = rvUpsert(res.review);
+      render();
+      if (rvEditando && rvEditando.id === v.id) abrirReview(v.id);
+      msg("ok", "Desfeito: " + v.store + " voltou para " + v.status + ".");
+    }).catch(function(e){ render(); msg("bad", e.message); });
+  } };
 }
 
 /** Muda um review no Apps Script e atualiza a tela na hora. */
 function rvAtualizar(x, campos, botao, msg, okMsg, depois){
-  var d = { action: "updateReview", id: x.id, versao: x.updated_at };
+  var d = { action: "updateReview", id: x.id, versao: x.updated_at, op: rvOp() };
   for (var k in campos) d[k] = campos[k];
   if (botao) botao.disabled = true;
   msg(null, "");
@@ -4551,7 +4615,7 @@ function rvAtualizar(x, campos, botao, msg, okMsg, depois){
     }
     var n = rvUpsert(res.review);
     render();
-    if (okMsg) msg("ok", okMsg);
+    if (okMsg) msg("ok", typeof okMsg === "function" ? okMsg(n) : okMsg, rvDesfazerAcao(n, msg));
     if (depois) depois(n);
   }).catch(function(e){ render(); msg("bad", e.message); })
     .then(function(){ if (botao && botao.isConnected) botao.disabled = false; });
@@ -4562,18 +4626,12 @@ function acaoFu(e){
   var x = rvPorId(b.closest("[data-id]").dataset.id);
   if (!x) return;
   if (b.dataset.fu === "abrir") return abrirReview(x.id);
-  if (b.dataset.fu === "follow") return rvAtualizar(x, { followUp: true }, b, fuMsg,
-    "Follow up registrado (" + x.store + "). Se o cliente não responder em " + FOLLOW_UP_DIAS + " dias, ele volta para esta lista.");
-  if (b.dataset.fu === "respondeu") return rvAtualizar(x, { status: "Resolvendo" }, b, fuMsg, "Cliente respondeu: o review foi para Resolvendo.");
+  if (b.dataset.fu === "follow") return rvAtualizar(x, { followUp: true }, b, fuMsg, msgFollowUp);
+  if (b.dataset.fu === "respondeu") return rvAtualizar(x, { status: "Resolvendo" }, b, fuMsg, msgRespondeu);
 }
 $("fuBox").onclick = acaoFu;
 $("fuEspera").onclick = acaoFu;
-$("segFu").querySelectorAll("button").forEach(function(b){
-  b.onclick = function(){
-    $("segFu").querySelectorAll("button").forEach(function(o){ o.classList.remove("on"); });
-    b.classList.add("on"); fuModo = b.dataset.m; renderFollowUp();
-  };
-});
+
 
 /* ---------- modal do review ---------- */
 function rvSetNota(n){
@@ -4665,7 +4723,9 @@ function rvValida(c){
   var limpo = linkTrustpilot(c.link);
   if (!limpo) return { el: "rvLink", msg: "Esse link não é de um review do Trustpilot. Abra o review e copie o link que tem /reviews/ no endereço." };
   var k = chaveLinkRv(limpo);
-  var dup = REVIEWS.filter(function(r){ return r.review_link && chaveLinkRv(r.review_link) === k && (!rvEditando || r.id !== rvEditando.id); })[0];
+  // editando sem mudar o link: nao confere de novo (o Review Desk tinha pares repetidos)
+  var mudou = !rvEditando || chaveLinkRv(rvEditando.review_link) !== k;
+  var dup = mudou && REVIEWS.filter(function(r){ return r.review_link && chaveLinkRv(r.review_link) === k && (!rvEditando || r.id !== rvEditando.id); })[0];
   if (dup) return { el: "rvLink", msg: "Esse review já foi cadastrado (" + dup.store + ", " + dup.status + (dup.owner ? ", com " + dup.owner : "") + ")." };
   if (!c.data) return { el: "rvData", msg: "Informe a data do review." };
   if (c.data > hojeISO()) return { el: "rvData", msg: "A data do review não pode ser no futuro." };
@@ -4685,7 +4745,13 @@ $("rvSalvar").onclick = function(){
   var novo = !rvEditando;
   var d = { action: novo ? "addReview" : "updateReview" };
   for (var k in c) d[k] = c[k];
-  if (!novo){ d.id = rvEditando.id; d.versao = rvEditando.updated_at; }
+  // o id (novo) e a op (edicao) fazem o Apps Script reconhecer o mesmo pedido
+  // se ele for repetido por GET depois de a resposta do POST se perder
+  if (novo) d.id = rvNovoId();
+  else {
+    d.id = rvEditando.id; d.versao = rvEditando.updated_at; d.op = rvOp();
+    if (chaveLinkRv(linkTrustpilot(c.link)) === chaveLinkRv(rvEditando.review_link)) delete d.link;   // link igual: nao manda
+  }
   var b = $("rvSalvar");
   b.disabled = true; b.textContent = "Salvando…"; rvMsg(null, "");
   markWrite();
@@ -4705,10 +4771,10 @@ $("rvAcoes").onclick = function(e){
   if (!b || !rvEditando) return;
   var x = rvEditando;
   if (b.dataset.rv === "follow") return rvAtualizar(x, { followUp: true }, b, rvMsg, "", function(n){
-    abrirReview(n.id); rvMsg("ok", "Follow up registrado. Se o cliente não responder em " + FOLLOW_UP_DIAS + " dias, ele volta para a lista de follow up.");
+    abrirReview(n.id); rvMsg("ok", msgFollowUp(n), rvDesfazerAcao(n, rvMsg));
   });
   if (b.dataset.rv === "respondeu") return rvAtualizar(x, { status: "Resolvendo" }, b, rvMsg, "", function(n){
-    abrirReview(n.id); rvMsg("ok", "Cliente respondeu: o review foi para Resolvendo.");
+    abrirReview(n.id); rvMsg("ok", msgRespondeu(n), rvDesfazerAcao(n, rvMsg));
   });
   if (b.dataset.rv === "excluir"){
     // confirmacao em dois cliques, sem a caixa padrao do navegador
@@ -4738,15 +4804,22 @@ $("rvBox").onkeydown = function(e){
   var tr = e.target.closest("tr[data-id]");
   if (tr) abrirReview(tr.dataset.id);
 };
-$("ovRvBox").onclick = function(e){ var r = e.target.closest(".rv[data-id]"); if (r) abrirReview(r.dataset.id); };
+$("ovRvBox").onclick = function(e){
+  if (e.target.closest("[data-ir=followup]")){ rvSetModo("followup"); setView("trustpilot"); return; }
+  var r = e.target.closest(".rv[data-id]");
+  if (r) abrirReview(r.dataset.id);
+};
 $("btnImportRd").onclick = function(){
   var b = this, t = b.textContent;
   b.disabled = true; b.textContent = "Trazendo…"; rvCardMsg(null, "");
   markWrite();
   apiPost({ action: "importReviews" }).then(function(res){
     if (res.status !== "ok") throw new Error(res.message || "não deu para trazer do Review Desk");
-    rvCardMsg("ok", res.importados ? nf(res.importados) + (res.importados === 1 ? " review novo veio" : " reviews novos vieram") + " do Review Desk."
-                                   : "Nada novo no Review Desk: tudo já está aqui.");
+    var fora = [];
+    if (res.repetidos) fora.push(nf(res.repetidos) + (res.repetidos === 1 ? " já estava aqui com outro ID" : " já estavam aqui com outro ID"));
+    if (res.excluidos) fora.push(nf(res.excluidos) + (res.excluidos === 1 ? " foi excluído aqui antes" : " foram excluídos aqui antes"));
+    rvCardMsg("ok", (res.importados ? nf(res.importados) + (res.importados === 1 ? " review novo veio" : " reviews novos vieram") + " do Review Desk."
+                                    : "Nada novo no Review Desk.") + (fora.length ? " Ficaram de fora: " + fora.join(" e ") + "." : ""));
     return loadData(true);
   }).catch(function(e){ rvCardMsg("bad", e.message); })
     .then(function(){ b.disabled = false; b.textContent = t; });
@@ -4850,6 +4923,7 @@ $("eqSalvar").onclick = function(){
 };
 
 function setView(v){
+  if (v === "followup"){ v = "trustpilot"; rvSetModo("followup"); }   // endereco antigo (#followup)
   if (!VIEWS[v]) v = "geral";
   if (SESSAO && !isAdmin() && VISTAS_AGENTE.indexOf(v) < 0) v = "geral";
   if (LEGADO && v === "equipe") v = "geral";   // a API antiga nao conhece listUsers/saveUser
@@ -4869,7 +4943,6 @@ function subTela(){
   var loja = state.store === "__all" ? "todas as lojas" : state.store;
   if (state.view === "trustpilot") $("pageSub").textContent = "Reviews do Trustpilot, " + loja;
   if (state.view === "equipe") $("pageSub").textContent = "Quem entra no painel e o que cada um vê";
-  if (state.view === "followup") $("pageSub").textContent = "Contatados há mais de " + FOLLOW_UP_DIAS + " dias sem resposta, " + loja;
 }
 $("nav").querySelectorAll("button").forEach(function(b){
   b.onclick = function(){ setView(b.dataset.view); };

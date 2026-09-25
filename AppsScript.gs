@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v16.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v17.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -35,7 +35,15 @@
  *   disso o Review Desk so e lido quando o admin pede "Trazer do Review Desk"
  *   (acrescenta o que faltar, pelo ID). testarReviews() no editor confere a conexao.
  *   POST {action:'addReview', token, link, data, loja, nota, status, responsavel, risco, notas, ticket}
- *   POST {action:'updateReview', token, id, versao, [campos acima] | followUp:true}
+ *   POST {action:'updateReview', token, id, versao, [campos acima] | followUp:true | desfazer:true}
+ *        desfazer (v17): volta a ultima troca de status (e o follow up contado junto),
+ *        so se ninguem mexeu no review depois (mesma versao). A coluna "Anterior" guarda
+ *        o estado de antes; qualquer outra edicao apaga essa memoria.
+ *        Pedido repetido (o painel refaz por GET quando a resposta do POST se perde):
+ *        addReview leva o id escolhido pelo painel (P-...) e updateReview leva "op";
+ *        chegando de novo, respondem ok sem gravar duas vezes.
+ *   Excluidos vao para a aba "Reviews excluidos" e a importacao nao os traz de volta;
+ *   a importacao tambem pula o review que ja esta aqui com outro ID (mesmo link).
  *   POST {action:'delReview', token, id}          (admin)
  *   POST {action:'importReviews', token}          (admin)
  *   POST {action:'login', email, senha}                 -> {token, usuario}
@@ -157,9 +165,12 @@ var PAPEIS        = ['admin', 'agente'];
 var REVIEW_SHEET  = 'Reviews';
 var REVIEW_HEADER = ['ID', 'Criado em', 'Atualizado em', 'Criado por', 'Atualizado por', 'Data do review', 'Loja', 'Nota',
                      'Status', 'Responsavel', 'Risco', 'Notas', 'Link do review', 'Ticket', 'Status desde',
-                     'Contatado em', 'Follow up em', 'Follow ups', 'Origem'];
+                     'Contatado em', 'Follow up em', 'Follow ups', 'Origem', 'Anterior', 'Operacao'];
 var RV = { id: 0, criado: 1, atualizado: 2, criadoPor: 3, atualizadoPor: 4, data: 5, loja: 6, nota: 7, status: 8,
-           resp: 9, risco: 10, notas: 11, link: 12, ticket: 13, desde: 14, contatado: 15, followEm: 16, follows: 17, origem: 18 };
+           resp: 9, risco: 10, notas: 11, link: 12, ticket: 13, desde: 14, contatado: 15, followEm: 16, follows: 17, origem: 18, anterior: 19, op: 20 };
+var REVIEW_EXCL_SHEET  = 'Reviews excluidos';   // o que o admin excluiu nao volta pela importacao
+var REVIEW_EXCL_HEADER = ['ID', 'Link do review', 'Excluido em', 'Excluido por'];
+var ID_PAINEL_RE = /^P-[0-9]{6}-[0-9]{5}$/;     // P- (painel) nunca colide com os R- do Review Desk
 var REVIEW_STATUS = ['Investigando', 'Contatado', 'Follow up', 'Resolvendo', 'Resolvido'];
 var FOLLOW_UP_DIAS = 3;   // contatado ha mais de 3 dias sem resposta -> lista de follow up
 
@@ -229,7 +240,7 @@ var REVIEW_ACOES = ['addReview', 'updateReview', 'delReview', 'importReviews'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 16 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 17 }, p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
     // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
@@ -1192,7 +1203,12 @@ function chaveLink_(v) {
 function garantirAbaReviews_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(REVIEW_SHEET);
-  if (sh) return sh;
+  if (sh) {
+    // aba criada numa versao anterior: acrescenta o cabecalho das colunas novas
+    var n = sh.getLastColumn();
+    if (n < REVIEW_HEADER.length) sh.getRange(1, n + 1, 1, REVIEW_HEADER.length - n).setValues([REVIEW_HEADER.slice(n)]);
+    return sh;
+  }
   return comLock_(function () {
     var sh2 = ss.getSheetByName(REVIEW_SHEET);   // outra execucao pode ter criado enquanto esperava
     if (sh2) return sh2;
@@ -1281,11 +1297,12 @@ function reviewAcao_(d) {
   if ((d.action === 'delReview' || d.action === 'importReviews') && u.papel !== 'admin') {
     return { status: 'error', code: 'permissao', message: 'So o admin pode fazer isso.' };
   }
-  var quem = u.nome || u.email;
+  // quem fez: o nome, nunca o e-mail (os agentes veem esse campo)
+  var quem = String(u.nome || u.agente || 'sem nome');
   garantirAbaReviews_();   // fora do lock: a criacao da aba pega o lock sozinha
   if (d.action === 'addReview')     return comLock_(function () { return addReview_(d, u, quem); });
   if (d.action === 'updateReview')  return comLock_(function () { return updateReview_(d, quem); });
-  if (d.action === 'delReview')     return comLock_(function () { return delReview_(d); });
+  if (d.action === 'delReview')     return comLock_(function () { return delReview_(d, quem); });
   if (d.action === 'importReviews') return comLock_(function () { return importarReviewDesk_(); });
   return { status: 'error', message: 'Acao desconhecida.' };
 }
@@ -1296,6 +1313,14 @@ function addReview_(d, u, quem) {
   var c = r.campos;
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REVIEW_SHEET);
   var linhas = linhasReviews_(sh);
+  // o mesmo pedido chegando de novo: ja esta gravado, responde ok sem duplicar
+  var pedido = limpa_(d.id, 20);
+  if (!ID_PAINEL_RE.test(pedido)) pedido = '';
+  for (var i = 0; pedido && i < linhas.length; i++) {
+    if (linhas[i][RV.id] !== pedido) continue;
+    if (chaveLink_(linhas[i][RV.link]) === chaveLink_(c.link)) return { status: 'ok', review: reviewObj_(linhas[i]), jaGravado: true };
+    pedido = '';
+  }
   var dup = reviewRepetido_(linhas, c.link, '');
   if (dup) {
     return { status: 'error', code: 'repetido', id: dup[RV.id],
@@ -1303,20 +1328,22 @@ function addReview_(d, u, quem) {
   }
   var ids = {};
   linhas.forEach(function (l) { ids[l[RV.id]] = true; });
-  var agora = agora_(), agoraIso = iso_(agora), id;
-  do { id = 'R-' + ymd_(agora).replace(/-/g, '').slice(2) + '-' + (1000 + Math.floor(Math.random() * 9000)); } while (ids[id]);
+  var agora = agora_(), agoraIso = iso_(agora), id = pedido;
+  while (!id || ids[id]) id = 'P-' + ymd_(agora).replace(/-/g, '').slice(2) + '-' + (10000 + Math.floor(Math.random() * 90000));
 
   var linha = new Array(REVIEW_HEADER.length);
   linha[RV.id] = id; linha[RV.criado] = agoraIso; linha[RV.atualizado] = isoMs_(agora);
   linha[RV.criadoPor] = quem; linha[RV.atualizadoPor] = quem;
   linha[RV.data] = c.data; linha[RV.loja] = c.loja; linha[RV.nota] = String(c.nota);
-  linha[RV.status] = c.status; linha[RV.resp] = c.responsavel || String(u.agente || u.nome || '');
+  linha[RV.status] = c.status;
+  // "Sem responsavel" escolhido no painel e respeitado; sem o campo, fica quem cadastrou
+  linha[RV.resp] = Object.prototype.hasOwnProperty.call(d, 'responsavel') ? c.responsavel : String(u.agente || u.nome || '');
   linha[RV.risco] = c.risco; linha[RV.notas] = c.notas; linha[RV.link] = c.link; linha[RV.ticket] = c.ticket;
   linha[RV.desde] = agoraIso;
   linha[RV.contatado] = c.status === 'Contatado' ? agoraIso : '';
   linha[RV.followEm] = c.status === 'Follow up' ? agoraIso : '';
   linha[RV.follows] = c.status === 'Follow up' ? '1' : '0';
-  linha[RV.origem] = 'Painel';
+  linha[RV.origem] = 'Painel'; linha[RV.anterior] = ''; linha[RV.op] = '';
   sh.appendRow(linha.map(txt_));
   return { status: 'ok', review: reviewObj_(linha) };
 }
@@ -1330,17 +1357,40 @@ function updateReview_(d, quem) {
   for (var i = 0; i < linhas.length; i++) if (linhas[i][RV.id] === id) { idx = i; break; }
   if (idx < 0) return { status: 'error', code: 'sumiu', message: 'Esse review nao existe mais (pode ter sido excluido).' };
   var linha = linhas[idx].slice();
+  var op = limpa_(d.op, 40);
+  // o mesmo pedido chegando de novo (repeticao por GET): ja foi aplicado
+  if (op && op === linha[RV.op]) return { status: 'ok', review: reviewObj_(linha), jaGravado: true };
   // duas pessoas editando o mesmo review: a segunda nao apaga a primeira sem ver
   if (d.versao && String(d.versao) !== linha[RV.atualizado]) {
     return { status: 'error', code: 'conflito', review: reviewObj_(linha),
              message: 'Alguem alterou esse review agora ha pouco. Abra de novo para ver a versao nova.' };
   }
+  var agora = agora_(), agoraIso = iso_(agora);
+
+  // Desfazer (v17): volta ao estado guardado antes da ultima troca de status.
+  if (d.desfazer === true || String(d.desfazer) === 'true' || String(d.desfazer) === '1') {
+    var ant = null;
+    try { ant = JSON.parse(linha[RV.anterior] || 'null'); } catch (eA) {}
+    if (!ant || !ant.s) return { status: 'error', code: 'nada', message: 'Nao ha o que desfazer nesse review.' };
+    linha[RV.status] = ant.s; linha[RV.desde] = ant.d || ''; linha[RV.contatado] = ant.c || '';
+    linha[RV.followEm] = ant.f || ''; linha[RV.follows] = String(ant.n || '0');
+    linha[RV.anterior] = ''; linha[RV.op] = op;
+    linha[RV.atualizado] = isoMs_(agora); linha[RV.atualizadoPor] = quem;
+    sh.getRange(idx + 2, 1, 1, REVIEW_HEADER.length).setValues([linha.map(txt_)]);
+    return { status: 'ok', review: reviewObj_(linha), desfeito: true };
+  }
+  var antes = JSON.stringify({ s: linha[RV.status], d: linha[RV.desde], c: linha[RV.contatado], f: linha[RV.followEm], n: linha[RV.follows] });
+
   var r = camposReview_(d, true);
   if (r.erro) return { status: 'error', message: r.erro };
   var c = r.campos;
   if (c.link) {
-    var dup = reviewRepetido_(linhas, c.link, id);
-    if (dup) return { status: 'error', code: 'repetido', id: dup[RV.id], message: 'Esse link ja esta em outro review (' + dup[RV.loja] + ', ' + dup[RV.status] + ').' };
+    // so confere repetido quando o link muda: os pares que vieram repetidos do
+    // Review Desk continuam editaveis
+    if (chaveLink_(c.link) !== chaveLink_(linha[RV.link])) {
+      var dup = reviewRepetido_(linhas, c.link, id);
+      if (dup) return { status: 'error', code: 'repetido', id: dup[RV.id], message: 'Esse link ja esta em outro review (' + dup[RV.loja] + ', ' + dup[RV.status] + ').' };
+    }
     linha[RV.link] = c.link;
   }
   if (c.data !== undefined) linha[RV.data] = c.data;
@@ -1351,10 +1401,11 @@ function updateReview_(d, quem) {
   if (c.notas !== undefined) linha[RV.notas] = c.notas;
   if (c.ticket !== undefined) linha[RV.ticket] = c.ticket;
 
-  var agora = agora_(), agoraIso = iso_(agora);
   var fez = d.followUp === true || String(d.followUp) === 'true' || String(d.followUp) === '1';
   var novo = fez ? 'Follow up' : (c.status !== undefined ? c.status : linha[RV.status]);
   var mudou = novo !== linha[RV.status];
+  // guarda o estado de antes so para a troca de status; qualquer outra edicao esquece
+  linha[RV.anterior] = (mudou || fez) ? antes : '';
   if (mudou || fez) linha[RV.desde] = agoraIso;
   if (novo === 'Contatado' && mudou) linha[RV.contatado] = agoraIso;
   if (novo === 'Follow up' && (mudou || fez)) {
@@ -1362,20 +1413,26 @@ function updateReview_(d, quem) {
     linha[RV.follows] = String((Number(linha[RV.follows]) || 0) + 1);
   }
   linha[RV.status] = novo;
+  linha[RV.op] = op;
   linha[RV.atualizado] = isoMs_(agora);
   linha[RV.atualizadoPor] = quem;
   sh.getRange(idx + 2, 1, 1, REVIEW_HEADER.length).setValues([linha.map(txt_)]);
   return { status: 'ok', review: reviewObj_(linha) };
 }
 
-function delReview_(d) {
+function delReview_(d, quem) {
   var id = limpa_(d.id, 40);
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REVIEW_SHEET);
   var linhas = linhasReviews_(sh);
   for (var i = 0; i < linhas.length; i++) {
-    if (linhas[i][RV.id] === id) { sh.deleteRow(i + 2); return { status: 'ok', apagado: id }; }
+    if (linhas[i][RV.id] !== id) continue;
+    // guarda o ID: "Trazer do Review Desk" nao traz de volta o que foi excluido
+    ensureSheet_(REVIEW_EXCL_SHEET, REVIEW_EXCL_HEADER).appendRow([id, linhas[i][RV.link], iso_(agora_()), quem].map(txt_));
+    sh.deleteRow(i + 2);
+    return { status: 'ok', apagado: id };
   }
-  return { status: 'error', code: 'sumiu', message: 'Esse review nao existe mais.' };
+  // ja nao existe (ex.: o mesmo pedido repetido depois de a exclusao dar certo)
+  return { status: 'ok', apagado: '' };
 }
 
 /* ---------- Review Desk: de onde vieram os reviews antes do painel ---------- */
@@ -1413,7 +1470,7 @@ function testarReviews() {
 function importarReviewDesk_() {
   var pr = PropertiesService.getScriptProperties();
   var f = fonteReviews_();
-  if (!f) return { status: 'ok', importados: 0, jaExistiam: 0, aviso: 'Review Desk nao configurado.' };
+  if (!f) return { status: 'ok', importados: 0, jaExistiam: 0, repetidos: 0, excluidos: 0, aviso: 'Review Desk nao configurado.' };
   var brutos;
   try {
     brutos = f.tipo === 'api' ? reviewsDaApi_(f) : reviewsDaPlanilha_(f.id);
@@ -1423,19 +1480,33 @@ function importarReviewDesk_() {
     return { status: 'error', message: 'Nao consegui ler o Review Desk: ' + msg };
   }
   pr.deleteProperty('REVIEWS_IMPORT_ERRO');
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REVIEW_SHEET) || ensureSheet_(REVIEW_SHEET, REVIEW_HEADER);
-  var ids = {};
-  linhasReviews_(sh).forEach(function (l) { ids[l[RV.id]] = true; });
-  var novas = [], ja = 0;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REVIEW_SHEET) || ensureSheet_(REVIEW_SHEET, REVIEW_HEADER);
+  var ids = {}, links = {};
+  linhasReviews_(sh).forEach(function (l) {
+    ids[l[RV.id]] = 'aqui';
+    if (String(l[RV.link] || '').trim()) links[chaveLink_(l[RV.link])] = true;
+  });
+  var excl = ss.getSheetByName(REVIEW_EXCL_SHEET);
+  if (excl && excl.getLastRow() >= 2) {
+    excl.getRange(2, 1, excl.getLastRow() - 1, 1).getDisplayValues().forEach(function (l) { if (!ids[l[0]]) ids[l[0]] = 'excluido'; });
+  }
+  var novas = [], ja = 0, repetidos = 0, excluidos = 0;
   for (var i = 0; i < brutos.length; i++) {
     var id = String(brutos[i].id === undefined || brutos[i].id === null ? '' : brutos[i].id).trim();
     if (!id) continue;
+    if (ids[id] === 'excluido') { excluidos++; continue; }
     if (ids[id]) { ja++; continue; }
-    ids[id] = true;
+    // o mesmo review ja esta aqui com outro ID (cadastrado no painel ou numa importacao anterior).
+    // So compara com o que ja estava na aba: repetidos dentro do proprio Review Desk entram
+    // (e aparecem marcados), para nao perder o que foi anotado em cada um.
+    var link = String(brutos[i].review_link || '').trim();
+    if (link && links[chaveLink_(link)]) { repetidos++; continue; }
+    ids[id] = 'novo';
     novas.push(linhaImportada_(brutos[i]).map(txt_));
   }
   if (novas.length) sh.getRange(sh.getLastRow() + 1, 1, novas.length, REVIEW_HEADER.length).setValues(novas);
-  return { status: 'ok', importados: novas.length, jaExistiam: ja };
+  return { status: 'ok', importados: novas.length, jaExistiam: ja, repetidos: repetidos, excluidos: excluidos };
 }
 
 /** Datas do Review Desk: ISO em UTC ("...Z") ou texto da planilha. Devolve ISO local ou ''. */
@@ -1462,7 +1533,7 @@ function linhaImportada_(o) {
   l[RV.link] = String(o.review_link || '').trim(); l[RV.ticket] = String(o.ticket_link || '').trim();
   // o Review Desk nao guarda quando o status mudou: a ultima alteracao e a melhor pista
   l[RV.desde] = atual; l[RV.contatado] = st === 'Contatado' ? atual : '';
-  l[RV.followEm] = ''; l[RV.follows] = '0'; l[RV.origem] = 'Review Desk';
+  l[RV.followEm] = ''; l[RV.follows] = '0'; l[RV.origem] = 'Review Desk'; l[RV.anterior] = '';
   return l;
 }
 
@@ -1618,7 +1689,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 16
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 17
   };
 
   if (p.compact) {

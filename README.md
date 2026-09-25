@@ -85,7 +85,7 @@ O painel exige login com e-mail e senha. Cada pessoa é uma linha na aba **Usuar
 | Papel | Vê | Não vê |
 |---|---|---|
 | admin | tudo, mais a tela **Equipe** (criar, editar, desativar, redefinir senha); exclui reviews e traz do Review Desk | — |
-| agente | Visão geral, Tarefas, Trustpilot e Follow up, só com as **próprias** contagens e tarefas; todos os reviews, que ele também cadastra e edita | metas, horários, agentes, qualidade, notas, ajustes, report, CSV |
+| agente | Visão geral, Tarefas e Trustpilot (com a aba Follow up), só com as **próprias** contagens e tarefas; todos os reviews, que ele também cadastra e edita | metas, horários, agentes, qualidade, notas, ajustes, report, CSV |
 
 O corte é feito no Apps Script: para um agente, o `getData` já sai sem as linhas dos
 outros e sem metas, qualidade, notas e ajustes. Esconder na tela sozinho não bastaria.
@@ -106,10 +106,13 @@ Status: Investigando, Contatado, Follow up, Resolvendo, Resolvido. "Contatado em
 cadastrou e quem alterou por último. Se duas pessoas editarem o mesmo review ao mesmo
 tempo, a segunda recebe um aviso em vez de apagar a mudança da primeira.
 
-**Follow up**: a tela lista quem está Contatado (ou em Follow up) há mais de 3 dias sem
-resposta (`FOLLOW_UP_DIAS` no Apps Script), com "Fiz o follow up" (conta a tentativa e o
-review volta a esperar mais 3 dias) e "Cliente respondeu" (vai para Resolvendo). O menu
-mostra quantos estão atrasados.
+**Follow up**: é uma aba da tela Trustpilot, ao lado de "Em aberto". Lista quem está
+Contatado (ou em Follow up) há mais de 3 dias sem resposta (`FOLLOW_UP_DIAS` no Apps
+Script), com "Fiz o follow up" (conta a tentativa e o review volta a esperar mais 3 dias)
+e "Cliente respondeu" (vai para Resolvendo). O menu Trustpilot e a aba mostram quantos
+estão atrasados, e "Só os meus" filtra pelo responsável. Depois de cada clique a mensagem
+diz para onde o review foi, com um "Desfazer" (Apps Script v17) que volta o status e as
+datas, desde que ninguém tenha mexido no review nesse meio tempo.
 
 **Review Desk**: na primeira leitura depois da v16, a aba Reviews é criada e recebe tudo o
 que estava no Review Desk, pela API dele: propriedades `REVIEWS_API_URL` (a URL `/exec`) e
