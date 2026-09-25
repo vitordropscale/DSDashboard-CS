@@ -100,8 +100,22 @@ aparece "Primeiro acesso", que pede a senha do Apps Script (`ADMIN_TOKEN`). Alte
 planilha fica na propriedade do script `REVIEWS_SHEET_ID` (Configurações do projeto ›
 Propriedades do script). Sem ela, o painel mostra o aviso no lugar dos reviews.
 
+**As duas implantações vão juntas para a v15.** O `getData` existe na implantação do
+painel e na dos contadores (a URL que está nos `.ahk`). Se a dos contadores ficar numa
+versão antiga, qualquer agente lê tudo por ela. Conferir as duas com `?action=ping`: a
+resposta tem que trazer `"version": 15`.
+
 **Transição**: enquanto o Apps Script no ar for anterior à v15, o painel pergunta a versão
-(`?action=ping`) e funciona como antes, sem login e sem a tela Equipe.
+(`?action=ping`) e funciona como antes, sem login e sem a tela Equipe. Se a implantação
+voltar para uma versão antiga com alguém logado, o painel larga a sessão e volta a esse
+modo. Ação nova (login, Equipe) nunca é mandada para uma API antiga: lá ela cairia no
+gravador de contagens e viraria uma linha falsa na aba Logs.
+
+**Travas**: depois de 8 senhas erradas para o mesmo e-mail em 15 minutos, cada tentativa
+espera até 5 s antes de responder. A senha certa sempre entra, para ninguém conseguir
+trancar o admin do lado de fora. Desativar direto na planilha aceita NAO, Não, FALSE, 0
+ou caixa desmarcada, mas pode levar até 10 minutos (cache das sessões); pela tela Equipe
+vale na hora.
 
 O contador de e-mails (`?agente=…`) e o de tarefas (`?action=addTarefa`) continuam sem login.
 
@@ -109,8 +123,12 @@ O contador de e-mails (`?agente=…`) e o de tarefas (`?action=addTarefa`) conti
 
 `ADMIN_TOKEN`, em **Configurações do projeto › Propriedades do script**. Nunca no
 código, nunca neste repositório. Continua valendo nas ações protegidas (ajustes, notas,
-metas, equipe) e serve para criar o primeiro admin. Com login, a sessão de um admin
-substitui a senha: o painel não pede mais senha para quem entrou como admin.
+metas, equipe) e serve para criar o primeiro admin, então **vale como admin total**: se
+ela já foi compartilhada, troque antes de implantar a v15. 20 erros em 15 minutos
+bloqueiam essa senha por 15 minutos; as sessões de admin continuam funcionando.
+
+Com login, a sessão de um admin substitui a senha: o painel não pede mais senha para quem
+entrou como admin. Depois de criar o primeiro admin, dá para apagar a propriedade.
 
 A URL da API é montada em tempo de execução em vez de aparecer literal no código. Isso
 evita coleta automática, mas **não é segurança**: a proteção dos dados é o login.

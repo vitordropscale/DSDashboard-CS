@@ -853,6 +853,7 @@ body[data-tela=equipe] .page-ctl,body[data-tela=equipe] .filters{display:none!im
             <select class="inp" id="eqPapel"><option value="agente">Agente</option><option value="admin">Admin</option></select></div>
           <div class="field"><label for="eqAgente">Nome no contador</label>
             <select class="inp" id="eqAgente"></select>
+            <input class="inp" id="eqAgenteNovo" placeholder="igual ao AGENT_NAME do contador" style="display:none;margin-top:8px">
             <div class="hint">É o que liga a pessoa às contagens dela.</div></div>
         </div>
         <div class="field"><label for="eqSenha">Senha</label><input class="inp" id="eqSenha" type="password" autocomplete="new-password" placeholder="mínimo 6 caracteres">
@@ -1215,6 +1216,9 @@ var VISTAS_AGENTE = ["geral", "tarefas", "trustpilot"];
    funciona como antes, sem login, ate a v15 ser implantada — ai a API passa a
    recusar o getData sem sessao e o login aparece sozinho. */
 var LEGADO = false;
+var API_V15 = false;   // o ping confirmou que a API no ar tem login
+var SAINDO = false;    // a pagina vai recarregar: nenhuma resposta atrasada entra
+var MSG_KEY = "emailcounter.loginMsg";
 function isAdmin(){ return LEGADO || !!(SESSAO && SESSAO.papel === "admin"); }
 function sessaoToken(){ return SESSAO ? SESSAO.token : ""; }
 var API_VERSION = 0;  // versao do Apps Script implantado (metas por loja e notas: 8+)
@@ -1234,7 +1238,7 @@ function precisaV8(){
 
 /* Metas sem senha exigem o Apps Script v9. Nas versoes anteriores a gravacao
    de metas ainda e protegida, entao o painel continua pedindo a senha. */
-function metasSemSenha(){ return API_VERSION >= 9; }
+function metasSemSenha(){ return API_VERSION >= 9 && API_VERSION < 15; }   // v9 a v14: metas abertas; v15: so admin
 
 /* Chave do indice de metas. loja "" (ou ausente) = meta total do agente. */
 function metaKey(agente, loja){ return agente + "|" + (loja || ""); }
@@ -1529,6 +1533,8 @@ function ensureCoverage(){
 function loadData(manual){
   if (!SESSAO && !LEGADO) return Promise.resolve();   // sem login a API nem e chamada
   if (LOADING) return Promise.resolve();
+  // quem pediu: se a sessao mudar (Sair, outro login) antes da resposta, ela e descartada
+  var tokenPedido = sessaoToken(), legadoPedido = LEGADO;
   LOADING = true;
   $("btnRefresh").classList.add("spin");
   if (!RECS.length) setStatus("live","carregando…"); else setStatus("live","atualizando…");
@@ -1546,11 +1552,19 @@ function loadData(manual){
     .catch(function(e){ errs.push("compact: "+e.message); return fetchJSON(base + "&_=" + Date.now()); })
     .catch(function(e){ errs.push("json: "+e.message);    return fetchJSONP(base); })
     .then(function(payload){
-      if (payload && payload.status === "error" && payload.code === "auth"){ authFail(payload.message); return; }
+      if (SAINDO || sessaoToken() !== tokenPedido || LEGADO !== legadoPedido) return;
+      if (payload && payload.status === "error" && payload.code === "auth"){ authFail(tokenPedido ? "Sua sessão venceu ou foi encerrada. Entre de novo." : ""); return; }
       if (!payload || payload.status === "error")
         throw new Error((payload && payload.message) || "a API retornou erro");
       if (started <= LAST_WRITE){ stale = true; return; }
-      if (payload.usuario) setSessao(Object.assign({}, SESSAO, payload.usuario));
+      if (SESSAO && !(Number(payload.version) >= 15)){
+        // a implantacao voltou para uma versao sem login: a sessao nao vale mais nada
+        // e as acoes novas virariam contagem falsa. Segue como antes, sem login.
+        try { localStorage.removeItem(cacheKey()); localStorage.removeItem(SESSAO_KEY); } catch(e){}
+        SESSAO = null; LEGADO = true; API_V15 = false; applyRole();
+        if (state.view === "equipe") setView("geral");
+      }
+      if (payload.usuario && SESSAO && payload.usuario.email === SESSAO.email) setSessao(Object.assign({}, SESSAO, payload.usuario));
       REVIEWS = normalizeReviews(payload.reviews); REVIEWS_OK = payload.reviewsOk !== false;
       LOADED_SINCE = since;
       RECS = normalize(payload); refreshAgentColors();
@@ -1561,6 +1575,7 @@ function loadData(manual){
       QUALIDADE = Array.isArray(payload.qualidade) ? payload.qualidade : [];
       TAREFAS = normalizeTarefas(payload.tarefas);
       API_VERSION = Number(payload.version) || 0;
+      if (API_VERSION >= 15) API_V15 = true;
       indexMetas(); indexNotas();
       LAST_OK = new Date();
       try { localStorage.setItem(cacheKey(), JSON.stringify({ at:LAST_OK.getTime(), since:since, payload:payload })); } catch(e){}
@@ -3554,7 +3569,19 @@ function parseApi(t){
  * Se o POST falhar (o /exec do Apps Script responde com redirect 302 e alguns
  * navegadores/proxies quebram nisso), repete a chamada por GET.
  */
+/** A API no ar tem login (v15+)? */
+function apiTemLogin(){ return API_V15 || API_VERSION >= 15; }
+var ACOES_V15 = ["listUsers", "saveUser", "login", "logout", "setupAdmin", "me"];
 function apiPost(obj){
+  // acao nova numa API antiga vira contagem falsa no gravador: nao sai daqui
+  if (ACOES_V15.indexOf(obj.action) > -1 && !apiTemLogin())
+    return Promise.reject(new Error("O Apps Script no ar ainda não tem login. Cole o AppsScript.gs v15 e reimplante."));
+  return apiPostBruto(obj).then(function(res){
+    if (res && res.code === "auth" && sessaoToken()) authFail("Sua sessão venceu ou perdeu a permissão. Entre de novo.");
+    return res;
+  });
+}
+function apiPostBruto(obj){
   obj.token = getPwd();
   // senha nunca vai na URL: com senha no pedido, nada de repetir por GET
   var soPost = !!obj.senha;
@@ -3994,12 +4021,29 @@ function showLogin(msg){
 function hideLogin(){ $("login").classList.remove("show"); }
 /** Sessao invalida: limpa tudo que era daquela pessoa e volta para o login. */
 function authFail(msg){
-  LEGADO = false;
+  if (SAINDO) return;
+  SAINDO = true;
   try { localStorage.removeItem(cacheKey()); } catch(e){}
-  setSessao(null);
-  RECS = []; TAREFAS = []; REVIEWS = []; METAS = {}; METAS_HIST = []; NOTAS = []; QUALIDADE = [];
-  setStatus("warn", "sem sessão");
-  showLogin(msg || "");
+  try { localStorage.removeItem(SESSAO_KEY); } catch(e){}
+  try { sessionStorage.setItem(MSG_KEY, msg || ""); } catch(e){}
+  SESSAO = null;
+  // recarregar em vez de limpar a mao: filtros, tabelas (inclusive a da Equipe) e
+  // graficos do usuario anterior somem de uma vez
+  location.reload();
+}
+/** Mensagem deixada pelo authFail antes de recarregar (ex.: sessao vencida). */
+function msgGuardada(){
+  var m = "";
+  try { m = sessionStorage.getItem(MSG_KEY) || ""; sessionStorage.removeItem(MSG_KEY); } catch(e){}
+  return m;
+}
+/** Login so vai para uma API que confirmou ter login: na v14 ele viraria uma contagem falsa. */
+function garantirV15(){
+  if (API_V15) return Promise.resolve();
+  return fetchJSON(API_URL + "?action=ping&_=" + Date.now()).then(function(p){
+    if (p && Number(p.version) >= 15){ API_V15 = true; return; }
+    throw new Error("O Apps Script no ar ainda não tem login. Cole o AppsScript.gs v15 e reimplante.");
+  });
 }
 function apiAcesso(obj){
   var post = fetch(API_URL, { method:"POST", redirect:"follow", body:JSON.stringify(obj) })
@@ -4010,7 +4054,8 @@ function fazerLogin(){
   var email = $("lgEmail").value.trim(), senha = $("lgSenha").value;
   if (!email || !senha){ loginMsg("bad", "Preencha e-mail e senha."); return; }
   var b = $("lgEntrar"); b.disabled = true; b.textContent = "Entrando…"; loginMsg(null, "");
-  apiAcesso({ action:"login", email:email, senha:senha })
+  garantirV15()
+    .then(function(){ return apiAcesso({ action:"login", email:email, senha:senha }); })
     .then(function(res){
       if (res.status !== "ok"){
         if (res.code === "no_users"){
@@ -4019,6 +4064,7 @@ function fazerLogin(){
           $("loginForm").style.display = "none"; $("setupForm").style.display = ""; $("suEmail").value = email; loginMsg(null, ""); return; }
         throw new Error(res.message || "não foi possível entrar");
       }
+      if (!res.token || !res.usuario) throw new Error("A API respondeu sem sessão. Confira se o Apps Script no ar é a v15.");
       setSessao(Object.assign({ token:res.token }, res.usuario));
       $("lgSenha").value = "";
       hideLogin();
@@ -4030,9 +4076,12 @@ function fazerLogin(){
 }
 function criarPrimeiroAdmin(){
   var b = $("suCriar"); b.disabled = true; b.textContent = "Criando…"; loginMsg(null, "");
-  apiAcesso({ action:"setupAdmin", nome:$("suNome").value, email:$("suEmail").value, senha:$("suSenha").value, token:$("suToken").value })
+  var dados = { action:"setupAdmin", nome:$("suNome").value, email:$("suEmail").value, senha:$("suSenha").value, token:$("suToken").value };
+  garantirV15()
+    .then(function(){ return apiAcesso(dados); })
     .then(function(res){
       if (res.status !== "ok") throw new Error(res.message || "não deu para criar");
+      if (!res.token || !res.usuario) throw new Error("A API respondeu sem sessão. Confira se o Apps Script no ar é a v15.");
       setSessao(Object.assign({ token:res.token }, res.usuario));
       $("suSenha").value = ""; $("suToken").value = "";
       hideLogin(); setView("geral"); loadData(true);
@@ -4042,7 +4091,8 @@ function criarPrimeiroAdmin(){
 }
 function sair(){
   var t = sessaoToken();
-  if (t) apiAcesso({ action:"logout", token:t }).catch(function(){});
+  // keepalive: o pedido segue mesmo com a pagina recarregando logo em seguida
+  if (t && apiTemLogin()){ try { fetch(API_URL, { method:"POST", body:JSON.stringify({ action:"logout", token:t }), keepalive:true }).catch(function(){}); } catch(e){} }
   authFail("");
 }
 $("lgEntrar").onclick = fazerLogin;
@@ -4172,9 +4222,18 @@ function fillEqAgentes(){
   var names = {}; RECS.forEach(function(r){ names[r.agente] = 1; }); TAREFAS.forEach(function(t){ names[t.agente] = 1; });
   USUARIOS.forEach(function(u){ if (u.agente) names[u.agente] = 1; });
   var sel = $("eqAgente"), atual = sel.value;
-  sel.innerHTML = '<option value="">— nenhum —</option>' + Object.keys(names).sort().map(function(a){ return '<option>' + esc(a) + '</option>'; }).join("");
+  sel.innerHTML = '<option value="">— nenhum —</option>' + Object.keys(names).sort().map(function(a){ return '<option>' + esc(a) + '</option>'; }).join("") +
+    '<option value="__outro">Outro nome…</option>';
   sel.value = atual;
+  if (sel.value !== atual) sel.value = "";
 }
+/** Agente novo ainda nao contou nada, entao nao esta na lista: "Outro nome…" abre o campo livre. */
+function eqAgenteValor(){ return $("eqAgente").value === "__outro" ? $("eqAgenteNovo").value.trim() : $("eqAgente").value; }
+$("eqAgente").onchange = function(){
+  var outro = $("eqAgente").value === "__outro";
+  $("eqAgenteNovo").style.display = outro ? "" : "none";
+  if (outro) $("eqAgenteNovo").focus();
+};
 function loadEquipe(){
   if (!isAdmin() || LEGADO || !sessaoToken()) return;
   $("eqBox").innerHTML = '<div class="empty" style="padding:26px">Carregando…</div>';
@@ -4216,7 +4275,7 @@ function eqEditar(email){
   var u = USUARIOS.filter(function(x){ return x.email === email; })[0]; if (!u) return;
   eqEditando = u.email;
   $("eqFormT").textContent = "Editar acesso"; $("eqNome").value = u.nome; $("eqEmail").value = u.email; $("eqEmail").disabled = true;
-  $("eqPapel").value = u.papel; fillEqAgentes(); $("eqAgente").value = u.agente || ""; $("eqSenha").value = "";
+  $("eqPapel").value = u.papel; fillEqAgentes(); $("eqAgente").value = u.agente || ""; $("eqAgenteNovo").value = ""; $("eqAgenteNovo").style.display = "none"; $("eqSenha").value = "";
   $("eqSenhaHint").textContent = "Deixe em branco para manter a senha atual. Preencha para redefinir.";
   $("eqSalvar").textContent = "Salvar"; $("eqCancelar").style.display = ""; eqMsg(null, "");
   $("eqNome").focus();
@@ -4224,13 +4283,13 @@ function eqEditar(email){
 function eqLimpar(){
   eqEditando = null;
   $("eqFormT").textContent = "Novo acesso"; $("eqNome").value = ""; $("eqEmail").value = ""; $("eqEmail").disabled = false;
-  $("eqPapel").value = "agente"; $("eqAgente").value = ""; $("eqSenha").value = "";
+  $("eqPapel").value = "agente"; $("eqAgente").value = ""; $("eqAgenteNovo").value = ""; $("eqAgenteNovo").style.display = "none"; $("eqSenha").value = "";
   $("eqSenhaHint").textContent = "A pessoa usa esta senha para entrar. Ao editar, deixe em branco para manter.";
   $("eqSalvar").textContent = "Criar acesso"; $("eqCancelar").style.display = "none";
 }
 $("eqCancelar").onclick = function(){ eqLimpar(); eqMsg(null, ""); };
 $("eqSalvar").onclick = function(){
-  var d = { action:"saveUser", email:$("eqEmail").value.trim(), nome:$("eqNome").value.trim(), papel:$("eqPapel").value, agente:$("eqAgente").value, ativo:"SIM" };
+  var d = { action:"saveUser", email:$("eqEmail").value.trim(), nome:$("eqNome").value.trim(), papel:$("eqPapel").value, agente:eqAgenteValor(), ativo:"SIM" };
   if (eqEditando){ var u = USUARIOS.filter(function(x){ return x.email === eqEditando; })[0]; if (u) d.ativo = u.ativo ? "SIM" : "NAO"; }
   if ($("eqSenha").value) d.senha = $("eqSenha").value;
   if (!d.email || !d.nome){ eqMsg("bad", "Preencha nome e e-mail."); return; }
@@ -4290,10 +4349,10 @@ if (SESSAO){ loadCache(); loadData(); } else { setStatus("live", "conferindo ace
 function checarApi(){
   fetchJSON(API_URL + "?action=ping&_=" + Date.now())
     .then(function(p){
-      if (p && Number(p.version) >= 15){ setStatus("warn", "sem sessão"); showLogin(""); return; }
+      if (p && Number(p.version) >= 15){ API_V15 = true; setStatus("warn", "sem sessão"); showLogin(msgGuardada()); return; }
       LEGADO = true; applyRole(); if (state.view === "equipe") setView("geral"); loadCache(); loadData();
     })
-    .catch(function(){ setStatus("warn", "sem sessão"); showLogin(""); });
+    .catch(function(){ setStatus("warn", "sem sessão"); showLogin(msgGuardada()); });   // o login confere a versao de novo
 }
 </script>
 </body>

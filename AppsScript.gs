@@ -160,11 +160,34 @@ function conferirSenha() {
 
 /** Senha do Apps Script (ADMIN_TOKEN) OU sessao de um admin logado. */
 function checkToken_(t) {
+  t = String(t || '');
+  // sessao primeiro: o admin logado nao depende do ADMIN_TOKEN existir
+  if (ehToken_(t)) {
+    var u = sessao_(t);
+    if (u) return u.papel === 'admin';
+  }
   var k = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
-  if (!k) throw new Error('Senha nao configurada no Apps Script (rode definirSenha()).');
-  if (String(t || '') === String(k)) return true;
-  var u = sessao_(t);
-  return !!(u && u.papel === 'admin');
+  if (!k) return false;
+  if (ehToken_(t) && t !== String(k)) return false;   // sessao vencida nao conta como chute de senha
+  return adminTokenOk_(t);
+}
+
+/** Formato do token de sessao (64 hexadecimais). */
+function ehToken_(t) { return /^[0-9a-f]{64}$/.test(String(t || '')); }
+
+/**
+ * Confere a senha do Apps Script com trava: 20 erros em 15 minutos bloqueiam a
+ * senha (as sessoes de admin continuam funcionando). Desde a v15 ela cria o
+ * primeiro admin e vale como admin nas acoes protegidas.
+ */
+function adminTokenOk_(t) {
+  var k = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
+  var cache = null, erros = 0;
+  try { cache = CacheService.getScriptCache(); erros = Number(cache.get('admerr')) || 0; } catch (eC) {}
+  if (erros >= 20) return false;
+  if (k && String(t || '') === String(k)) return true;
+  try { cache && cache.put('admerr', String(erros + 1), 900); } catch (eP) {}
+  return false;
 }
 
 /* ============================================================
@@ -219,7 +242,11 @@ function doPost(e) {
 }
 
 function protegida_(d) {
-  if (!checkToken_(d.token)) return { status: 'error', message: 'Senha invalida.' };
+  if (!checkToken_(d.token)) {
+    // com token de sessao, o painel entende "code: auth" e volta para o login
+    if (ehToken_(d.token)) return { status: 'error', code: 'auth', message: 'Sessao vencida ou sem permissao.' };
+    return { status: 'error', message: 'Senha invalida.' };
+  }
   if (d.action === 'listAdjust') return { status: 'ok', ajustes: listAdjust_() };
   if (d.action === 'addAdjust')  return addAdjust_(d);
   if (d.action === 'delAdjust')  return delAdjust_(d.id);
@@ -807,7 +834,22 @@ function listTarefas_(desde) {
 
 function hash_(salt, senha) {
   var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + '|' + String(senha), Utilities.Charset.UTF_8);
-  return Utilities.base64Encode(bytes);
+  // hexadecimal: base64 pode comecar com "+" ou "=", e a planilha leria como formula
+  return bytes.map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+}
+/** Texto puro na celula: o apostrofo impede a planilha de ler data, numero ou formula. */
+function txt_(v) { return "'" + String(v === null || v === undefined ? '' : v); }
+/** Roda fn com o lock do script (o mesmo do gravador de contagens). Nao aninhar. */
+function comLock_(fn) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (ignore) {}
+  try { return fn(); } finally { try { lock.releaseLock(); } catch (ignore2) {} }
+}
+/** Nao/NAO/NÃO/FALSE/0/N/inativo desativam (inclusive caixa de selecao desmarcada). */
+function ativoCelula_(v) {
+  var a = String(v === '' || v === null || v === undefined ? 'SIM' : v).trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return ['NAO', 'FALSE', 'FALSO', '0', 'N', 'INATIVO', 'DESATIVADO'].indexOf(a) < 0;
 }
 function aleatorio_() { return Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, ''); }
 function emailLimpo_(e) { return String(e || '').trim().toLowerCase(); }
@@ -844,7 +886,7 @@ function readUsers_() {
       linha: i + 2, email: email, nome: String(v[i][1] || '').trim(),
       papel: String(v[i][2] || 'agente').trim().toLowerCase(), agente: String(v[i][3] || '').trim(),
       salt: String(v[i][4] || ''), hash: String(v[i][5] || ''),
-      ativo: String(v[i][6] || 'SIM').toUpperCase() !== 'NAO',
+      ativo: ativoCelula_(v[i][6]),
       criadoEm: String(v[i][7] || ''), ultimoAcesso: String(v[i][8] || '')
     });
   }
@@ -886,14 +928,14 @@ function saveUser_(d) {
     if (atual) {
       var salt = atual.salt, hash = atual.hash;
       if (senha) { salt = aleatorio_(); hash = hash_(salt, senha); }
-      sh.getRange(atual.linha, 1, 1, 7).setValues([[email, nome, papel, agente, salt, hash, ativo]]);
+      sh.getRange(atual.linha, 1, 1, 7).setValues([[email, nome, papel, agente, salt, hash, ativo].map(txt_)]);
       if (senha || ativo === 'NAO') apagarSessoes_(email);
       else esquecerSessoes_(email);   // papel/agente novo vale ja na proxima chamada
       return { status: 'ok', usuario: publico_({ email: email, nome: nome, papel: papel, agente: agente, ativo: ativo === 'SIM', criadoEm: atual.criadoEm, ultimoAcesso: atual.ultimoAcesso }), atualizado: true };
     }
     if (!senha) return { status: 'error', message: 'Usuario novo precisa de senha inicial.' };
     var s2 = aleatorio_();
-    sh.appendRow([email, nome, papel, agente, s2, hash_(s2, senha), ativo, iso_(agora_()), '']);
+    sh.appendRow([email, nome, papel, agente, s2, hash_(s2, senha), ativo, iso_(agora_()), ''].map(txt_));
     return { status: 'ok', usuario: { email: email, nome: nome, papel: papel, agente: agente, ativo: ativo === 'SIM' }, criado: true };
   } finally {
     try { lock.releaseLock(); } catch (ignore) {}
@@ -902,8 +944,7 @@ function saveUser_(d) {
 
 /** Primeiro acesso: cria o admin inicial. Exige ADMIN_TOKEN e planilha sem usuarios. */
 function setupAdmin_(d) {
-  var k = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
-  if (!k || String(d.token || '') !== String(k)) return { status: 'error', message: 'Senha do Apps Script invalida.' };
+  if (!adminTokenOk_(d.token)) return { status: 'error', message: 'Senha do Apps Script invalida (ou muitas tentativas: espere 15 minutos).' };
   if (readUsers_().length) return { status: 'error', message: 'Ja existe usuario cadastrado. Peca ao admin para criar o seu.' };
   var r = saveUser_({ email: d.email, nome: d.nome, papel: 'admin', agente: d.agente || '', ativo: 'SIM', senha: d.senha });
   if (r.status !== 'ok') return r;
@@ -915,7 +956,9 @@ function login_(d) {
   // trava de tentativas: 8 erros em 15 min para o mesmo e-mail
   var cache = null, kErr = 'loginerr:' + email, erros = 0;
   try { cache = CacheService.getScriptCache(); erros = Number(cache.get(kErr)) || 0; } catch (eC) {}
-  if (erros >= 8) return { status: 'error', code: 'login', message: 'Muitas tentativas. Espere 15 minutos.' };
+  // Depois de 8 erros em 15 min, cada tentativa espera antes de conferir (ate 5 s).
+  // Nao recusa a senha certa: recusar deixaria qualquer um trancar o admin do lado de fora.
+  if (erros >= 8) Utilities.sleep(Math.min(erros - 7, 5) * 1000);
   var lista = readUsers_();
   if (!lista.length) return { status: 'error', code: 'no_users', message: 'Nenhum usuario cadastrado ainda.' };
   var u = null;
@@ -927,10 +970,11 @@ function login_(d) {
   try { cache && cache.remove(kErr); } catch (eR) {}
   var token = aleatorio_();
   var exp = new Date(agora_().getTime() + SESSAO_HORAS * 3600 * 1000);
-  var sh = sessSheet_();
-  sh.appendRow([token, u.email, iso_(agora_()), iso_(exp)]);
-  usersSheet_().getRange(u.linha, 9).setValue(iso_(agora_()));
-  limparSessoes_(sh);
+  comLock_(function () {
+    sessSheet_().appendRow([token, u.email, iso_(agora_()), iso_(exp)].map(txt_));
+    usersSheet_().getRange(u.linha, 9).setValue(txt_(iso_(agora_())));
+    limparSessoes_();
+  });
   var pub = publico_(u);
   try { CacheService.getScriptCache().put('sess:' + token, JSON.stringify(pub), 600); } catch (eC) {}
   return { status: 'ok', token: token, usuario: pub, expira: iso_(exp) };
@@ -940,12 +984,7 @@ function logout_(d) {
   var token = String(d.token || '');
   if (!token) return { status: 'ok' };
   try { CacheService.getScriptCache().remove('sess:' + token); } catch (eC) {}
-  var sh = sessSheet_();
-  var last = sh.getLastRow();
-  if (last >= 2) {
-    var v = sh.getRange(2, 1, last - 1, 1).getDisplayValues();
-    for (var i = v.length - 1; i >= 0; i--) if (String(v[i][0]) === token) sh.deleteRow(i + 2);
-  }
+  comLock_(function () { filtrarSessoes_(function (r) { return String(r[0]) !== token; }); });
   return { status: 'ok' };
 }
 
@@ -977,29 +1016,47 @@ function sessao_(token) {
   return null;
 }
 
-/** Tira as sessoes vencidas (e limita a aba a ~500 linhas). */
-function limparSessoes_(sh) {
+/**
+ * Reescreve a aba Sessoes de uma vez, so com as linhas em que manter(linha) e
+ * verdadeiro. Chamar SEMPRE com o lock (comLock_ ou o do saveUser_): apagar
+ * linha por linha com indices de uma leitura anterior acertava sessoes validas
+ * quando dois logins rodavam juntos.
+ */
+function filtrarSessoes_(manter) {
+  var sh = sessSheet_();
   var last = sh.getLastRow();
   if (last < 2) return;
-  var v = sh.getRange(2, 1, last - 1, SESS_HEADER.length).getDisplayValues();
+  var n = SESS_HEADER.length;
+  var v = sh.getRange(2, 1, last - 1, n).getDisplayValues();
+  var fica = v.filter(manter);
+  if (fica.length === v.length) return;
+  sh.getRange(2, 1, v.length, n).clearContent();
+  if (fica.length) sh.getRange(2, 1, fica.length, n).setValues(fica.map(function (r) { return r.map(txt_); }));
+}
+
+/** Tira as sessoes vencidas e guarda no maximo as 500 mais novas. Chamar com o lock. */
+function limparSessoes_() {
   var agoraStr = iso_(agora_());
-  for (var i = v.length - 1; i >= 0; i--) {
-    if (String(v[i][3]) < agoraStr || (v.length - i) > 500) sh.deleteRow(i + 2);
+  filtrarSessoes_(function (r) { return String(r[3]) >= agoraStr; });
+  var sh = sessSheet_();
+  var sobra = sh.getLastRow() - 1 - 500;
+  if (sobra > 0) {
+    var cont = 0;
+    filtrarSessoes_(function () { return ++cont > sobra; });
   }
 }
 
+/** Derruba todas as sessoes de um e-mail. Chamar com o lock (o saveUser_ ja segura). */
 function apagarSessoes_(email) {
   var sh = sessSheet_();
   var last = sh.getLastRow();
   if (last < 2) return;
   var v = sh.getRange(2, 1, last - 1, 2).getDisplayValues();
-  var cache = null; try { cache = CacheService.getScriptCache(); } catch (eC) {}
-  for (var i = v.length - 1; i >= 0; i--) {
-    if (emailLimpo_(v[i][1]) === email) {
-      try { cache && cache.remove('sess:' + String(v[i][0])); } catch (eR) {}
-      sh.deleteRow(i + 2);
-    }
-  }
+  try {
+    var cache = CacheService.getScriptCache();
+    for (var i = 0; i < v.length; i++) if (emailLimpo_(v[i][1]) === email) cache.remove('sess:' + String(v[i][0]));
+  } catch (eC) {}
+  filtrarSessoes_(function (r) { return emailLimpo_(r[1]) !== email; });
 }
 
 /** Tira do cache as sessoes de um e-mail (continuam validas, so releem o usuario). */
