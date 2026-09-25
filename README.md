@@ -11,8 +11,8 @@ Página estática, sem build, publicada pelo GitHub Pages.
 Script AHK (máquina do agente)
         │  HTTP GET  ?agente=&contador=&loja=&ticket=
         ▼
-Google Apps Script  ──►  Google Sheets (abas Logs / Ajustes / Metas / Tarefas / Usuarios / Sessoes)
-        │  GET ?action=getData&token=SESSAO      ◄── API do Review Desk (action=list)
+Google Apps Script  ──►  Google Sheets (abas Logs / Ajustes / Metas / Tarefas / Usuarios / Sessoes / Reviews)
+        │  GET ?action=getData&token=SESSAO      ◄── API do Review Desk (só para importar)
         ▼
 index.html (GitHub Pages, com login)
 ```
@@ -76,7 +76,7 @@ O `AppsScript.gs` deste repositório é backup. Para alterar de verdade:
 3. Repetir em **todas** as implantações ativas — existem várias, e cada uma fica presa
    à versão em que foi publicada. Atualizar só uma deixa o resto rodando código antigo.
 
-## Acessos (Apps Script v15)
+## Acessos (Apps Script v15 e v16)
 
 O painel exige login com e-mail e senha. Cada pessoa é uma linha na aba **Usuarios**
 (senha guardada como hash com salt, nunca em texto). O login cria um token de sessão
@@ -84,8 +84,8 @@ O painel exige login com e-mail e senha. Cada pessoa é uma linha na aba **Usuar
 
 | Papel | Vê | Não vê |
 |---|---|---|
-| admin | tudo, mais a tela **Equipe** (criar, editar, desativar, redefinir senha) | — |
-| agente | Visão geral, Tarefas e Trustpilot, só com as **próprias** contagens e tarefas; todos os reviews | metas, horários, agentes, qualidade, notas, ajustes, report, CSV |
+| admin | tudo, mais a tela **Equipe** (criar, editar, desativar, redefinir senha); exclui reviews e traz do Review Desk | — |
+| agente | Visão geral, Tarefas, Trustpilot e Follow up, só com as **próprias** contagens e tarefas; todos os reviews, que ele também cadastra e edita | metas, horários, agentes, qualidade, notas, ajustes, report, CSV |
 
 O corte é feito no Apps Script: para um agente, o `getData` já sai sem as linhas dos
 outros e sem metas, qualidade, notas e ajustes. Esconder na tela sozinho não bastaria.
@@ -96,16 +96,28 @@ O campo **Nome no contador** liga a pessoa às contagens: tem que ser igual ao
 aparece "Primeiro acesso", que pede a senha do Apps Script (`ADMIN_TOKEN`). Alternativa:
 `criarAdmin()` no editor. Só funciona enquanto não existe nenhum usuário.
 
-**Trustpilot**: os reviews vêm da API do próprio Review Desk, a mesma chamada de leitura
-(`?action=list`) que o site dele faz. Duas propriedades do script (Configurações do projeto ›
-Propriedades do script): `REVIEWS_API_URL` (a URL `/exec` do Review Desk) e
-`REVIEWS_SECRET` (o `SHARED_SECRET` dele). A chamada sai do Apps Script, servidor a servidor:
-a senha fica só nas propriedades, nunca no navegador nem neste repositório, e este script
-só lê, nunca chama `add`/`update`. Alternativa: `REVIEWS_SHEET_ID` lê a aba Reviews direto,
-se a conta do script tiver acesso à planilha. Depois de configurar, rode `testarReviews()`
-uma vez no editor: chamar outro serviço pede uma autorização nova do Google, e a função
-conta os reviews. Se a leitura falhar, o painel mostra o motivo ao admin. Se o
-`SHARED_SECRET` do Review Desk mudar, atualize `REVIEWS_SECRET` junto.
+**Trustpilot (v16)**: os reviews moram na aba **Reviews** da planilha e são cadastrados no
+painel por quem tem login, em **Trustpilot › Novo review**. O link do review é obrigatório e
+tem que ser de um review do Trustpilot (com `/reviews/` no endereço; vale www, país ou o app
+Business). O mesmo review não entra duas vezes, mesmo escrito de outro jeito. Campos: data,
+loja, nota, status, responsável, risco de chargeback, notas e ticket (link ou número).
+Status: Investigando, Contatado, Follow up, Resolvendo, Resolvido. "Contatado em" e
+"Follow up em" são gravados sozinhos na troca de status, e cada review guarda quem
+cadastrou e quem alterou por último. Se duas pessoas editarem o mesmo review ao mesmo
+tempo, a segunda recebe um aviso em vez de apagar a mudança da primeira.
+
+**Follow up**: a tela lista quem está Contatado (ou em Follow up) há mais de 3 dias sem
+resposta (`FOLLOW_UP_DIAS` no Apps Script), com "Fiz o follow up" (conta a tentativa e o
+review volta a esperar mais 3 dias) e "Cliente respondeu" (vai para Resolvendo). O menu
+mostra quantos estão atrasados.
+
+**Review Desk**: na primeira leitura depois da v16, a aba Reviews é criada e recebe tudo o
+que estava no Review Desk, pela API dele: propriedades `REVIEWS_API_URL` (a URL `/exec`) e
+`REVIEWS_SECRET` (o `SHARED_SECRET` dele), ou `REVIEWS_SHEET_ID`. Depois disso o Review
+Desk só é lido quando o admin clica em **Trazer do Review Desk**, que acrescenta o que faltar
+(pelo ID) sem mexer no que já está aqui. Reviews com o mesmo link aparecem marcados como
+"repetido" para o admin. `testarReviews()` no editor confere a conexão e reabre a
+autorização do Google se "Connect to an external service" tiver ficado desmarcado.
 
 **As duas implantações vão juntas para a v15.** O `getData` existe na implantação do
 painel e na dos contadores (a URL que está nos `.ahk`). Se a dos contadores ficar numa
@@ -125,6 +137,8 @@ ou caixa desmarcada, mas pode levar até 10 minutos (cache das sessões); pela t
 vale na hora.
 
 O contador de e-mails (`?agente=…`) e o de tarefas (`?action=addTarefa`) continuam sem login.
+Desde a v16, um pedido com uma ação que o script não conhece, ou um POST sem agente, volta
+erro e não grava nada: antes ele virava uma linha falsa de contagem na aba Logs.
 
 ## Senha do Apps Script
 
