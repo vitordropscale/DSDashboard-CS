@@ -11,10 +11,10 @@ Página estática, sem build, publicada pelo GitHub Pages.
 Script AHK (máquina do agente)
         │  HTTP GET  ?agente=&contador=&loja=&ticket=
         ▼
-Google Apps Script  ──►  Google Sheets (abas Logs / Ajustes / Metas / Tarefas)
-        │  GET ?action=getData
+Google Apps Script  ──►  Google Sheets (abas Logs / Ajustes / Metas / Tarefas / Usuarios / Sessoes)
+        │  GET ?action=getData&token=SESSAO      ◄── planilha do Review Desk (aba Reviews)
         ▼
-index.html (GitHub Pages)
+index.html (GitHub Pages, com login)
 ```
 
 Um script AutoHotkey roda na máquina de cada agente e conta os e-mails respondidos.
@@ -76,20 +76,44 @@ O `AppsScript.gs` deste repositório é backup. Para alterar de verdade:
 3. Repetir em **todas** as implantações ativas — existem várias, e cada uma fica presa
    à versão em que foi publicada. Atualizar só uma deixa o resto rodando código antigo.
 
-## Senha
+## Acessos (Apps Script v15)
 
-As ações de escrita de **ajustes** e **notas** exigem senha, guardada em
-**Configurações do projeto › Propriedades do script**, chave `ADMIN_TOKEN`.
-Nunca no código, nunca neste repositório.
+O painel exige login com e-mail e senha. Cada pessoa é uma linha na aba **Usuarios**
+(senha guardada como hash com salt, nunca em texto). O login cria um token de sessão
+(aba **Sessoes**, 14 horas) que vai em todas as chamadas.
 
-As **metas** não pedem senha a partir do Apps Script v9. Quem abrir o dashboard
-publicado consegue alterá-las. Com um Apps Script mais antigo, o painel de metas
-continua pedindo a senha, porque a gravação ainda é recusada sem ela.
+| Papel | Vê | Não vê |
+|---|---|---|
+| admin | tudo, mais a tela **Equipe** (criar, editar, desativar, redefinir senha) | — |
+| agente | Visão geral, Tarefas e Trustpilot, só com as **próprias** contagens e tarefas; todos os reviews | metas, horários, agentes, qualidade, notas, ajustes, report, CSV |
 
-A leitura (`?action=getData`) é aberta. A URL da API é montada em tempo de execução
-em vez de aparecer literal no código — isso evita coleta automática por scanners que
-varrem repositórios públicos, mas **não é segurança**: quem abrir o DevTools no site
-publicado vê a URL. Os dados expostos são volume de e-mail por agente, dia e loja.
+O corte é feito no Apps Script: para um agente, o `getData` já sai sem as linhas dos
+outros e sem metas, qualidade, notas e ajustes. Esconder na tela sozinho não bastaria.
+O campo **Nome no contador** liga a pessoa às contagens: tem que ser igual ao
+`AGENT_NAME` do contador dela.
+
+**Primeiro admin**: abra o painel, digite e-mail e senha; com a aba Usuarios vazia,
+aparece "Primeiro acesso", que pede a senha do Apps Script (`ADMIN_TOKEN`). Alternativa:
+`criarAdmin()` no editor. Só funciona enquanto não existe nenhum usuário.
+
+**Trustpilot**: os reviews vêm da aba **Reviews** da planilha do Review Desk. O ID dessa
+planilha fica na propriedade do script `REVIEWS_SHEET_ID` (Configurações do projeto ›
+Propriedades do script). Sem ela, o painel mostra o aviso no lugar dos reviews.
+
+**Transição**: enquanto o Apps Script no ar for anterior à v15, o painel pergunta a versão
+(`?action=ping`) e funciona como antes, sem login e sem a tela Equipe.
+
+O contador de e-mails (`?agente=…`) e o de tarefas (`?action=addTarefa`) continuam sem login.
+
+## Senha do Apps Script
+
+`ADMIN_TOKEN`, em **Configurações do projeto › Propriedades do script**. Nunca no
+código, nunca neste repositório. Continua valendo nas ações protegidas (ajustes, notas,
+metas, equipe) e serve para criar o primeiro admin. Com login, a sessão de um admin
+substitui a senha: o painel não pede mais senha para quem entrou como admin.
+
+A URL da API é montada em tempo de execução em vez de aparecer literal no código. Isso
+evita coleta automática, mas **não é segurança**: a proteção dos dados é o login.
 
 ## Notas de implementação
 

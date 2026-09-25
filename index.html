@@ -415,6 +415,45 @@ textarea.inp{resize:vertical;line-height:1.55}
 .preview b{color:var(--text)}
 
 /* ---------- telas menores ---------- */
+/* ---------- acessos ---------- */
+body.role-agente .admin-only{display:none!important}
+body.legado .nav button[data-view=equipe]{display:none!important}
+body.role-agente .kpis{grid-template-columns:repeat(3,1fr)}
+.login{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px}
+.login.show{display:flex}
+.login-box{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 28px 24px}
+.login-box .logo{width:48px;height:48px;border-radius:12px;overflow:hidden;background:none;margin:0 auto 18px}
+.login-box .logo img{width:100%;height:100%;display:block}
+/* Trustpilot nao depende do periodo; Equipe nao depende de filtro nenhum */
+body[data-tela=trustpilot] .page-ctl,body[data-tela=trustpilot] #chipAgents,
+body[data-tela=equipe] .page-ctl,body[data-tela=equipe] .filters{display:none!important}
+.login-box h2{font-family:var(--font-d);font-size:20px;font-weight:700;text-align:center;letter-spacing:-.3px}
+.login-box p.sub{font-size:12.5px;color:var(--muted);text-align:center;margin:6px 0 22px}
+.login-box .link{background:none;border:none;color:var(--brand-2);font-size:12.5px;cursor:pointer;padding:6px 0;width:100%;text-align:center}
+.user-line{display:flex;align-items:center;gap:10px;padding:6px 10px 2px;min-width:0}
+.user-line .av{width:3px;height:22px}
+.user-line b{display:block;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-line small{display:block;font-size:11px;color:var(--muted)}
+.stars{font-family:var(--font);letter-spacing:1px;color:var(--warn);font-size:12px;white-space:nowrap}
+.stars .off{color:rgba(255,255,255,.16)}
+.rv-tag{display:inline-block;font-size:11px;font-weight:500;padding:3px 8px;border-radius:5px;background:var(--off);color:var(--text2);white-space:nowrap}
+.rv-tag.investigando{background:var(--warn-soft);color:#f6cd84}
+.rv-tag.contatado,.rv-tag.resolvendo{background:var(--brand-soft);color:#a9c8ff}
+.rv-tag.resolvido{background:var(--good-soft);color:#7fe0b4}
+.rv-risk{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#f7a3ad;white-space:nowrap}
+.rv-risk::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--crit)}
+.rv-list .rv{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.rv-list .rv:last-child{border-bottom:none}
+.rv-list .rv .grow{flex:1 1 auto;min-width:0}
+.rv-list .rv .grow small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.rv-note{color:var(--text2);font-size:12px;max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;margin-bottom:16px}
+.mini-kpis div{background:var(--card);padding:12px 14px}
+.mini-kpis b{display:block;font-family:var(--font-d);font-size:22px;font-weight:700;letter-spacing:-.6px}
+.mini-kpis span{font-size:11.5px;color:var(--muted)}
+.eq-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:680px){.eq-row{grid-template-columns:1fr}.mini-kpis{grid-template-columns:1fr}}
+
 @media(max-width:1240px){.kpis{grid-template-columns:repeat(3,1fr)}.kpis .kpi:nth-child(n+4){grid-column:span 1}.g-2,.g-2b{grid-template-columns:1fr}}
 @media(max-width:900px){
   /* o menu lateral vira uma faixa no topo, so com icones */
@@ -429,6 +468,7 @@ textarea.inp{resize:vertical;line-height:1.55}
   .nav button span{display:none}
   .nav button.on span{display:inline}
   .side-foot{margin:0 0 0 auto;flex-direction:row}
+  .side-foot .user-line{display:none}
   .main{margin-left:0}
   .wrap{padding:18px 14px 40px}
   .page-t{font-size:21px}
@@ -459,25 +499,31 @@ textarea.inp{resize:vertical;line-height:1.55}
     <button data-view="geral" class="on">
       <svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
       <span>Visão geral</span></button>
-    <button data-view="metas">
+    <button data-view="metas" class="admin-only">
       <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6"/></svg>
       <span>Metas</span></button>
-    <button data-view="horarios">
+    <button data-view="horarios" class="admin-only">
       <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
       <span>Horários</span></button>
-    <button data-view="agentes">
+    <button data-view="agentes" class="admin-only">
       <svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><path d="M16 5.6a3.2 3.2 0 0 1 0 5.8"/><path d="M18.2 14.9c1.5.8 2.4 2.3 2.8 4.6"/></svg>
       <span>Agentes</span></button>
-    <button data-view="qualidade">
+    <button data-view="qualidade" class="admin-only">
       <svg class="ic" viewBox="0 0 24 24"><path d="M12 3.5 19.5 6v6c0 4.2-3 7.2-7.5 8.5C7.5 19.2 4.5 16.2 4.5 12V6z"/><path d="m9 12 2.2 2.2L15.2 10"/></svg>
       <span>Qualidade</span></button>
     <button data-view="tarefas">
       <svg class="ic" viewBox="0 0 24 24"><path d="m4.5 7.6 1.8 1.8 3.2-3.3"/><path d="M12.5 8h7"/><path d="m4.5 15.6 1.8 1.8 3.2-3.3"/><path d="M12.5 16h7"/></svg>
       <span>Tarefas</span></button>
+    <button data-view="trustpilot">
+      <svg class="ic" viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L12 16.9l-5.3 2.8 1.1-5.9-4.3-4.1 5.9-.8z"/></svg>
+      <span>Trustpilot</span></button>
+    <button data-view="equipe" class="admin-only">
+      <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.6 3.4-5.5 7-5.5s6.3 1.9 7 5.5"/></svg>
+      <span>Equipe</span></button>
   </nav>
 
-  <div class="side-lab">Ações</div>
-  <div class="nav">
+  <div class="side-lab admin-only">Ações</div>
+  <div class="nav admin-only">
     <button id="btnNota" title="Registrar o que aconteceu de especial num dia">
       <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Nova nota</span></button>
     <button id="btnAdj" title="Corrigir loja ou ajustar totais">
@@ -489,12 +535,14 @@ textarea.inp{resize:vertical;line-height:1.55}
   </div>
 
   <div class="side-foot">
+    <div class="user-line"><span class="av" id="userAv"></span><div style="min-width:0"><b id="userNome">—</b><small id="userPapel"></small></div></div>
     <div class="stat"><span class="dot live" id="stDot"></span><span id="stTxt">carregando…</span></div>
     <div class="stat" id="stRows" title="Registros no filtro atual">—</div>
     <button class="btn" id="btnRefresh" title="Atualizar agora (tecla R)">
       <svg class="ic" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5v5h-5"/></svg>
       Atualizar
     </button>
+    <button class="btn" id="btnLogout" title="Encerrar a sessão neste navegador">Sair</button>
   </div>
 </aside>
 
@@ -529,7 +577,7 @@ textarea.inp{resize:vertical;line-height:1.55}
 
   <div class="filters">
     <div class="seg stores" id="segStore"></div>
-    <div class="chips" id="chipAgents" title="Clique para tirar ou recolocar um agente. Alt+clique isola."></div>
+    <div class="chips admin-only" id="chipAgents" title="Clique para tirar ou recolocar um agente. Alt+clique isola."></div>
   </div>
 
   <!-- ===================== VISÃO GERAL ===================== -->
@@ -550,14 +598,14 @@ textarea.inp{resize:vertical;line-height:1.55}
         <div class="kpi-v"><span class="sk" id="kDia">0</span><small>por dia</small></div>
         <div class="kpi-s" id="kDiaS">&nbsp;</div>
       </div>
-      <div class="kpi">
+      <div class="kpi admin-only">
         <div class="kpi-h">
           <div class="kpi-l">Agentes ativos</div>
         </div>
         <div class="kpi-v"><span class="sk" id="kAg">0</span><small>agentes</small></div>
         <div class="kpi-s" id="kAgS">&nbsp;</div>
       </div>
-      <div class="kpi">
+      <div class="kpi admin-only">
         <div class="kpi-h">
           <div class="kpi-l">Top agente</div>
         </div>
@@ -573,7 +621,24 @@ textarea.inp{resize:vertical;line-height:1.55}
       </div>
     </div>
 
-    <div class="card" id="metaCard">
+    <div class="grid g-2b">
+      <div class="card">
+        <div class="card-h">
+          <div><div class="card-t">Tarefas</div><div class="card-sub" id="ovTarSub">&nbsp;</div></div>
+          <button class="btn" id="btnVerTarefas">Ver tudo</button>
+        </div>
+        <div id="ovTarBox"></div>
+      </div>
+      <div class="card">
+        <div class="card-h">
+          <div><div class="card-t">Trustpilot</div><div class="card-sub" id="ovRvSub">&nbsp;</div></div>
+          <button class="btn" id="btnVerReviews">Ver tudo</button>
+        </div>
+        <div id="ovRvBox"></div>
+      </div>
+    </div>
+
+    <div class="card admin-only" id="metaCard">
       <div class="card-h">
         <div><div class="card-t">Metas do dia</div>
         <div class="card-sub" id="metaSub">&nbsp;</div></div>
@@ -588,7 +653,7 @@ textarea.inp{resize:vertical;line-height:1.55}
           <div><div class="card-t">Evolução</div><div class="card-sub" id="trendSub">&nbsp;</div></div>
           <div class="mini-seg" id="segTrend">
             <button data-m="total" class="on">Total</button>
-            <button data-m="agente">Por agente</button>
+            <button data-m="agente" class="admin-only">Por agente</button>
             <button data-m="loja">Por loja</button>
           </div>
         </div>
@@ -750,6 +815,76 @@ textarea.inp{resize:vertical;line-height:1.55}
       <div id="tarSessoes"></div>
     </div>
   </section>
+
+  <!-- ===================== TRUSTPILOT ===================== -->
+  <section class="view" data-view="trustpilot">
+    <div class="card">
+      <div class="card-h">
+        <div><div class="card-t">Reviews</div><div class="card-sub" id="rvSub">&nbsp;</div></div>
+        <div class="mini-seg" id="segRv">
+          <button data-m="abertos" class="on">Em aberto</button>
+          <button data-m="risco">Com risco</button>
+          <button data-m="todos">Todos</button>
+        </div>
+      </div>
+      <div id="rvBox"></div>
+    </div>
+  </section>
+
+  <!-- ===================== EQUIPE (admin) ===================== -->
+  <section class="view" data-view="equipe">
+    <div class="grid g-2">
+      <div class="card">
+        <div class="card-h">
+          <div><div class="card-t">Pessoas com acesso</div><div class="card-sub" id="eqSub">&nbsp;</div></div>
+        </div>
+        <div id="eqBox"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><div><div class="card-t" id="eqFormT">Novo acesso</div>
+          <div class="card-sub">Agente vê só os próprios e-mails, tarefas e o Trustpilot.</div></div></div>
+        <div class="msg" id="eqMsg"></div>
+        <div class="eq-row">
+          <div class="field"><label for="eqNome">Nome</label><input class="inp" id="eqNome" placeholder="ex.: Amanda"></div>
+          <div class="field"><label for="eqEmail">Email</label><input class="inp" id="eqEmail" type="email" placeholder="nome@dropscale.com"></div>
+        </div>
+        <div class="eq-row">
+          <div class="field"><label for="eqPapel">Papel</label>
+            <select class="inp" id="eqPapel"><option value="agente">Agente</option><option value="admin">Admin</option></select></div>
+          <div class="field"><label for="eqAgente">Nome no contador</label>
+            <select class="inp" id="eqAgente"></select>
+            <div class="hint">É o que liga a pessoa às contagens dela.</div></div>
+        </div>
+        <div class="field"><label for="eqSenha">Senha</label><input class="inp" id="eqSenha" type="password" autocomplete="new-password" placeholder="mínimo 6 caracteres">
+          <div class="hint" id="eqSenhaHint">A pessoa usa esta senha para entrar. Ao editar, deixe em branco para manter.</div></div>
+        <button class="btn-primary" id="eqSalvar">Criar acesso</button>
+        <button class="btn" id="eqCancelar" style="display:none;width:100%;justify-content:center;margin-top:8px">Cancelar edição</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="login" id="login">
+    <div class="login-box">
+      <div class="logo"><img alt="" id="loginLogo"></div>
+      <h2>CS Dashboard</h2>
+      <p class="sub" id="loginSub">Entre com o seu e-mail e senha.</p>
+      <div class="msg" id="loginMsg"></div>
+      <div id="loginForm">
+        <div class="field"><label for="lgEmail">Email</label><input class="inp" id="lgEmail" type="email" autocomplete="username"></div>
+        <div class="field"><label for="lgSenha">Senha</label><input class="inp" id="lgSenha" type="password" autocomplete="current-password"></div>
+        <button class="btn-primary" id="lgEntrar">Entrar</button>
+      </div>
+      <div id="setupForm" style="display:none">
+        <div class="field"><label for="suNome">Seu nome</label><input class="inp" id="suNome"></div>
+        <div class="field"><label for="suEmail">Seu email</label><input class="inp" id="suEmail" type="email"></div>
+        <div class="field"><label for="suSenha">Crie uma senha</label><input class="inp" id="suSenha" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="suToken">Senha do Apps Script</label><input class="inp" id="suToken" type="password">
+          <div class="hint">A mesma que você definiu em ADMIN_TOKEN. Só serve para criar o primeiro admin.</div></div>
+        <button class="btn-primary" id="suCriar">Criar admin e entrar</button>
+        <button class="link" id="suVoltar">Voltar ao login</button>
+      </div>
+    </div>
+  </div>
 
   <div class="ov" id="ovTk">
     <div class="modal" style="max-width:520px">
@@ -1070,6 +1205,18 @@ var NOTAS = [];       // [{id, data, tipo, agente, loja, texto}]
 var NOTAS_DIA = {};
 var QUALIDADE = [];  // [{data, agente, ticket, fora, repetidos}] — resumo do Apps Script v10   // {"yyyy-MM-dd": [nota, ...]}
 var TAREFAS = [];    // sessões do Contador de Tarefas (Apps Script v14) — ver normalizeTarefas
+var REVIEWS = [];    // reviews do Trustpilot (Apps Script v15) — ver normalizeReviews
+var REVIEWS_OK = true;
+var SESSAO_KEY = "emailcounter.sessao";
+var SESSAO = null;   // {token, email, nome, papel, agente}
+var USUARIOS = [];   // tela Equipe (admin)
+var VISTAS_AGENTE = ["geral", "tarefas", "trustpilot"];
+/* LEGADO: o Apps Script no ar ainda nao tem login (v14 ou antes). O painel
+   funciona como antes, sem login, ate a v15 ser implantada — ai a API passa a
+   recusar o getData sem sessao e o login aparece sozinho. */
+var LEGADO = false;
+function isAdmin(){ return LEGADO || !!(SESSAO && SESSAO.papel === "admin"); }
+function sessaoToken(){ return SESSAO ? SESSAO.token : ""; }
 var API_VERSION = 0;  // versao do Apps Script implantado (metas por loja e notas: 8+)
 var LAST_WRITE  = 0;  // instante da ultima gravacao iniciada ou confirmada (ver loadData)
 var LOADED_SINCE = null;  // primeiro dia carregado ("yyyy-MM-dd"); null = base inteira
@@ -1269,6 +1416,23 @@ function chaveTarefa(s){
   return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
 }
 
+/** Só http(s): o link vem de uma planilha editável e vira href na tela. */
+function linkSeguro(u){ u = String(u || "").trim(); return /^https?:\/\//i.test(u) ? u : ""; }
+
+/** Reviews do Trustpilot vindos do Review Desk: descarta o que não tem loja nem nota. */
+function normalizeReviews(raw){
+  if (Object.prototype.toString.call(raw) !== "[object Array]") return [];
+  return raw.map(function(r){
+    return {
+      id: String(r.id || ""), store: canonStore(r.store), stars: Math.max(0, Math.min(5, +r.stars || 0)),
+      date: parseDay(r.date) || parseDay(r.created_at) || "", status: String(r.status || "").trim(),
+      owner: String(r.owner || "").trim(), risk: !!r.risk, notes: String(r.notes || ""),
+      review_link: linkSeguro(r.review_link), ticket_link: linkSeguro(r.ticket_link)
+    };
+  }).filter(function(r){ return r.stars > 0 || r.status; })
+    .sort(function(a, b){ return b.date < a.date ? -1 : b.date > a.date ? 1 : 0; });
+}
+
 /** Devolve "yyyy-MM-dd" a partir de vários formatos, ou null. */
 function parseDay(v){
   if (v === null || v === undefined) return null;
@@ -1363,6 +1527,7 @@ function ensureCoverage(){
 }
 
 function loadData(manual){
+  if (!SESSAO && !LEGADO) return Promise.resolve();   // sem login a API nem e chamada
   if (LOADING) return Promise.resolve();
   LOADING = true;
   $("btnRefresh").classList.add("spin");
@@ -1371,7 +1536,7 @@ function loadData(manual){
   var since = neededSince();
   // uma leitura que ja cobre mais do que o pedido continua cobrindo
   if (since !== null && LOADED_SINCE !== null && LOADED_SINCE < since) since = LOADED_SINCE;
-  var base = API_URL + "?action=getData" + (since ? "&since=" + since : "");
+  var base = API_URL + "?action=getData&token=" + encodeURIComponent(sessaoToken()) + (since ? "&since=" + since : "");
   var errs = [];
   // Uma leitura que saiu antes de uma gravacao terminar volta sem ela, e
   // desfaria na tela o que acabou de ser salvo. Essa e descartada e refeita.
@@ -1381,9 +1546,12 @@ function loadData(manual){
     .catch(function(e){ errs.push("compact: "+e.message); return fetchJSON(base + "&_=" + Date.now()); })
     .catch(function(e){ errs.push("json: "+e.message);    return fetchJSONP(base); })
     .then(function(payload){
+      if (payload && payload.status === "error" && payload.code === "auth"){ authFail(payload.message); return; }
       if (!payload || payload.status === "error")
         throw new Error((payload && payload.message) || "a API retornou erro");
       if (started <= LAST_WRITE){ stale = true; return; }
+      if (payload.usuario) setSessao(Object.assign({}, SESSAO, payload.usuario));
+      REVIEWS = normalizeReviews(payload.reviews); REVIEWS_OK = payload.reviewsOk !== false;
       LOADED_SINCE = since;
       RECS = normalize(payload); refreshAgentColors();
       ADJ_COUNT = Number(payload.ajustes) || 0;
@@ -1395,7 +1563,7 @@ function loadData(manual){
       API_VERSION = Number(payload.version) || 0;
       indexMetas(); indexNotas();
       LAST_OK = new Date();
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at:LAST_OK.getTime(), since:since, payload:payload })); } catch(e){}
+      try { localStorage.setItem(cacheKey(), JSON.stringify({ at:LAST_OK.getTime(), since:since, payload:payload })); } catch(e){}
       buildFilters();
       render();
       reportHealth(payload);
@@ -1450,8 +1618,9 @@ function hideBanner(){ $("banner").className="banner"; }
 
 function loadCache(){
   try{
-    var c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    var c = JSON.parse(localStorage.getItem(cacheKey()) || "null");
     if (!c || !c.payload) return;
+    REVIEWS = normalizeReviews(c.payload.reviews); REVIEWS_OK = c.payload.reviewsOk !== false;
     LOADED_SINCE = c.since || null;
     RECS = normalize(c.payload); refreshAgentColors();
     METAS = (c.payload.metas && typeof c.payload.metas === "object") ? c.payload.metas : {};
@@ -1529,10 +1698,11 @@ function buildFilters(){
     });
   }
 
-  // agentes
+  // agentes (o agente so ve a si mesmo: sem chips)
   var names = {}; RECS.forEach(function(r){ names[r.agente]=1; });
   var agents = Object.keys(names).sort();
   var box = $("chipAgents");
+  if (!isAdmin()){ box.innerHTML = ""; box.dataset.built = ""; return; }
   if (box.dataset.built === agents.join("|")) return;
   box.dataset.built = agents.join("|");
   box.innerHTML = agents.map(function(a,i){
@@ -1617,11 +1787,14 @@ function render(){
   renderBursts(rows);
   renderQualidade(r);
   renderTarefas(r);
+  renderOverviewTarefas(r);
+  renderReviews(r);
   renderTable(A, rows);
   renderAgentCharts(A, rows);
 
   $("pageSub").textContent = r.label.charAt(0).toUpperCase() + r.label.slice(1) + ", " +
     (state.store === "__all" ? "todas as lojas" : state.store);
+  subTela();
 
   var parts = [nf(RECS.length)+" registros na base"];
   if (ADJ_COUNT)   parts.push(nf(ADJ_COUNT)+" ajuste"+(ADJ_COUNT>1?"s":"")+" aplicado"+(ADJ_COUNT>1?"s":""));
@@ -3368,7 +3541,7 @@ $("segWeek").querySelectorAll("button").forEach(function(b){
    ========================================================================== */
 var PWD_KEY = "emailcounter.pwd";
 
-function getPwd(){ try { return sessionStorage.getItem(PWD_KEY) || ""; } catch(e){ return ""; } }
+function getPwd(){ if (sessaoToken()) return sessaoToken(); try { return sessionStorage.getItem(PWD_KEY) || ""; } catch(e){ return ""; } }
 function setPwd(v){ try { v ? sessionStorage.setItem(PWD_KEY,v) : sessionStorage.removeItem(PWD_KEY); } catch(e){} }
 
 function parseApi(t){
@@ -3383,12 +3556,15 @@ function parseApi(t){
  */
 function apiPost(obj){
   obj.token = getPwd();
+  // senha nunca vai na URL: com senha no pedido, nada de repetir por GET
+  var soPost = !!obj.senha;
 
   var post = fetch(API_URL, { method:"POST", redirect:"follow", body:JSON.stringify(obj) })
     .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
     .then(parseApi);
 
   return withTimeout(post, 35000, "gravação").catch(function(e){
+    if (soPost) throw e;
     var qs = Object.keys(obj).map(function(k){
       return encodeURIComponent(k)+"="+encodeURIComponent(obj[k] === null || obj[k] === undefined ? "" : obj[k]);
     }).join("&");
@@ -3540,6 +3716,8 @@ function undoAdj(id, btn){
 }
 
 function forceLogin(){
+  // com sessao ativa, "senha invalida" significa sessao vencida no servidor
+  if (sessaoToken()){ authFail("Sua sessão venceu. Entre de novo."); return; }
   setPwd("");
   $("adjAuth").style.display = ""; $("adjPanel").style.display = "none";
   adjMsg("bad","Senha inválida ou expirada. Entre de novo.");
@@ -3773,32 +3951,350 @@ document.addEventListener("visibilitychange", function(){
 /* =============================================================================
    TELAS — o menu lateral escolhe qual bloco de cartoes aparece
    ========================================================================== */
-var VIEWS = { geral:"Visão geral", metas:"Metas", horarios:"Horários", agentes:"Agentes", qualidade:"Qualidade", tarefas:"Tarefas" };
+var VIEWS = { geral:"Visão geral", metas:"Metas", horarios:"Horários", agentes:"Agentes", qualidade:"Qualidade", tarefas:"Tarefas", trustpilot:"Trustpilot", equipe:"Equipe" };
+
+/* =============================================================================
+   SESSAO E PAPEIS
+   ========================================================================== */
+function cacheKey(){ return CACHE_KEY + ":" + (SESSAO ? SESSAO.email : "anon"); }
+function loadSessao(){ try { SESSAO = JSON.parse(localStorage.getItem(SESSAO_KEY) || "null"); } catch(e){ SESSAO = null; } }
+function setSessao(s){
+  SESSAO = s || null;
+  try { s ? localStorage.setItem(SESSAO_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSAO_KEY); } catch(e){}
+  applyRole();
+}
+function applyRole(){
+  document.body.classList.toggle("role-agente", !!SESSAO && !isAdmin());
+  document.body.classList.toggle("legado", LEGADO);
+  $("btnLogout").style.display = SESSAO ? "" : "none";
+  document.querySelector(".user-line").style.visibility = SESSAO ? "" : "hidden";
+  // agente nao tem o modo "Por agente" no grafico de evolucao
+  if (SESSAO && !isAdmin() && state.trendMode === "agente"){
+    state.trendMode = "total";
+    $("segTrend").querySelectorAll("button").forEach(function(x){ x.classList.toggle("on", x.dataset.m === "total"); });
+  }
+  if (SESSAO){
+    $("userNome").textContent = SESSAO.nome || SESSAO.email;
+    $("userPapel").textContent = isAdmin() ? "admin" : "agente" + (SESSAO.agente ? " · " + SESSAO.agente : "");
+    $("userAv").style.background = SESSAO.agente ? agColor(SESSAO.agente) : "var(--brand)";
+  }
+}
+function loginMsg(kind, text){
+  var m = $("loginMsg");
+  if (!text){ m.className = "msg"; m.textContent = ""; return; }
+  m.className = "msg show " + (kind === "ok" ? "ok" : "bad"); m.textContent = text;
+}
+function showLogin(msg){
+  $("login").classList.add("show");
+  $("loginSub").textContent = "Entre com o seu e-mail e senha.";
+  $("loginForm").style.display = ""; $("setupForm").style.display = "none";
+  loginMsg(msg ? "bad" : null, msg || "");
+  setTimeout(function(){ $("lgEmail").focus(); }, 50);
+}
+function hideLogin(){ $("login").classList.remove("show"); }
+/** Sessao invalida: limpa tudo que era daquela pessoa e volta para o login. */
+function authFail(msg){
+  LEGADO = false;
+  try { localStorage.removeItem(cacheKey()); } catch(e){}
+  setSessao(null);
+  RECS = []; TAREFAS = []; REVIEWS = []; METAS = {}; METAS_HIST = []; NOTAS = []; QUALIDADE = [];
+  setStatus("warn", "sem sessão");
+  showLogin(msg || "");
+}
+function apiAcesso(obj){
+  var post = fetch(API_URL, { method:"POST", redirect:"follow", body:JSON.stringify(obj) })
+    .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); }).then(parseApi);
+  return withTimeout(post, 45000, "login");
+}
+function fazerLogin(){
+  var email = $("lgEmail").value.trim(), senha = $("lgSenha").value;
+  if (!email || !senha){ loginMsg("bad", "Preencha e-mail e senha."); return; }
+  var b = $("lgEntrar"); b.disabled = true; b.textContent = "Entrando…"; loginMsg(null, "");
+  apiAcesso({ action:"login", email:email, senha:senha })
+    .then(function(res){
+      if (res.status !== "ok"){
+        if (res.code === "no_users"){
+          $("loginSub").textContent = "Ninguém cadastrado ainda. Crie o primeiro admin do painel.";
+          $("suSenha").value = senha;
+          $("loginForm").style.display = "none"; $("setupForm").style.display = ""; $("suEmail").value = email; loginMsg(null, ""); return; }
+        throw new Error(res.message || "não foi possível entrar");
+      }
+      setSessao(Object.assign({ token:res.token }, res.usuario));
+      $("lgSenha").value = "";
+      hideLogin();
+      setView(location.hash.slice(1));
+      loadCache(); loadData(true);
+    })
+    .catch(function(e){ loginMsg("bad", e.message); })
+    .then(function(){ b.disabled = false; b.textContent = "Entrar"; });
+}
+function criarPrimeiroAdmin(){
+  var b = $("suCriar"); b.disabled = true; b.textContent = "Criando…"; loginMsg(null, "");
+  apiAcesso({ action:"setupAdmin", nome:$("suNome").value, email:$("suEmail").value, senha:$("suSenha").value, token:$("suToken").value })
+    .then(function(res){
+      if (res.status !== "ok") throw new Error(res.message || "não deu para criar");
+      setSessao(Object.assign({ token:res.token }, res.usuario));
+      $("suSenha").value = ""; $("suToken").value = "";
+      hideLogin(); setView("geral"); loadData(true);
+    })
+    .catch(function(e){ loginMsg("bad", e.message); })
+    .then(function(){ b.disabled = false; b.textContent = "Criar admin e entrar"; });
+}
+function sair(){
+  var t = sessaoToken();
+  if (t) apiAcesso({ action:"logout", token:t }).catch(function(){});
+  authFail("");
+}
+$("lgEntrar").onclick = fazerLogin;
+$("lgSenha").onkeydown = function(e){ if (e.key === "Enter") fazerLogin(); };
+$("lgEmail").onkeydown = function(e){ if (e.key === "Enter") fazerLogin(); };
+$("suCriar").onclick = criarPrimeiroAdmin;
+$("suVoltar").onclick = function(){ showLogin(""); };
+$("btnLogout").onclick = sair;
+$("btnVerTarefas").onclick = function(){ setView("tarefas"); };
+$("btnVerReviews").onclick = function(){ setView("trustpilot"); };
+
+/* =============================================================================
+   VISAO GERAL: tarefas e trustpilot
+   ========================================================================== */
+function renderOverviewTarefas(r){
+  var lista = TAREFAS.filter(function(t){
+    if (t.day < r.from || t.day > r.to) return false;
+    if (state.store !== "__all" && t.loja !== state.store) return false;
+    return !state.agents[t.agente];
+  });
+  var box = $("ovTarBox");
+  if (!lista.length){
+    $("ovTarSub").textContent = r.label;
+    box.innerHTML = '<div class="empty" style="padding:22px">Nenhuma tarefa finalizada neste período.</div>';
+    return;
+  }
+  var feitas = 0, min = 0, grupos = {};
+  lista.forEach(function(t){
+    feitas += t.qtd; min += t.min;
+    var g = grupos[t.chave] || (grupos[t.chave] = { nome:t.tarefa, qtd:0, min:0 });
+    g.qtd += t.qtd; g.min += t.min;
+  });
+  var top = Object.keys(grupos).map(function(k){ return grupos[k]; }).sort(function(a, b){ return b.qtd - a.qtd; }).slice(0, 5);
+  $("ovTarSub").textContent = r.label + ", " + nf(lista.length) + (lista.length === 1 ? " sessão" : " sessões");
+  box.innerHTML = '<div class="mini-kpis"><div><b>' + nf(feitas) + '</b><span>feitas</span></div>' +
+    '<div><b>' + fmtDur(min) + '</b><span>tempo</span></div>' +
+    '<div><b>' + (min ? porHora(min, feitas) : "–") + '</b><span>por hora</span></div></div>' +
+    '<div class="rv-list">' + top.map(function(g){
+      return '<div class="rv"><div class="grow">' + esc(g.nome) + '<small>' + fmtDur(g.min) + ', ' + porTarefa(g.min, g.qtd) + ' por tarefa</small></div>' +
+        '<b style="font-family:var(--font-d);font-size:16px">' + nf(g.qtd) + '</b></div>';
+    }).join("") + '</div>';
+}
+
+function starsHTML(n){
+  var out = "";
+  for (var i = 1; i <= 5; i++) out += i <= n ? "★" : '<span class="off">★</span>';
+  return '<span class="stars" title="' + n + ' de 5">' + out + '</span>';
+}
+function rvTag(status){
+  var k = String(status || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return '<span class="rv-tag ' + esc(k) + '">' + esc(status || "sem status") + '</span>';
+}
+function rvAberto(r){ return String(r.status).toLowerCase() !== "resolvido"; }
+
+function reviewsFiltrados(){
+  return REVIEWS.filter(function(r){ return state.store === "__all" || r.store === state.store; });
+}
+
+function renderReviews(r){
+  var todos = reviewsFiltrados();
+  var abertos = todos.filter(rvAberto), risco = todos.filter(function(x){ return x.risk && rvAberto(x); });
+  var novos = todos.filter(function(x){ return x.date >= r.from && x.date <= r.to; });
+  var lojaTxt = state.store === "__all" ? "todas as lojas" : state.store;
+
+  // cartao da visao geral
+  var ov = $("ovRvBox");
+  $("ovRvSub").textContent = lojaTxt;
+  if (LEGADO){
+    ov.innerHTML = '<div class="empty" style="padding:22px">Os reviews aparecem aqui depois que o Apps Script v15 for implantado.</div>';
+  } else if (!REVIEWS_OK){
+    ov.innerHTML = '<div class="empty" style="padding:22px">O Apps Script ainda não sabe onde está a planilha do Review Desk. ' +
+      'Em Configurações do projeto › Propriedades do script, crie <b>REVIEWS_SHEET_ID</b> com o ID da planilha.</div>';
+  } else if (!todos.length){
+    ov.innerHTML = '<div class="empty" style="padding:22px">Nenhum review registrado no Review Desk.</div>';
+  } else {
+    ov.innerHTML = '<div class="mini-kpis"><div><b>' + nf(abertos.length) + '</b><span>em aberto</span></div>' +
+      '<div><b>' + nf(risco.length) + '</b><span>com risco de chargeback</span></div>' +
+      '<div><b>' + nf(novos.length) + '</b><span>novos, ' + esc(r.label) + '</span></div></div>' +
+      '<div class="rv-list">' + abertos.slice(0, 5).map(function(x){
+        return '<div class="rv"><i class="sw" style="background:' + (STORE_COLOR[x.store] || THEME.muted) + '"></i>' +
+          '<div class="grow">' + esc(x.store) + ' ' + starsHTML(x.stars) + '<small>' + (x.date ? brDate(x.date) : "sem data") +
+          (x.owner ? ", " + esc(x.owner) : ", sem responsável") + '</small></div>' + rvTag(x.status) + '</div>';
+      }).join("") + (abertos.length > 5 ? '<div class="adj-why" style="padding-top:10px">+ ' + nf(abertos.length - 5) + ' em aberto</div>' : '') + '</div>';
+  }
+
+  // tela Trustpilot
+  var modo = state.rvMode || "abertos";
+  var lista = modo === "abertos" ? abertos : modo === "risco" ? risco : todos;
+  $("rvSub").textContent = lojaTxt + ", " + nf(lista.length) + (lista.length === 1 ? " review" : " reviews");
+  var box = $("rvBox");
+  if (!lista.length){
+    box.innerHTML = '<div class="empty" style="padding:30px">' + (LEGADO ? "Os reviews aparecem aqui depois que o Apps Script v15 for implantado." : REVIEWS_OK ? "Nenhum review nesta lista." :
+      "Configure REVIEWS_SHEET_ID no Apps Script para os reviews aparecerem aqui.") + '</div>';
+    return;
+  }
+  var th = function(t){ return '<th style="cursor:default">' + t + '</th>'; };
+  box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' + th("Data") + th("Loja") + th("Nota") + th("Status") +
+    th("Responsável") + th("Risco") + th("Notas") + th("Links") + '</tr></thead><tbody>' +
+    lista.map(function(x){
+      return '<tr><td style="white-space:nowrap">' + (x.date ? brDate(x.date) : '<span class="zero">–</span>') + '</td>' +
+        '<td style="white-space:nowrap"><i class="sw" style="background:' + (STORE_COLOR[x.store] || THEME.muted) + '"></i>' + esc(x.store) + '</td>' +
+        '<td>' + starsHTML(x.stars) + '</td><td>' + rvTag(x.status) + '</td>' +
+        '<td>' + (x.owner ? esc(x.owner) : '<span class="zero">–</span>') + '</td>' +
+        '<td>' + (x.risk ? '<span class="rv-risk">chargeback</span>' : '<span class="zero">–</span>') + '</td>' +
+        '<td><div class="rv-note" title="' + esc(x.notes) + '">' + (x.notes ? esc(x.notes) : '<span class="zero">–</span>') + '</div></td>' +
+        '<td style="white-space:nowrap">' + (x.review_link ? '<a href="' + esc(x.review_link) + '" target="_blank" rel="noopener" class="nt-edit" style="text-decoration:none">review</a> ' : '') +
+        (x.ticket_link ? '<a href="' + esc(x.ticket_link) + '" target="_blank" rel="noopener" class="nt-edit" style="text-decoration:none">ticket</a>' : '') + '</td></tr>';
+    }).join("") + '</tbody></table></div>';
+}
+$("segRv").querySelectorAll("button").forEach(function(b){
+  b.onclick = function(){
+    $("segRv").querySelectorAll("button").forEach(function(x){ x.classList.remove("on"); });
+    b.classList.add("on"); state.rvMode = b.dataset.m; render();
+  };
+});
+
+/* =============================================================================
+   EQUIPE (admin)
+   ========================================================================== */
+var eqEditando = null;
+function eqMsg(kind, text){
+  var m = $("eqMsg");
+  if (!text){ m.className = "msg"; m.textContent = ""; return; }
+  m.className = "msg show " + (kind === "ok" ? "ok" : "bad"); m.textContent = text;
+}
+function fillEqAgentes(){
+  var names = {}; RECS.forEach(function(r){ names[r.agente] = 1; }); TAREFAS.forEach(function(t){ names[t.agente] = 1; });
+  USUARIOS.forEach(function(u){ if (u.agente) names[u.agente] = 1; });
+  var sel = $("eqAgente"), atual = sel.value;
+  sel.innerHTML = '<option value="">— nenhum —</option>' + Object.keys(names).sort().map(function(a){ return '<option>' + esc(a) + '</option>'; }).join("");
+  sel.value = atual;
+}
+function loadEquipe(){
+  if (!isAdmin() || LEGADO || !sessaoToken()) return;
+  $("eqBox").innerHTML = '<div class="empty" style="padding:26px">Carregando…</div>';
+  apiPost({ action:"listUsers" })
+    .then(function(res){
+      if (res.status !== "ok") throw new Error(res.message || "erro");
+      USUARIOS = res.usuarios || [];
+      renderEquipe();
+    })
+    .catch(function(e){ $("eqBox").innerHTML = '<div class="empty" style="padding:26px">Não consegui listar: ' + esc(e.message) + '</div>'; });
+}
+function renderEquipe(){
+  fillEqAgentes();
+  var ativos = USUARIOS.filter(function(u){ return u.ativo; }).length;
+  $("eqSub").textContent = nf(ativos) + (ativos === 1 ? " pessoa ativa" : " pessoas ativas") + (USUARIOS.length > ativos ? ", " + nf(USUARIOS.length - ativos) + " desativada" + (USUARIOS.length - ativos > 1 ? "s" : "") : "");
+  if (!USUARIOS.length){ $("eqBox").innerHTML = '<div class="empty" style="padding:26px">Ninguém cadastrado além de você.</div>'; return; }
+  var th = function(t){ return '<th style="cursor:default">' + t + '</th>'; };
+  $("eqBox").innerHTML = '<div class="tbl-wrap"><table style="min-width:520px"><thead><tr>' + th("Nome") + th("Email") + th("Papel") + th("Contador") + th("Último acesso") + th("") +
+    '</tr></thead><tbody>' + USUARIOS.map(function(u){
+      var quando = u.ultimoAcesso ? (parseDay(u.ultimoAcesso) ? brDate(parseDay(u.ultimoAcesso)) + " " + (parseHM(u.ultimoAcesso) || "") : esc(u.ultimoAcesso)) : "nunca";
+      return '<tr' + (u.ativo ? '' : ' style="opacity:.5"') + '><td><div class="ag"><span class="av" style="background:' + (u.agente ? agColor(u.agente) : "var(--brand)") + '"></span>' + esc(u.nome) + (u.ativo ? '' : ' <span class="zero">(desativado)</span>') + '</div></td>' +
+        '<td>' + esc(u.email) + '</td><td><span class="rv-tag' + (u.papel === "admin" ? " contatado" : "") + '">' + esc(u.papel) + '</span></td>' +
+        '<td>' + (u.agente ? esc(u.agente) : '<span class="zero">–</span>') + '</td><td style="white-space:nowrap">' + quando + '</td>' +
+        '<td style="white-space:nowrap;text-align:right"><button class="nt-edit" data-edit="' + esc(u.email) + '">editar</button> ' +
+        '<button class="nt-edit" data-toggle="' + esc(u.email) + '">' + (u.ativo ? "desativar" : "reativar") + '</button></td></tr>';
+    }).join("") + '</tbody></table></div>';
+  $("eqBox").querySelectorAll("[data-edit]").forEach(function(b){ b.onclick = function(){ eqEditar(b.dataset.edit); }; });
+  $("eqBox").querySelectorAll("[data-toggle]").forEach(function(b){
+    b.onclick = function(){
+      var u = USUARIOS.filter(function(x){ return x.email === b.dataset.toggle; })[0]; if (!u) return;
+      b.disabled = true;
+      apiPost({ action:"saveUser", email:u.email, nome:u.nome, papel:u.papel, agente:u.agente, ativo:u.ativo ? "NAO" : "SIM" })
+        .then(function(res){ if (res.status !== "ok") throw new Error(res.message || "erro"); eqMsg("ok", (u.ativo ? "Acesso desativado: " : "Acesso reativado: ") + u.nome); loadEquipe(); })
+        .catch(function(e){ eqMsg("bad", e.message); b.disabled = false; });
+    };
+  });
+}
+function eqEditar(email){
+  var u = USUARIOS.filter(function(x){ return x.email === email; })[0]; if (!u) return;
+  eqEditando = u.email;
+  $("eqFormT").textContent = "Editar acesso"; $("eqNome").value = u.nome; $("eqEmail").value = u.email; $("eqEmail").disabled = true;
+  $("eqPapel").value = u.papel; fillEqAgentes(); $("eqAgente").value = u.agente || ""; $("eqSenha").value = "";
+  $("eqSenhaHint").textContent = "Deixe em branco para manter a senha atual. Preencha para redefinir.";
+  $("eqSalvar").textContent = "Salvar"; $("eqCancelar").style.display = ""; eqMsg(null, "");
+  $("eqNome").focus();
+}
+function eqLimpar(){
+  eqEditando = null;
+  $("eqFormT").textContent = "Novo acesso"; $("eqNome").value = ""; $("eqEmail").value = ""; $("eqEmail").disabled = false;
+  $("eqPapel").value = "agente"; $("eqAgente").value = ""; $("eqSenha").value = "";
+  $("eqSenhaHint").textContent = "A pessoa usa esta senha para entrar. Ao editar, deixe em branco para manter.";
+  $("eqSalvar").textContent = "Criar acesso"; $("eqCancelar").style.display = "none";
+}
+$("eqCancelar").onclick = function(){ eqLimpar(); eqMsg(null, ""); };
+$("eqSalvar").onclick = function(){
+  var d = { action:"saveUser", email:$("eqEmail").value.trim(), nome:$("eqNome").value.trim(), papel:$("eqPapel").value, agente:$("eqAgente").value, ativo:"SIM" };
+  if (eqEditando){ var u = USUARIOS.filter(function(x){ return x.email === eqEditando; })[0]; if (u) d.ativo = u.ativo ? "SIM" : "NAO"; }
+  if ($("eqSenha").value) d.senha = $("eqSenha").value;
+  if (!d.email || !d.nome){ eqMsg("bad", "Preencha nome e e-mail."); return; }
+  if (!eqEditando && !d.senha){ eqMsg("bad", "Defina a senha inicial."); return; }
+  if (d.papel === "agente" && !d.agente){ eqMsg("bad", "Escolha o nome que a pessoa usa no contador, senão ela não vê contagem nenhuma."); return; }
+  var b = $("eqSalvar"); b.disabled = true;
+  apiPost(d)
+    .then(function(res){
+      if (res.status !== "ok") throw new Error(res.message || "erro ao salvar");
+      eqMsg("ok", (eqEditando ? "Acesso atualizado: " : "Acesso criado: ") + d.nome + (d.senha && eqEditando ? " (senha redefinida)" : ""));
+      eqLimpar(); loadEquipe();
+    })
+    .catch(function(e){ eqMsg("bad", e.message); })
+    .then(function(){ b.disabled = false; });
+};
 
 function setView(v){
   if (!VIEWS[v]) v = "geral";
+  if (SESSAO && !isAdmin() && VISTAS_AGENTE.indexOf(v) < 0) v = "geral";
+  if (LEGADO && v === "equipe") v = "geral";   // a API antiga nao conhece listUsers/saveUser
+  if (v === "equipe") loadEquipe();
   state.view = v;
+  document.body.setAttribute("data-tela", v);
   document.querySelectorAll(".view").forEach(function(el){ el.classList.toggle("on", el.dataset.view === v); });
   $("nav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("on", b.dataset.view === v); });
   $("pageTitle").textContent = VIEWS[v];
   try { history.replaceState(null, "", "#" + v); } catch(e){}
   window.scrollTo(0, 0);
   // grafico criado com a tela escondida nasce com tamanho zero: redesenha ao trocar
-  if (RECS.length) render();
+  if (RECS.length) render(); else subTela();
+}
+/** Subtitulo das telas que nao seguem o periodo. */
+function subTela(){
+  var loja = state.store === "__all" ? "todas as lojas" : state.store;
+  if (state.view === "trustpilot") $("pageSub").textContent = "Reviews do Review Desk, " + loja;
+  if (state.view === "equipe") $("pageSub").textContent = "Quem entra no painel e o que cada um vê";
 }
 $("nav").querySelectorAll("button").forEach(function(b){
   b.onclick = function(){ setView(b.dataset.view); };
 });
 
-/* boot */
+/* boot: sem sessao, so a tela de login; com sessao, o painel (a API confirma) */
+loadSessao();
+applyRole();
+// cache da versao sem login (sem dono): sai do navegador
+try { localStorage.removeItem(CACHE_KEY); } catch(e){}
+$("loginLogo").src = document.querySelector('link[rel="icon"]').href;
 setView(location.hash.slice(1));
 if (!hasChart()){
   showBanner("warn","Os gráficos não carregaram",
     "A biblioteca Chart.js foi bloqueada (CDN indisponível ou bloqueador de anúncios). " +
     "Os KPIs e a tabela continuam funcionando.");
 }
-loadCache();
-loadData();
+if (SESSAO){ loadCache(); loadData(); } else { setStatus("live", "conferindo acesso…"); checarApi(); }
+
+/** Sem sessao: a API ja tem login (v15+)? Se nao, segue sem login, como antes. */
+function checarApi(){
+  fetchJSON(API_URL + "?action=ping&_=" + Date.now())
+    .then(function(p){
+      if (p && Number(p.version) >= 15){ setStatus("warn", "sem sessão"); showLogin(""); return; }
+      LEGADO = true; applyRole(); if (state.view === "equipe") setView("geral"); loadCache(); loadData();
+    })
+    .catch(function(){ setStatus("warn", "sem sessão"); showLogin(""); });
+}
 </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas)  v14.0
- *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas"
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos)  v15.0
+ *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes"
  * =============================================================
  *
  *  COMO ATUALIZAR
@@ -10,8 +10,29 @@
  *  3. Implantar > Gerenciar implantacoes > (lapis) > Versao: Nova versao > Implantar
  *  A senha ja configurada em ADMIN_TOKEN continua valendo — nao precisa refazer.
  *
- *  ENDPOINTS DE LEITURA (abertos)
- *   GET  ?action=getData                 -> {status,total,rows,ajustes,metas,metasHist,notas}
+ *  ACESSOS (v15)
+ *   O dashboard passou a exigir login. Cada pessoa tem uma linha na aba "Usuarios"
+ *   (email, nome, papel admin|agente, o nome que ela usa no contador, senha em hash
+ *   com salt). O login devolve um token de sessao (aba "Sessoes", validade
+ *   SESSAO_HORAS) que vai em todas as chamadas. O getData entrega por papel:
+ *     admin  -> tudo, como antes, mais os reviews.
+ *     agente -> so os proprios emails e tarefas, mais os reviews. Metas, qualidade,
+ *               notas e ajustes NAO saem da API para ele — esconder na tela nao bastaria.
+ *   Primeiro admin: rode criarAdmin() no editor OU, na tela de login, "Primeiro
+ *   acesso" com a senha do Apps Script (ADMIN_TOKEN). So funciona enquanto nao
+ *   existe nenhum usuario.
+ *   Reviews: le a planilha do Review Desk pelo ID guardado na propriedade do script
+ *   REVIEWS_SHEET_ID (Configuracoes do projeto > Propriedades do script). Sem ela,
+ *   o campo "reviews" volta vazio e o painel avisa.
+ *   POST {action:'login', email, senha}                 -> {token, usuario}
+ *   POST {action:'logout', token}
+ *   POST {action:'me', token}                           -> {usuario}
+ *   POST {action:'setupAdmin', token(ADMIN_TOKEN), email, nome, senha}
+ *   POST {action:'listUsers', token}                    (admin)
+ *   POST {action:'saveUser', token, email, nome, papel, agente, ativo [, senha]}  (admin)
+ *
+ *  ENDPOINTS DE LEITURA
+ *   GET  ?action=getData&token=SESSAO    -> {status,total,rows,ajustes,metas,metasHist,notas,reviews,usuario}
  *   GET  ?action=getData&compact=1       -> payload ~5x menor
  *   GET  ?action=getData&callback=fn     -> JSONP
  *   GET  ?action=ping                    -> teste de saude
@@ -22,7 +43,8 @@
  *   POST {action:'setMetas', metas:[{agente,loja,meta},...], desde, base}   (sem senha desde a v9)
  *   POST {action:'delMeta',  agente, loja, desde}                          (sem senha desde a v9)
  *
- *  ENDPOINTS PROTEGIDOS (exigem senha)
+ *  ENDPOINTS PROTEGIDOS (token de sessao de admin, ou a senha ADMIN_TOKEN)
+ *   POST {action:'setMetas' | 'delMeta', token, ...}   (voltaram a ser protegidos na v15)
  *   POST {action:'listAdjust', token}
  *   POST {action:'addAdjust',  token, tipo, data, agente, deLoja, paraLoja, qtd, motivo}
  *   POST {action:'delAdjust',  token, id}
@@ -107,6 +129,12 @@ var NOTA_TIPOS  = ['nota', 'bom', 'ruim', 'ausencia', 'sistema'];
 var TAREFA_SHEET  = 'Tarefas';
 var TAREFA_HEADER = ['ID', 'Registrado em', 'Agente', 'Data', 'Tarefa', 'Loja', 'Quantidade', 'Inicio', 'Fim', 'Pausa (min)', 'Tempo (min)'];
 var TAREFA_ID_RE  = /^[A-Za-z0-9_.:-]{6,80}$/;
+var USER_SHEET    = 'Usuarios';
+var USER_HEADER   = ['Email', 'Nome', 'Papel', 'Agente', 'Salt', 'Hash', 'Ativo', 'Criado em', 'Ultimo acesso'];
+var SESS_SHEET    = 'Sessoes';
+var SESS_HEADER   = ['Token', 'Email', 'Criado em', 'Expira em'];
+var SESSAO_HORAS  = 14;
+var PAPEIS        = ['admin', 'agente'];
 
 /* ============================================================
    SENHA
@@ -130,24 +158,29 @@ function conferirSenha() {
   else   Logger.log('ATENCAO — nenhuma senha configurada. Rode definirSenha() ou cadastre ADMIN_TOKEN nas Propriedades do script.');
 }
 
+/** Senha do Apps Script (ADMIN_TOKEN) OU sessao de um admin logado. */
 function checkToken_(t) {
   var k = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
   if (!k) throw new Error('Senha nao configurada no Apps Script (rode definirSenha()).');
-  return String(t || '') === String(k);
+  if (String(t || '') === String(k)) return true;
+  var u = sessao_(t);
+  return !!(u && u.papel === 'admin');
 }
 
 /* ============================================================
    ROTEAMENTO
    ============================================================ */
 
-var PROTEGIDAS = ['listAdjust', 'addAdjust', 'delAdjust', 'addNota', 'delNota'];
-var LIVRES     = ['setMetas', 'delMeta'];   // gravacao sem senha (v9)
+var PROTEGIDAS = ['listAdjust', 'addAdjust', 'delAdjust', 'addNota', 'delNota', 'setMetas', 'delMeta', 'listUsers', 'saveUser'];
+var LIVRES     = [];   // metas voltaram a exigir admin na v15 (agentes nao podem ve-las)
+var ACESSO     = ['login', 'logout', 'me', 'setupAdmin'];
 
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_() }, p.callback);
-    if (p.action === 'getData') return respond_(getData_(p), p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 15 }, p.callback);
+    if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
+    if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
     // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
     if (p.action === 'addTarefa') return respond_(addTarefa_(p), p.callback);
 
@@ -174,7 +207,8 @@ function doPost(e) {
     for (var a in p)    d[a] = p[a];
     for (var b in body) d[b] = body[b];
 
-    if (d.action === 'getData') return respond_(getData_(d), p.callback);
+    if (d.action === 'getData') return respond_(getDataAuth_(d), p.callback);
+    if (ACESSO.indexOf(d.action) > -1)     return respond_(acesso_(d), p.callback);
     if (d.action === 'addTarefa') return respond_(addTarefa_(d), p.callback);
     if (LIVRES.indexOf(d.action) > -1)     return respond_(livre_(d), p.callback);
     if (PROTEGIDAS.indexOf(d.action) > -1) return respond_(protegida_(d), p.callback);
@@ -191,6 +225,10 @@ function protegida_(d) {
   if (d.action === 'delAdjust')  return delAdjust_(d.id);
   if (d.action === 'addNota')    return addNota_(d);
   if (d.action === 'delNota')    return delNota_(d.id);
+  if (d.action === 'setMetas')   return setMetas_(d);
+  if (d.action === 'delMeta')    return delMeta_(d);
+  if (d.action === 'listUsers')  return { status: 'ok', usuarios: listUsers_() };
+  if (d.action === 'saveUser')   return saveUser_(d);
   return { status: 'error', message: 'Acao desconhecida.' };
 }
 
@@ -764,6 +802,295 @@ function listTarefas_(desde) {
 }
 
 /* ============================================================
+   ACESSOS: usuarios, sessoes e dados por papel (v15)
+   ============================================================ */
+
+function hash_(salt, senha) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + '|' + String(senha), Utilities.Charset.UTF_8);
+  return Utilities.base64Encode(bytes);
+}
+function aleatorio_() { return Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, ''); }
+function emailLimpo_(e) { return String(e || '').trim().toLowerCase(); }
+function agora_() { return new Date(); }
+function iso_(d) { return Utilities.formatDate(d, TZ, "yyyy-MM-dd'T'HH:mm:ss"); }
+
+/**
+ * Primeiro admin, pelo editor: preencha as tres linhas, rode, e depois apague
+ * a senha do codigo. So cria se ainda nao houver nenhum usuario.
+ */
+function criarAdmin() {
+  var email = 'COLE_O_EMAIL_AQUI';
+  var nome  = 'COLE_O_NOME_AQUI';
+  var senha = 'COLE_A_SENHA_AQUI';
+  if (email.indexOf('_AQUI') > -1 || senha.indexOf('_AQUI') > -1) throw new Error('Preencha email, nome e senha nas tres linhas de criarAdmin().');
+  var r = setupAdmin_({ email: email, nome: nome, senha: senha, token: PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN') });
+  Logger.log(JSON.stringify(r));
+}
+
+function usersSheet_() { return ensureSheet_(USER_SHEET, USER_HEADER); }
+function sessSheet_()  { return ensureSheet_(SESS_SHEET, SESS_HEADER); }
+
+/** Todas as linhas da aba Usuarios como objetos (com hash; nunca devolver assim para fora). */
+function readUsers_() {
+  var sh = usersSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var v = sh.getRange(2, 1, last - 1, USER_HEADER.length).getDisplayValues();
+  var out = [];
+  for (var i = 0; i < v.length; i++) {
+    var email = emailLimpo_(v[i][0]);
+    if (!email) continue;
+    out.push({
+      linha: i + 2, email: email, nome: String(v[i][1] || '').trim(),
+      papel: String(v[i][2] || 'agente').trim().toLowerCase(), agente: String(v[i][3] || '').trim(),
+      salt: String(v[i][4] || ''), hash: String(v[i][5] || ''),
+      ativo: String(v[i][6] || 'SIM').toUpperCase() !== 'NAO',
+      criadoEm: String(v[i][7] || ''), ultimoAcesso: String(v[i][8] || '')
+    });
+  }
+  return out;
+}
+
+function publico_(u) { return { email: u.email, nome: u.nome, papel: u.papel, agente: u.agente, ativo: u.ativo, criadoEm: u.criadoEm, ultimoAcesso: u.ultimoAcesso }; }
+
+function listUsers_() { return readUsers_().map(publico_); }
+
+/** Cria ou atualiza um usuario (admin). Senha so muda quando vier preenchida. */
+function saveUser_(d) {
+  var email = emailLimpo_(d.email);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { status: 'error', message: 'Email invalido.' };
+  var nome = String(d.nome || '').trim();
+  if (!nome) return { status: 'error', message: 'Informe o nome.' };
+  var papel = String(d.papel || 'agente').trim().toLowerCase();
+  if (PAPEIS.indexOf(papel) < 0) return { status: 'error', message: 'Papel invalido.' };
+  var agente = String(d.agente || '').trim();
+  var ativo = String(d.ativo === undefined ? 'SIM' : d.ativo).toUpperCase();
+  ativo = (ativo === 'NAO' || ativo === 'FALSE' || ativo === '0') ? 'NAO' : 'SIM';
+  var senha = String(d.senha || '');
+  if (senha && senha.length < 6) return { status: 'error', message: 'A senha precisa ter pelo menos 6 caracteres.' };
+
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (ignore) {}
+  try {
+    var sh = usersSheet_();
+    var lista = readUsers_();
+    var atual = null;
+    for (var i = 0; i < lista.length; i++) if (lista[i].email === email) { atual = lista[i]; break; }
+
+    // nunca deixar a planilha sem admin ativo
+    if (atual && atual.papel === 'admin' && (papel !== 'admin' || ativo === 'NAO')) {
+      var outros = lista.filter(function (u) { return u.email !== email && u.papel === 'admin' && u.ativo; }).length;
+      if (!outros) return { status: 'error', message: 'Este e o unico admin ativo. Crie outro admin antes.' };
+    }
+
+    if (atual) {
+      var salt = atual.salt, hash = atual.hash;
+      if (senha) { salt = aleatorio_(); hash = hash_(salt, senha); }
+      sh.getRange(atual.linha, 1, 1, 7).setValues([[email, nome, papel, agente, salt, hash, ativo]]);
+      if (senha || ativo === 'NAO') apagarSessoes_(email);
+      else esquecerSessoes_(email);   // papel/agente novo vale ja na proxima chamada
+      return { status: 'ok', usuario: publico_({ email: email, nome: nome, papel: papel, agente: agente, ativo: ativo === 'SIM', criadoEm: atual.criadoEm, ultimoAcesso: atual.ultimoAcesso }), atualizado: true };
+    }
+    if (!senha) return { status: 'error', message: 'Usuario novo precisa de senha inicial.' };
+    var s2 = aleatorio_();
+    sh.appendRow([email, nome, papel, agente, s2, hash_(s2, senha), ativo, iso_(agora_()), '']);
+    return { status: 'ok', usuario: { email: email, nome: nome, papel: papel, agente: agente, ativo: ativo === 'SIM' }, criado: true };
+  } finally {
+    try { lock.releaseLock(); } catch (ignore) {}
+  }
+}
+
+/** Primeiro acesso: cria o admin inicial. Exige ADMIN_TOKEN e planilha sem usuarios. */
+function setupAdmin_(d) {
+  var k = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
+  if (!k || String(d.token || '') !== String(k)) return { status: 'error', message: 'Senha do Apps Script invalida.' };
+  if (readUsers_().length) return { status: 'error', message: 'Ja existe usuario cadastrado. Peca ao admin para criar o seu.' };
+  var r = saveUser_({ email: d.email, nome: d.nome, papel: 'admin', agente: d.agente || '', ativo: 'SIM', senha: d.senha });
+  if (r.status !== 'ok') return r;
+  return login_({ email: d.email, senha: d.senha });
+}
+
+function login_(d) {
+  var email = emailLimpo_(d.email), senha = String(d.senha || '');
+  // trava de tentativas: 8 erros em 15 min para o mesmo e-mail
+  var cache = null, kErr = 'loginerr:' + email, erros = 0;
+  try { cache = CacheService.getScriptCache(); erros = Number(cache.get(kErr)) || 0; } catch (eC) {}
+  if (erros >= 8) return { status: 'error', code: 'login', message: 'Muitas tentativas. Espere 15 minutos.' };
+  var lista = readUsers_();
+  if (!lista.length) return { status: 'error', code: 'no_users', message: 'Nenhum usuario cadastrado ainda.' };
+  var u = null;
+  for (var i = 0; i < lista.length; i++) if (lista[i].email === email) { u = lista[i]; break; }
+  if (!u || !u.ativo || !senha || hash_(u.salt, senha) !== u.hash) {
+    try { cache && cache.put(kErr, String(erros + 1), 900); } catch (eP) {}
+    return { status: 'error', code: 'login', message: 'Email ou senha incorretos.' };
+  }
+  try { cache && cache.remove(kErr); } catch (eR) {}
+  var token = aleatorio_();
+  var exp = new Date(agora_().getTime() + SESSAO_HORAS * 3600 * 1000);
+  var sh = sessSheet_();
+  sh.appendRow([token, u.email, iso_(agora_()), iso_(exp)]);
+  usersSheet_().getRange(u.linha, 9).setValue(iso_(agora_()));
+  limparSessoes_(sh);
+  var pub = publico_(u);
+  try { CacheService.getScriptCache().put('sess:' + token, JSON.stringify(pub), 600); } catch (eC) {}
+  return { status: 'ok', token: token, usuario: pub, expira: iso_(exp) };
+}
+
+function logout_(d) {
+  var token = String(d.token || '');
+  if (!token) return { status: 'ok' };
+  try { CacheService.getScriptCache().remove('sess:' + token); } catch (eC) {}
+  var sh = sessSheet_();
+  var last = sh.getLastRow();
+  if (last >= 2) {
+    var v = sh.getRange(2, 1, last - 1, 1).getDisplayValues();
+    for (var i = v.length - 1; i >= 0; i--) if (String(v[i][0]) === token) sh.deleteRow(i + 2);
+  }
+  return { status: 'ok' };
+}
+
+/** Usuario da sessao (publico), ou null. Cache de 10 min para nao ler a aba a cada chamada. */
+function sessao_(token) {
+  token = String(token || '');
+  if (token.length < 32) return null;
+  var cache = null;
+  try { cache = CacheService.getScriptCache(); var hit = cache.get('sess:' + token); if (hit) return JSON.parse(hit); } catch (eC) {}
+  var sh = sessSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return null;
+  var v = sh.getRange(2, 1, last - 1, SESS_HEADER.length).getDisplayValues();
+  var agoraStr = iso_(agora_());
+  for (var i = 0; i < v.length; i++) {
+    if (String(v[i][0]) !== token) continue;
+    if (String(v[i][3]) < agoraStr) return null;   // expirada
+    var email = emailLimpo_(v[i][1]);
+    var lista = readUsers_();
+    for (var j = 0; j < lista.length; j++) {
+      if (lista[j].email === email && lista[j].ativo) {
+        var pub = publico_(lista[j]);
+        try { cache && cache.put('sess:' + token, JSON.stringify(pub), 600); } catch (eP) {}
+        return pub;
+      }
+    }
+    return null;
+  }
+  return null;
+}
+
+/** Tira as sessoes vencidas (e limita a aba a ~500 linhas). */
+function limparSessoes_(sh) {
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var v = sh.getRange(2, 1, last - 1, SESS_HEADER.length).getDisplayValues();
+  var agoraStr = iso_(agora_());
+  for (var i = v.length - 1; i >= 0; i--) {
+    if (String(v[i][3]) < agoraStr || (v.length - i) > 500) sh.deleteRow(i + 2);
+  }
+}
+
+function apagarSessoes_(email) {
+  var sh = sessSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var v = sh.getRange(2, 1, last - 1, 2).getDisplayValues();
+  var cache = null; try { cache = CacheService.getScriptCache(); } catch (eC) {}
+  for (var i = v.length - 1; i >= 0; i--) {
+    if (emailLimpo_(v[i][1]) === email) {
+      try { cache && cache.remove('sess:' + String(v[i][0])); } catch (eR) {}
+      sh.deleteRow(i + 2);
+    }
+  }
+}
+
+/** Tira do cache as sessoes de um e-mail (continuam validas, so releem o usuario). */
+function esquecerSessoes_(email) {
+  var sh = sessSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return;
+  var v = sh.getRange(2, 1, last - 1, 2).getDisplayValues();
+  try {
+    var cache = CacheService.getScriptCache();
+    for (var i = 0; i < v.length; i++) if (emailLimpo_(v[i][1]) === email) cache.remove('sess:' + String(v[i][0]));
+  } catch (eC) {}
+}
+
+function acesso_(d) {
+  if (d.action === 'login')      return login_(d);
+  if (d.action === 'logout')     return logout_(d);
+  if (d.action === 'setupAdmin') return setupAdmin_(d);
+  if (d.action === 'me') {
+    var u = sessao_(d.token);
+    return u ? { status: 'ok', usuario: u } : { status: 'error', code: 'auth', message: 'Sessao invalida ou vencida.' };
+  }
+  return { status: 'error', message: 'Acao desconhecida.' };
+}
+
+/** getData com login: admin recebe tudo; agente recebe so o que e dele. */
+function getDataAuth_(p) {
+  var u = sessao_(p.token);
+  if (!u) return { status: 'error', code: 'auth', message: 'Faca login para ver o painel.' };
+  var base = getData_(p);
+  if (u.papel !== 'admin') restringe_(base, u, !!p.compact);
+  base.usuario = u;
+  base.reviews = listReviews_();
+  base.reviewsOk = !!PropertiesService.getScriptProperties().getProperty('REVIEWS_SHEET_ID');
+  return base;
+}
+
+/**
+ * O que um agente pode ver: os proprios emails e as proprias tarefas. Metas,
+ * qualidade, notas e ajustes saem da resposta — nao adianta esconder so na tela.
+ */
+function restringe_(base, u, compact) {
+  var meu = String(u.agente || '').trim().toLowerCase();
+  var ehMeu = function (nome) { return meu && String(nome || '').trim().toLowerCase() === meu; };
+  base.rows = (base.rows || []).filter(function (r) { return ehMeu(compact ? r[2] : r.agente); });
+  base.total = base.rows.length;
+  base.tarefas = (base.tarefas || []).filter(function (t) { return ehMeu(t.agente); });
+  base.metas = {}; base.metasHist = []; base.qualidade = []; base.notas = []; base.ajustes = 0;
+  base.skipped = 0;
+}
+
+/**
+ * Reviews do Trustpilot: aba "Reviews" da planilha do Review Desk (propriedade
+ * REVIEWS_SHEET_ID). So os campos do painel; cache de 2 minutos.
+ */
+function listReviews_() {
+  var id = PropertiesService.getScriptProperties().getProperty('REVIEWS_SHEET_ID');
+  if (!id) return [];
+  var cache = null;
+  try { cache = CacheService.getScriptCache(); var hit = cache.get('reviews'); if (hit) return JSON.parse(hit); } catch (eC) {}
+  var out = [];
+  try {
+    var sh = SpreadsheetApp.openById(id).getSheetByName('Reviews');
+    if (sh && sh.getLastRow() >= 2) {
+      var h = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0].map(function (x) { return String(x).trim().toLowerCase(); });
+      var col = function (n) { return h.indexOf(n); };
+      var v = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getDisplayValues();
+      var ci = col('id'), cs = col('store'), ce = col('stars'), cd = col('review_date'), cl = col('review_link'),
+          ct = col('ticket_link'), cst = col('status'), co = col('owner'), cr = col('risk'), cn = col('notes'), cc = col('created_at');
+      for (var i = 0; i < v.length; i++) {
+        var r = v[i];
+        if (ci >= 0 && !String(r[ci] || '').trim()) continue;
+        var dt = cd >= 0 ? parseAny_(r[cd]) : null;
+        out.push({
+          id: ci >= 0 ? String(r[ci]) : String(i), store: cs >= 0 ? String(r[cs] || '').trim() : '',
+          stars: ce >= 0 ? Number(String(r[ce] || '').replace(/[^0-9]/g, '')) || 0 : 0,
+          date: dt ? ymd_(dt) : '', review_link: cl >= 0 ? String(r[cl] || '') : '', ticket_link: ct >= 0 ? String(r[ct] || '') : '',
+          status: cst >= 0 ? String(r[cst] || '').trim() : '', owner: co >= 0 ? String(r[co] || '').trim() : '',
+          risk: cr >= 0 ? String(r[cr] || '').toUpperCase() === 'TRUE' : false, notes: cn >= 0 ? String(r[cn] || '') : '',
+          created_at: cc >= 0 ? String(r[cc] || '') : ''
+        });
+      }
+    }
+  } catch (e) {
+    return [];
+  }
+  try { cache && cache.put('reviews', JSON.stringify(out), 120); } catch (eP) {}
+  return out;
+}
+
+/* ============================================================
    LEITURA (API do dashboard)
    ============================================================ */
 
@@ -882,7 +1209,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 14
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 15
   };
 
   if (p.compact) {
