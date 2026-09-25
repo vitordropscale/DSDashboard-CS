@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v18.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v19.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -88,7 +88,8 @@
  *
  *  TICKET (v10)
  *   O contador v5.1 manda junto o ticket que estava aberto na hora da contagem:
- *   "cs:CONTA:CAIXA:TICKET" (Commslayer), "rp:TICKET" (Richpanel), "fora" (a janela
+ *   "cs:CONTA:CAIXA:TICKET" (Commslayer), "rp:TICKET" (Richpanel), "gg:CONTA:TICKET"
+ *   (Gorgias, desde o contador v6.5 e esta API v19), "fora" (a janela
  *   da frente nao era um ticket) ou vazio (nao deu para ler). Fica na coluna H da
  *   aba Logs. E so um codigo — nenhum dado de cliente. O getData NAO devolve os
  *   tickets, so um resumo por agente e dia (campo "qualidade"). A unica excecao
@@ -103,6 +104,7 @@
  *   viram email. O resumo "qualidade" do getData junta as duas abas.
  *   A caixa de entrada do Commslayer (no codigo do ticket) diz a loja de verdade:
  *   INBOX_LOJA traduz, e o resumo conta quantas vezes a loja do widget nao bateu.
+ *   No Gorgias quem diz a loja e a conta (o endereco CONTA.gorgias.com): GORGIAS_LOJA.
  *
  *  DESEMPENHO (v12)
  *   Utilities.formatDate custa ~1 ms por chamada. Com 3 chamadas por linha e 20 mil
@@ -147,9 +149,11 @@ var TENT_SHEET  = 'Tentativas';
 var TENT_HEADER = ['Timestamp', 'Agente', 'Data', 'Loja', 'Ticket', 'Situacao'];
 var SITUACOES   = ['ticket', 'repetido', 'fora', 'semleitura', 'outra'];
 /* Caixa de entrada do Commslayer -> loja. Fonte: README do CS Reporting (10/09/2026).
-   Old World Healing e Nouveian: preencher quando o usuario mandar o endereco de um ticket. */
+   Nouveian: preencher quando o usuario mandar o endereco de um ticket. */
 var INBOX_LOJA  = { '26430': 'Vellum', '26575': 'Vigewell', '27261': 'Stratum', '10077': 'Elevare' };
-var TICKET_RE   = /^(cs:\d{1,12}:\d{1,12}:\d{1,15}|rp:\d{1,15}|fora)$/;
+/* Conta do Gorgias (o CONTA de CONTA.gorgias.com) -> loja. v19. */
+var GORGIAS_LOJA = { 'oldworldhealing': 'Old World Healing' };
+var TICKET_RE   = /^(cs:\d{1,12}:\d{1,12}:\d{1,15}|rp:\d{1,15}|gg:[a-z0-9-]{1,40}:\d{1,15}|fora)$/;
 var ADJ_HEADER  = ['ID', 'Registrado em', 'Tipo', 'Data', 'Agente', 'De loja', 'Para loja', 'Qtd', 'Motivo', 'Ativo'];
 var META_HEADER = ['Agente', 'Meta diaria', 'Vigente a partir de', 'Definida em', 'Base', 'Loja'];
 var NOTA_HEADER = ['ID', 'Registrado em', 'Data', 'Tipo', 'Agente', 'Loja', 'Nota', 'Ativo'];
@@ -241,7 +245,7 @@ var REVIEW_ACOES = ['addReview', 'updateReview', 'delReview', 'importReviews'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 18 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 19 }, p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
     // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
@@ -322,10 +326,12 @@ function limpaSituacao_(v) {
   return SITUACOES.indexOf(v) > -1 ? v : '';
 }
 
-/** Loja que a caixa do Commslayer indica, ou '' quando o ticket nao diz (Richpanel, fora, vazio). */
+/** Loja que o ticket indica (caixa do Commslayer, conta do Gorgias), ou '' quando nao diz (Richpanel, fora, vazio). */
 function lojaDoTicket_(tk) {
   var m = /^cs:\d+:(\d+):/.exec(tk || '');
-  return m && INBOX_LOJA[m[1]] ? INBOX_LOJA[m[1]] : '';
+  if (m) return INBOX_LOJA[m[1]] || '';
+  var g = /^gg:([a-z0-9-]+):/.exec(tk || '');
+  return g && GORGIAS_LOJA[g[1]] ? GORGIAS_LOJA[g[1]] : '';
 }
 
 /** Recusa do contador em modo bloquear: registra e NAO conta. */
@@ -1695,7 +1701,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 18
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 19
   };
 
   if (p.compact) {

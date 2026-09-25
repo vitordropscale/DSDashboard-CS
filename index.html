@@ -2394,8 +2394,8 @@ function renderProd(rows){
 
 /**
  * Onde o agente estava na hora de cada contagem. O contador v5.1 le o endereco da
- * aba da frente e manda so um codigo (ticket do Commslayer, ticket do Richpanel ou
- * "fora"). O Apps Script devolve o resumo por agente e dia — os tickets nao vem.
+ * aba da frente e manda so um codigo (ticket do Commslayer, do Richpanel ou, desde a
+ * v6.5, do Gorgias; ou "fora"). O Apps Script devolve o resumo por agente e dia — os tickets nao vem.
  * Por enquanto e so observacao: nenhuma contagem e bloqueada por causa disso.
  */
 function renderQualidade(r){
@@ -2444,7 +2444,7 @@ function renderQualidade(r){
     '<b>Repetidas em 1 min</b>: o mesmo ticket contado de novo em menos de um minuto — é o que o modo bloquear recusa. ' +
     '<b>Mesmo ticket no dia</b>: nem sempre é erro; se o cliente respondeu de novo, a segunda resposta conta. ' +
     'Clique no número para ver quais foram e abrir cada um no helpdesk. ' +
-    '<b>Loja diferente da caixa</b>: a caixa do Commslayer no endereço dizia outra loja — o agente esqueceu de trocar no widget. ' +
+    '<b>Loja diferente da caixa</b>: a caixa do Commslayer (ou a conta do Gorgias) no endereço dizia outra loja — o agente esqueceu de trocar no widget. ' +
     '<b>Outras conversas</b>: o agente entrou pela ficha do cliente para fechar outra conversa pendente dele. ' +
     'Conta como ticket — está dentro de "Num ticket" — e aparece aqui só para se saber quanto do dia é isso. ' +
     '<b>Recusadas</b>: só existe em modo bloquear.</div>';
@@ -2572,6 +2572,8 @@ function celulaRepetidos(a, nome){
 
 /** Endereço do ticket no helpdesk, a partir do código gravado pelo contador. */
 function ticketUrl(code){
+  var g = /^gg:([a-z0-9-]+):(\d+)$/.exec(code);   // Gorgias: a conta e o endereco
+  if (g) return "https://" + g[1] + ".gorgias.com/app/ticket/" + g[2];
   var m = /^cs:(\d+):(\d+):(\d+)$/.exec(code);
   if (!m) return "";
   return m[2] === "0"
@@ -2587,7 +2589,7 @@ function abrirTicketsRepetidos(nome, a, label){
     (itens.length === 1 ? " ticket contado mais de uma vez." : " tickets contados mais de uma vez.");
   $("tkBox").innerHTML = itens.length ? itens.map(function(i){
     var url = ticketUrl(i.t);
-    var num = i.t.replace(/^cs:\d+:\d+:/, "#").replace(/^rp:/, "Richpanel #");
+    var num = i.t.replace(/^cs:\d+:\d+:/, "#").replace(/^rp:/, "Richpanel #").replace(/^gg:[a-z0-9-]+:/, "Gorgias #");
     var fora = /^cs:\d+:0:/.test(i.t) ? '<span class="tk-tag">fora da caixa</span>' : "";
     return '<div class="tk-row"><div>' +
       (url ? '<a href="'+url+'" target="_blank" rel="noopener">'+esc(num)+'</a>' : '<span>'+esc(num)+'</span>') +

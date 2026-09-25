@@ -126,7 +126,7 @@ autorização do Google se "Connect to an external service" tiver ficado desmarc
 **As duas implantações vão sempre juntas.** O `getData` existe na implantação do
 painel e na dos contadores (a URL que está nos `.ahk`). Se a dos contadores ficar numa
 versão antiga, qualquer agente lê tudo por ela. Conferir as duas com `?action=ping`: a
-resposta tem que trazer a versão atual (`"version": 18`).
+resposta tem que trazer a versão atual (`"version": 19`).
 
 **Transição**: enquanto o Apps Script no ar for anterior à v15, o painel pergunta a versão
 (`?action=ping`) e funciona como antes, sem login e sem a tela Equipe. Se a implantação
@@ -184,11 +184,12 @@ evita coleta automática, mas **não é segurança**: a proteção dos dados é 
 - **Ticket na contagem**: o contador v6 tem `MODO := "observar"` (conta sempre, anota a situação:
   em ticket, fora, sem leitura, repetido em 1 min) ou `"bloquear"` (só conta com ticket aberto e recusa
   o mesmo ticket em 1 min; recusas vão para a aba Tentativas, sem virar e-mail). O Apps Script v11
-  traduz a caixa do Commslayer em loja (`INBOX_LOJA`) e conta quando a loja do widget não bate.
+  traduz a caixa do Commslayer em loja (`INBOX_LOJA`), e a v19 a conta do Gorgias (`GORGIAS_LOJA`),
+  e conta quando a loja do widget não bate.
   Começamos em observar. O contador v5.1 lê o endereço da aba da frente
   pela acessibilidade do Windows — só leitura, sem tecla nem área de transferência, porque
   dispara no instante em que o agente envia o e-mail. Manda só um código (`cs:conta:caixa:ticket`,
-  `rp:ticket` ou `fora`), gravado na coluna H da aba Logs pelo Apps Script v10. A API aberta
+  `rp:ticket`, `gg:conta:ticket` do Gorgias desde o contador v6.5, ou `fora`), gravado na coluna H da aba Logs pelo Apps Script v10. A API aberta
   devolve apenas o resumo por agente e dia (`qualidade`), nunca os tickets. Nada é bloqueado.
   Próximo passo: cruzar esses tickets com os fechamentos que o projeto do CS Reporting já
   recebe dos helpdesks (tabela `helpdesk_events`), já que no Commslayer o login é compartilhado
