@@ -21,9 +21,12 @@
  *   Primeiro admin: rode criarAdmin() no editor OU, na tela de login, "Primeiro
  *   acesso" com a senha do Apps Script (ADMIN_TOKEN). So funciona enquanto nao
  *   existe nenhum usuario.
- *   Reviews: le a planilha do Review Desk pelo ID guardado na propriedade do script
- *   REVIEWS_SHEET_ID (Configuracoes do projeto > Propriedades do script). Sem ela,
- *   o campo "reviews" volta vazio e o painel avisa.
+ *   Reviews: le pela API do proprio Review Desk (propriedades REVIEWS_API_URL e
+ *   REVIEWS_SECRET, as mesmas do site dele), servidor a servidor: a senha fica so
+ *   nas Propriedades do script, nunca no navegador nem no repositorio. Alternativa:
+ *   REVIEWS_SHEET_ID le a aba Reviews direto (precisa de acesso a planilha). Sem
+ *   nenhuma das duas, o campo "reviews" volta vazio e o painel avisa. Depois de
+ *   configurar, rode testarReviews() uma vez no editor (pede a autorizacao nova).
  *   POST {action:'login', email, senha}                 -> {token, usuario}
  *   POST {action:'logout', token}
  *   POST {action:'me', token}                           -> {usuario}
@@ -1090,7 +1093,7 @@ function getDataAuth_(p) {
   if (u.papel !== 'admin') restringe_(base, u, !!p.compact);
   base.usuario = u;
   base.reviews = listReviews_();
-  base.reviewsOk = !!PropertiesService.getScriptProperties().getProperty('REVIEWS_SHEET_ID');
+  base.reviewsOk = !!fonteReviews_();
   base.reviewsErro = REVIEWS_ERRO_;
   return base;
 }
@@ -1112,61 +1115,110 @@ function restringe_(base, u, compact) {
 var REVIEWS_ERRO_ = '';   // motivo da ultima falha ao ler o Review Desk (vai para o painel)
 
 /**
- * Rode UMA VEZ no editor depois de criar a propriedade REVIEWS_SHEET_ID. Ler outra
- * planilha pede uma autorizacao nova do Google; sem ela, o painel mostra o erro no
- * lugar dos reviews. No fim, o log diz quantos reviews achou.
+ * De onde vem os reviews. Preferencia: API do Review Desk (REVIEWS_API_URL +
+ * REVIEWS_SECRET, os mesmos valores do CONFIG do site dele). Alternativa:
+ * REVIEWS_SHEET_ID, lendo a aba Reviews direto.
  */
-function testarReviews() {
-  var id = PropertiesService.getScriptProperties().getProperty('REVIEWS_SHEET_ID');
-  if (!id) throw new Error('Crie a propriedade REVIEWS_SHEET_ID com o ID da planilha do Review Desk.');
-  var sh = SpreadsheetApp.openById(id).getSheetByName('Reviews');
-  if (!sh) throw new Error('A planilha ' + id + ' nao tem a aba "Reviews".');
-  try { CacheService.getScriptCache().remove('reviews'); } catch (eC) {}
-  var n = listReviews_().length;
-  if (REVIEWS_ERRO_) throw new Error(REVIEWS_ERRO_);
-  Logger.log('Tudo certo: ' + n + ' reviews encontrados na aba Reviews.');
+function fonteReviews_() {
+  var pr = PropertiesService.getScriptProperties();
+  var url = String(pr.getProperty('REVIEWS_API_URL') || '').trim();
+  var seg = String(pr.getProperty('REVIEWS_SECRET') || '').trim();
+  if (url && seg) return { tipo: 'api', url: url, segredo: seg };
+  var id = String(pr.getProperty('REVIEWS_SHEET_ID') || '').trim();
+  if (id) return { tipo: 'planilha', id: id };
+  return null;
 }
 
 /**
- * Reviews do Trustpilot: aba "Reviews" da planilha do Review Desk (propriedade
- * REVIEWS_SHEET_ID). So os campos do painel; cache de 2 minutos.
+ * Rode UMA VEZ no editor depois de criar as propriedades. Chamar outro servico
+ * (ou ler outra planilha) pede uma autorizacao nova do Google; sem ela, o painel
+ * mostra o erro no lugar dos reviews. No fim, o log diz quantos reviews achou.
  */
+function testarReviews() {
+  var f = fonteReviews_();
+  if (!f) throw new Error('Crie as propriedades REVIEWS_API_URL e REVIEWS_SECRET (ou REVIEWS_SHEET_ID).');
+  try { CacheService.getScriptCache().remove('reviews'); } catch (eC) {}
+  var n = listReviews_().length;
+  if (REVIEWS_ERRO_) throw new Error(REVIEWS_ERRO_);
+  Logger.log('Tudo certo (' + (f.tipo === 'api' ? 'API do Review Desk' : 'planilha') + '): ' + n + ' reviews encontrados.');
+}
+
+/** Reviews do Trustpilot, so com os campos do painel. Cache de 2 minutos. */
 function listReviews_() {
   REVIEWS_ERRO_ = '';
-  var id = PropertiesService.getScriptProperties().getProperty('REVIEWS_SHEET_ID');
-  if (!id) return [];
+  var f = fonteReviews_();
+  if (!f) return [];
   var cache = null;
   try { cache = CacheService.getScriptCache(); var hit = cache.get('reviews'); if (hit) return JSON.parse(hit); } catch (eC) {}
-  var out = [];
+  var brutos;
   try {
-    var sh = SpreadsheetApp.openById(id).getSheetByName('Reviews');
-    if (!sh) { REVIEWS_ERRO_ = 'a planilha do Review Desk nao tem a aba "Reviews"'; return []; }
-    if (sh.getLastRow() >= 2) {
-      var h = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0].map(function (x) { return String(x).trim().toLowerCase(); });
-      var col = function (n) { return h.indexOf(n); };
-      var v = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getDisplayValues();
-      var ci = col('id'), cs = col('store'), ce = col('stars'), cd = col('review_date'), cl = col('review_link'),
-          ct = col('ticket_link'), cst = col('status'), co = col('owner'), cr = col('risk'), cn = col('notes'), cc = col('created_at');
-      for (var i = 0; i < v.length; i++) {
-        var r = v[i];
-        if (ci >= 0 && !String(r[ci] || '').trim()) continue;
-        var dt = cd >= 0 ? parseAny_(r[cd]) : null;
-        out.push({
-          id: ci >= 0 ? String(r[ci]) : String(i), store: cs >= 0 ? String(r[cs] || '').trim() : '',
-          stars: ce >= 0 ? Number(String(r[ce] || '').replace(/[^0-9]/g, '')) || 0 : 0,
-          date: dt ? ymd_(dt) : '', review_link: cl >= 0 ? String(r[cl] || '') : '', ticket_link: ct >= 0 ? String(r[ct] || '') : '',
-          status: cst >= 0 ? String(r[cst] || '').trim() : '', owner: co >= 0 ? String(r[co] || '').trim() : '',
-          risk: cr >= 0 ? String(r[cr] || '').toUpperCase() === 'TRUE' : false, notes: cn >= 0 ? String(r[cn] || '') : '',
-          created_at: cc >= 0 ? String(r[cc] || '') : ''
-        });
-      }
-    }
+    brutos = f.tipo === 'api' ? reviewsDaApi_(f) : reviewsDaPlanilha_(f.id);
   } catch (e) {
     REVIEWS_ERRO_ = String((e && e.message) || e);
     return [];
   }
+  var out = [];
+  for (var i = 0; i < brutos.length; i++) {
+    var r = reviewDe_(brutos[i]);
+    if (r) out.push(r);
+  }
   try { cache && cache.put('reviews', JSON.stringify(out), 120); } catch (eP) {}
   return out;
+}
+
+/**
+ * A mesma chamada que o site do Review Desk faz (GET ?action=list&secret=), mas
+ * daqui, servidor a servidor: a senha nao passa pelo navegador de ninguem. So
+ * leitura — este script nunca chama add/update.
+ */
+function reviewsDaApi_(f) {
+  var url = f.url + (f.url.indexOf('?') > -1 ? '&' : '?') + 'action=list&secret=' + encodeURIComponent(f.segredo);
+  var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+  var code = resp.getResponseCode();
+  if (code !== 200) throw new Error('a API do Review Desk respondeu HTTP ' + code + ' (confira REVIEWS_API_URL)');
+  var j;
+  try { j = JSON.parse(resp.getContentText()); } catch (eJ) { throw new Error('a API do Review Desk nao devolveu JSON (confira REVIEWS_API_URL)'); }
+  if (!j || j.ok !== true) {
+    throw new Error(j && j.error === 'unauthorized'
+      ? 'REVIEWS_SECRET nao confere com o SHARED_SECRET do Review Desk'
+      : 'a API do Review Desk devolveu erro: ' + (j && j.error));
+  }
+  return j.rows || [];
+}
+
+/** Aba Reviews lida direto (precisa de acesso a planilha): objetos com o cabecalho como chave. */
+function reviewsDaPlanilha_(id) {
+  var sh = SpreadsheetApp.openById(id).getSheetByName('Reviews');
+  if (!sh) throw new Error('a planilha do Review Desk nao tem a aba "Reviews"');
+  if (sh.getLastRow() < 2) return [];
+  var v = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getDisplayValues();
+  var h = v[0].map(function (x) { return String(x).trim().toLowerCase(); });
+  return v.slice(1).map(function (row) {
+    var o = {};
+    h.forEach(function (k, i) { o[k] = row[i]; });
+    return o;
+  });
+}
+
+/** Um review no formato do painel, venha da API ou da planilha. Sem id, fica de fora. */
+function reviewDe_(o) {
+  if (!o) return null;
+  var id = String(o.id === undefined || o.id === null ? '' : o.id).trim();
+  if (!id) return null;
+  var dt = parseAny_(o.review_date);
+  return {
+    id: id,
+    store: String(o.store || '').trim(),
+    stars: Number(String(o.stars === undefined || o.stars === null ? '' : o.stars).replace(/[^0-9]/g, '')) || 0,
+    date: dt ? ymd_(dt) : '',
+    review_link: String(o.review_link || ''),
+    ticket_link: String(o.ticket_link || ''),
+    status: String(o.status || '').trim(),
+    owner: String(o.owner || '').trim(),
+    risk: o.risk === true || String(o.risk || '').toUpperCase() === 'TRUE',
+    notes: String(o.notes || ''),
+    created_at: String(o.created_at || '')
+  };
 }
 
 /* ============================================================

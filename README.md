@@ -12,7 +12,7 @@ Script AHK (máquina do agente)
         │  HTTP GET  ?agente=&contador=&loja=&ticket=
         ▼
 Google Apps Script  ──►  Google Sheets (abas Logs / Ajustes / Metas / Tarefas / Usuarios / Sessoes)
-        │  GET ?action=getData&token=SESSAO      ◄── planilha do Review Desk (aba Reviews)
+        │  GET ?action=getData&token=SESSAO      ◄── API do Review Desk (action=list)
         ▼
 index.html (GitHub Pages, com login)
 ```
@@ -96,12 +96,16 @@ O campo **Nome no contador** liga a pessoa às contagens: tem que ser igual ao
 aparece "Primeiro acesso", que pede a senha do Apps Script (`ADMIN_TOKEN`). Alternativa:
 `criarAdmin()` no editor. Só funciona enquanto não existe nenhum usuário.
 
-**Trustpilot**: os reviews vêm da aba **Reviews** da planilha do Review Desk. O ID dessa
-planilha fica na propriedade do script `REVIEWS_SHEET_ID` (Configurações do projeto ›
-Propriedades do script). Sem ela, o painel mostra o aviso no lugar dos reviews. Depois de
-criar a propriedade, rode `testarReviews()` uma vez no editor: ler outra planilha pede uma
-autorização nova do Google, e a função confere o ID e conta os reviews. Se a leitura falhar,
-o painel mostra o motivo ao admin.
+**Trustpilot**: os reviews vêm da API do próprio Review Desk, a mesma chamada de leitura
+(`?action=list`) que o site dele faz. Duas propriedades do script (Configurações do projeto ›
+Propriedades do script): `REVIEWS_API_URL` (a URL `/exec` do Review Desk) e
+`REVIEWS_SECRET` (o `SHARED_SECRET` dele). A chamada sai do Apps Script, servidor a servidor:
+a senha fica só nas propriedades, nunca no navegador nem neste repositório, e este script
+só lê, nunca chama `add`/`update`. Alternativa: `REVIEWS_SHEET_ID` lê a aba Reviews direto,
+se a conta do script tiver acesso à planilha. Depois de configurar, rode `testarReviews()`
+uma vez no editor: chamar outro serviço pede uma autorização nova do Google, e a função
+conta os reviews. Se a leitura falhar, o painel mostra o motivo ao admin. Se o
+`SHARED_SECRET` do Review Desk mudar, atualize `REVIEWS_SECRET` junto.
 
 **As duas implantações vão juntas para a v15.** O `getData` existe na implantação do
 painel e na dos contadores (a URL que está nos `.ahk`). Se a dos contadores ficar numa

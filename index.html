@@ -1208,7 +1208,7 @@ var QUALIDADE = [];  // [{data, agente, ticket, fora, repetidos}] — resumo do 
 var TAREFAS = [];    // sessões do Contador de Tarefas (Apps Script v14) — ver normalizeTarefas
 var REVIEWS = [];    // reviews do Trustpilot (Apps Script v15) — ver normalizeReviews
 var REVIEWS_OK = true;
-var REVIEWS_ERRO = "";   // o Apps Script nao conseguiu ler a planilha do Review Desk
+var REVIEWS_ERRO = "";   // o Apps Script nao conseguiu ler os reviews do Review Desk
 var SESSAO_KEY = "emailcounter.sessao";
 var SESSAO = null;   // {token, email, nome, papel, agente}
 var USUARIOS = [];   // tela Equipe (admin)
@@ -4148,9 +4148,15 @@ function rvTag(status){
 }
 /** Falha ao ler o Review Desk: o admin ve o motivo e o que fazer; o agente, so o aviso. */
 function rvErroTxt(){
-  return "Não consegui ler a planilha do Review Desk" + (isAdmin()
+  return "Não consegui ler os reviews do Review Desk" + (isAdmin()
     ? ": " + esc(REVIEWS_ERRO) + ". No editor do Apps Script, rode <b>testarReviews()</b> uma vez para autorizar e conferir o ID."
     : ". Avise o admin.");
+}
+/** Reviews ainda nao configurados no Apps Script. */
+function rvSemConfigTxt(){
+  return isAdmin()
+    ? "O Apps Script ainda não sabe de onde ler os reviews. Em Configurações do projeto › Propriedades do script, crie <b>REVIEWS_API_URL</b> e <b>REVIEWS_SECRET</b> (os mesmos do Review Desk) e rode <b>testarReviews()</b>."
+    : "Os reviews ainda não foram configurados. Avise o admin.";
 }
 function rvAberto(r){ return String(r.status).toLowerCase() !== "resolvido"; }
 
@@ -4172,8 +4178,7 @@ function renderReviews(r){
   } else if (REVIEWS_OK && REVIEWS_ERRO){
     ov.innerHTML = '<div class="empty" style="padding:22px">' + rvErroTxt() + '</div>';
   } else if (!REVIEWS_OK){
-    ov.innerHTML = '<div class="empty" style="padding:22px">O Apps Script ainda não sabe onde está a planilha do Review Desk. ' +
-      'Em Configurações do projeto › Propriedades do script, crie <b>REVIEWS_SHEET_ID</b> com o ID da planilha.</div>';
+    ov.innerHTML = '<div class="empty" style="padding:22px">' + rvSemConfigTxt() + '</div>';
   } else if (!todos.length){
     ov.innerHTML = '<div class="empty" style="padding:22px">Nenhum review registrado no Review Desk.</div>';
   } else {
@@ -4194,7 +4199,7 @@ function renderReviews(r){
   var box = $("rvBox");
   if (!lista.length){
     box.innerHTML = '<div class="empty" style="padding:30px">' + (LEGADO ? "Os reviews aparecem aqui depois que o Apps Script v15 for implantado." : REVIEWS_OK && REVIEWS_ERRO ? rvErroTxt() : REVIEWS_OK ? "Nenhum review nesta lista." :
-      "Configure REVIEWS_SHEET_ID no Apps Script para os reviews aparecerem aqui.") + '</div>';
+      rvSemConfigTxt()) + '</div>';
     return;
   }
   var th = function(t){ return '<th style="cursor:default">' + t + '</th>'; };
