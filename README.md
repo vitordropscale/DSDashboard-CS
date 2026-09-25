@@ -159,6 +159,16 @@ evita coleta automática, mas **não é segurança**: a proteção dos dados é 
 
 ## Notas de implementação
 
+- **Modo claro e escuro**: as cores vivem em tokens (`:root` para o escuro, `:root[data-tema=claro]`
+  para o claro). Nada de cor fixa no CSS novo: use os tokens. O Chart.js não lê CSS, então as
+  cores dos gráficos ficam em `TEMAS` (uma paleta por tema) e são copiadas para `THEME` na troca.
+  A escolha fica em `localStorage` (`emailcounter.tema`); sem escolha, segue o tema do sistema.
+  Um script no `<head>` aplica o tema antes de pintar, para a tela não piscar.
+- **Datas**: `seletorData()` é o botão com atalhos e calendário (topo do painel e filtro do
+  Trustpilot). `campoData()` troca os `<input type=date>` dos formulários pelo mesmo calendário,
+  em modo de um dia, mantendo o `<input>` escondido com o mesmo id: quem lê ou grava `.value`
+  e quem escuta `input`/`change` continua funcionando.
+
 - **Datas**: a leitura usa `getDisplayValues()` da planilha, não `getValues()`.
   Passar as células por `new Date()` devolvia epoch 0 e horas como serial de 1899.
 - **Fuso**: normalizado para `America/Sao_Paulo` no Apps Script; o dashboard recebe
