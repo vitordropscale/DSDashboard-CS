@@ -15,10 +15,10 @@
   if (t !== "claro" && t !== "escuro") t = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "claro" : "escuro";
   document.documentElement.setAttribute("data-tema", t); })();
 </script>
-<!-- Outfit nos titulos e numeros, Inter no texto. Se o Google Fonts nao carregar, cai nas fontes do sistema. -->
+<!-- Inter Tight nos titulos e numeros, Inter no texto. Se o Google Fonts nao carregar, cai nas fontes do sistema. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@600;700&display=swap">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 /* =============================================================================
@@ -47,9 +47,9 @@
   --violet-soft:rgba(139,92,246,.17); --violet-ink:#cdbcff; --cyan-soft:rgba(34,211,238,.13); --cyan-ink:#9ee8f5;
   --focus-row:rgba(91,155,255,.08);
   --shadow-pop:0 18px 44px rgba(0,0,0,.5);
-  --r:12px; --r-sm:8px; --pill:8px; --tag:6px;
+  --r:10px; --r-sm:7px; --pill:7px; --tag:5px;
   --side-w:232px;
-  --font-d:'Outfit','Poppins','Segoe UI',system-ui,sans-serif;
+  --font-d:'Inter Tight','Inter','Segoe UI',system-ui,sans-serif;
   --font:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
 }
 /* Modo claro: mesma identidade (azul de marca, fios finos), fundo cinza-azulado claro
@@ -90,7 +90,7 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 
 /* ---------- menu lateral ---------- */
 .side{position:fixed;inset:0 auto 0 0;width:var(--side-w);z-index:50;background:var(--side);
-  border-right:1px solid var(--line);display:flex;flex-direction:column;padding:22px 12px 18px}
+  border-right:1px solid var(--line);display:flex;flex-direction:column;padding:22px 12px 18px;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:12px;padding:0 8px 26px}
 /* logo DS: o PNG ja vem com os cantos arredondados (o mesmo do favicon) */
 .logo{width:34px;height:34px;position:relative;flex:none}
@@ -101,26 +101,35 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .side-lab{font-size:11.5px;color:var(--muted);font-weight:500;
   padding:0 12px 8px}
 .nav + .side-lab{margin-top:26px}
-.brand h1{font-family:var(--font-d);font-size:17px;font-weight:700;letter-spacing:-.2px;line-height:1.2;white-space:nowrap}
+.brand h1{font-family:var(--font-d);font-size:16px;font-weight:600;letter-spacing:-.2px;line-height:1.2;white-space:nowrap}
 .brand p{font-size:11.5px;color:var(--muted);margin-top:2px}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav button{display:flex;align-items:center;gap:12px;width:100%;padding:9px 12px;border:none;
   border-radius:var(--pill);background:transparent;color:var(--text2);font-size:13.5px;font-weight:500;
   cursor:pointer;text-align:left;transition:background .15s,color .15s}
 .nav button:hover:not(.on){color:var(--text);background:var(--hover)}
-.nav button.on{background:var(--brand);color:#fff}
-.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:0 4px}
+/* selecao neutra: o azul fica para as acoes (botoes), nao para "onde estou" */
+.nav button.on{background:var(--card3);color:var(--text)}
+.nav button.on svg.ic{color:var(--brand-2)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:16px 4px 0}
 .stat{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text2);padding:3px 10px}
 .stat b{color:var(--text);font-weight:600}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--good);flex:none}
 .dot.warn{background:var(--warn)}
 .dot.err{background:var(--crit)}
+/* rodape do menu: estado da leitura numa linha so; atualizar, tema e sair lado a lado */
+.stat #stTxt{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-n{flex:none;color:var(--muted)}
+.side-acts{display:flex;gap:6px;margin-top:2px}
+.side-acts .btn{height:34px;padding:0 12px}
+.side-acts #btnRefresh{flex:1 1 auto}
+.side-acts .btn.so-ic{width:34px;padding:0;flex:none}
 
 /* ---------- conteudo ---------- */
 .main{margin-left:var(--side-w);min-width:0}
 .wrap{max-width:1320px;margin:0 auto;padding:26px 32px 48px}
 .page-h{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px}
-.page-t{font-family:var(--font-d);font-size:24px;font-weight:700;letter-spacing:-.4px;line-height:1.15}
+.page-t{font-family:var(--font-d);font-size:22px;font-weight:600;letter-spacing:-.4px;line-height:1.15}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px}
 .page-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -141,16 +150,15 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 /* ---------- filtros ---------- */
 .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;
   padding-bottom:22px;margin-bottom:26px;border-bottom:1px solid var(--line)}
-.seg,.chips{display:flex;gap:2px;flex-wrap:wrap;padding:3px;border:1px solid var(--line);border-radius:10px;
+.seg,.chips{display:flex;gap:2px;flex-wrap:wrap;padding:3px;border:1px solid var(--line);border-radius:8px;
   background:var(--side)}
 .seg button,.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:none;
-  border-radius:7px;background:transparent;color:var(--text2);font-size:12.5px;font-weight:500;
+  border-radius:6px;background:transparent;color:var(--text2);font-size:12.5px;font-weight:500;
   cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
 .seg button:hover:not(.on),.chip:hover{color:var(--text);background:var(--hover2)}
 /* selecao e sempre a cor de marca; a identidade da loja fica no pontinho */
-.seg button.on{background:var(--brand);color:#fff;font-weight:600}
+.seg button.on{background:var(--card3);color:var(--text);font-weight:600}
 .sw{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
-.seg button.on .sw{box-shadow:0 0 0 2px rgba(255,255,255,.4)}
 /* agentes: varios ligados ao mesmo tempo, entao "ligado" nao e um bloco azul */
 .chip{color:var(--muted)}
 .chip .swatch{width:8px;height:8px;border-radius:50%;background:var(--c,var(--muted));opacity:.3;flex:none}
@@ -158,7 +166,7 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .chip.on .swatch{opacity:1}
 /* ---------- seletor de periodo: botao com a data; abre atalhos + calendario ---------- */
 .dp{position:relative}
-.dp-btn{display:inline-flex;align-items:center;gap:9px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);
+.dp-btn{display:inline-flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);
   background:var(--side);color:var(--text);font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;
   transition:border-color .15s,box-shadow .15s}
 .dp-btn:hover{border-color:var(--line2)}
@@ -167,7 +175,7 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .dp-btn[aria-expanded=true]{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .dp-btn.ativo{border-color:var(--brand);background:var(--brand-soft)}
 .dp-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:80;display:flex;background:var(--card);
-  border:1px solid var(--line2);border-radius:14px;box-shadow:var(--shadow-pop);overflow:hidden}
+  border:1px solid var(--line2);border-radius:12px;box-shadow:var(--shadow-pop);overflow:hidden}
 .dp.esq .dp-pop{right:auto;left:0}
 .dp-pre{display:flex;flex-direction:column;gap:2px;padding:10px;border-right:1px solid var(--line);min-width:156px;background:var(--side)}
 .dp-pre button{text-align:left;padding:8px 12px;border:none;border-radius:8px;background:transparent;color:var(--text2);
@@ -233,7 +241,7 @@ td .sw{margin-right:8px;vertical-align:1px}
 .banner.show{display:flex}
 .banner.err{background:var(--crit-soft)}
 .banner.warn{background:var(--warn-soft)}
-.banner .ic{font-size:15px;line-height:1.3}
+.banner .ic{flex:none;line-height:0;padding-top:1px}
 .banner.err .ic{color:var(--crit)} .banner.warn .ic{color:var(--warn)}
 .banner b{display:block;margin-bottom:3px;color:var(--text);font-size:13px}
 .banner code{background:var(--code);padding:1px 7px;border-radius:6px;font-size:11.5px}
@@ -251,10 +259,10 @@ td .sw{margin-right:8px;vertical-align:1px}
 .kpi-h{margin-bottom:12px}
 .kpi-ic{display:none}
 .kpi-l{font-size:12.5px;color:var(--muted);font-weight:500}
-.kpi-v{font-family:var(--font-d);font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1;
+.kpi-v{font-family:var(--font-d);font-size:30px;font-weight:600;letter-spacing:-.9px;line-height:1;
   color:var(--text);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;min-height:34px}
 .kpi-v small{font-family:var(--font);font-size:12px;font-weight:500;letter-spacing:0;color:var(--text2)}
-.kpi-v.sm{font-size:26px;letter-spacing:-.6px}
+.kpi-v.sm{font-size:24px;letter-spacing:-.6px}
 .kpi-s{font-size:12px;color:var(--text2);margin-top:10px;display:flex;align-items:center;gap:8px;
   min-height:22px;flex-wrap:wrap;line-height:1.45}
 /* variacao: selo translucido, nao numero colorido solto */
@@ -271,10 +279,10 @@ td .sw{margin-right:8px;vertical-align:1px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;min-width:0;margin-bottom:14px}
 .grid .card{margin-bottom:0}
 .card-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px;flex-wrap:wrap}
-.card-t{font-family:var(--font-d);font-size:16px;font-weight:600;color:var(--text);letter-spacing:-.1px}
+.card-t{font-family:var(--font-d);font-size:15px;font-weight:600;color:var(--text);letter-spacing:-.1px}
 .card-sub{font-size:12.5px;color:var(--muted);font-weight:400;margin-top:3px}
-.mini-seg{display:flex;gap:2px;background:var(--side);border:1px solid var(--line);border-radius:9px;padding:3px}
-.mini-seg button{padding:5px 11px;border-radius:6px;border:none;background:transparent;color:var(--muted);
+.mini-seg{display:flex;gap:2px;background:var(--side);border:1px solid var(--line);border-radius:8px;padding:3px}
+.mini-seg button{padding:5px 11px;border-radius:5px;border:none;background:transparent;color:var(--muted);
   font-size:11px;cursor:pointer;transition:.15s;font-weight:500}
 .mini-seg button:hover:not(.on){color:var(--text2)}
 .mini-seg button.on{background:var(--card3);color:var(--text)}
@@ -322,7 +330,7 @@ tbody tr:last-child td{border-bottom:none}
 /* dia com nota registrada: anel claro em volta do quadradinho */
 .hd.note{box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--text2)}
 .hist-num{flex:none;text-align:right;min-width:130px}
-.hist-num b{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:-.3px;
+.hist-num b{font-family:var(--font-d);font-size:17px;font-weight:600;letter-spacing:-.3px;
   font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:8px}
 .hist-num>i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:3px}
 .st-dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
@@ -336,7 +344,7 @@ tbody tr:last-child td{border-bottom:none}
 .meta-row{display:flex;align-items:center;gap:16px;font-size:13px}
 .meta-ag{display:flex;align-items:center;gap:11px;font-weight:600;flex:1 1 auto;min-width:0}
 .meta-num{flex:none;text-align:right;min-width:112px;font-variant-numeric:tabular-nums;color:var(--muted)}
-.meta-num b{font-family:var(--font-d);font-size:19px;font-weight:700;letter-spacing:-.4px;color:var(--text)}
+.meta-num b{font-family:var(--font-d);font-size:18px;font-weight:600;letter-spacing:-.4px;color:var(--text)}
 .meta-bar{flex:1 1 200px;min-width:110px}
 /* selos de estado translucidos */
 .meta-tag{flex:none;font-size:11px;font-weight:600;padding:4px 10px;border-radius:var(--tag);white-space:nowrap;
@@ -390,7 +398,7 @@ tbody tr:last-child td{border-bottom:none}
 .nt-meta{color:var(--muted);font-size:11px;margin-top:4px}
 .nt-act{flex:none;display:flex;gap:6px}
 .nt-tag,.adj-tag{display:inline-block;font-size:11px;font-weight:500;
-  padding:3px 8px;border-radius:5px;margin-right:9px;vertical-align:1px;
+  padding:3px 8px;border-radius:4px;margin-right:9px;vertical-align:1px;
   background:var(--off);color:var(--text2)}
 .nt-tag.bom{background:var(--good-soft);color:var(--good-ink)}
 .nt-tag.ruim{background:var(--crit-soft);color:var(--crit-ink)}
@@ -426,13 +434,13 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
 .bs{background:var(--off);border-radius:var(--r-sm);padding:14px 18px;font-size:12px;line-height:1.45;min-width:130px}
 .bs b{display:flex;align-items:center;gap:8px;color:var(--text2);font-weight:500;font-size:12px}
 .bs b::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none}
-.bs span{display:block;color:var(--text);font-family:var(--font-d);font-weight:700;font-size:24px;
+.bs span{display:block;color:var(--text);font-family:var(--font-d);font-weight:600;font-size:22px;
   letter-spacing:-.6px;margin:6px 0 2px}
 .bs i{display:block;color:var(--muted);font-style:normal;font-size:11px}
 .burst-list .bl{display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:14px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--text2)}
 .burst-list .bl:last-child{border-bottom:none}
-.burst-list .bl b{color:var(--text);font-family:var(--font-d);font-size:17px;font-weight:700;margin-right:3px}
+.burst-list .bl b{color:var(--text);font-family:var(--font-d);font-size:16px;font-weight:600;margin-right:3px}
 
 /* ---------- heatmap ---------- */
 .heat{display:grid;gap:3px;font-size:9.5px}
@@ -468,9 +476,9 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
 .ov{position:fixed;inset:0;z-index:90;background:var(--overlay);backdrop-filter:blur(6px);
   display:none;align-items:flex-start;justify-content:center;padding:48px 16px;overflow-y:auto}
 .ov.show{display:flex}
-.modal{background:var(--card);border:1px solid var(--line2);border-radius:14px;width:100%;max-width:600px}
+.modal{background:var(--card);border:1px solid var(--line2);border-radius:12px;width:100%;max-width:600px}
 .modal-h{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:22px 24px 4px}
-.modal-h h2{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:-.4px}
+.modal-h h2{font-family:var(--font-d);font-size:17px;font-weight:600;letter-spacing:-.3px}
 .modal-h p{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.55}
 .modal-h p b{color:var(--text2);font-weight:600}
 .x{background:var(--off);border:none;color:var(--text2);font-size:18px;cursor:pointer;line-height:1;
@@ -484,16 +492,21 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
 .inp{width:100%;padding:11px 14px;border-radius:var(--r-sm);border:1px solid transparent;
   background:var(--field);color:var(--text);font-size:13.5px;color-scheme:var(--scheme);transition:.15s}
 select.inp option{background:var(--card2);color:var(--text)}
+/* seta do site no lugar da seta do navegador (a mesma dos filtros) */
+select.inp{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:38px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239ea8bb' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center}
+select.inp:hover:not(:focus){border-color:var(--line2)}
 textarea.inp{resize:vertical;line-height:1.55}
 .inp:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-.tabs{display:flex;gap:2px;background:var(--side);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:18px}
-.tabs button{flex:1;padding:8px 10px;border-radius:7px;border:none;background:transparent;
+.tabs{display:flex;gap:2px;background:var(--side);border:1px solid var(--line);border-radius:8px;padding:3px;margin-bottom:18px}
+.tabs button{flex:1;padding:8px 10px;border-radius:6px;border:none;background:transparent;
   color:var(--muted);font-size:12.5px;cursor:pointer;font-weight:500;transition:.15s}
 .tabs button:hover:not(.on){color:var(--text2)}
 .tabs button:focus{outline:none}
-.tabs button.on{background:var(--brand);color:#fff}
+.tabs button.on{background:var(--card3);color:var(--text)}
 .pane{display:none}.pane.on{display:block}
 .btn-primary{width:100%;padding:11px;border-radius:var(--pill);border:none;background:var(--brand);
   color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s;margin-top:6px}
@@ -520,13 +533,13 @@ body.legado .nav button[data-view=equipe]{display:none!important}
 body.role-agente .kpis{grid-template-columns:repeat(3,1fr)}
 .login{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px}
 .login.show{display:flex}
-.login-box{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 28px 24px}
+.login-box{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px 28px 24px}
 .login-box .logo{width:48px;height:48px;border-radius:12px;overflow:hidden;background:none;margin:0 auto 18px}
 .login-box .logo img{width:100%;height:100%;display:block}
 /* Trustpilot nao depende do periodo; Equipe nao depende de filtro nenhum */
 body[data-tela=trustpilot] .page-ctl,body[data-tela=trustpilot] #chipAgents,
 body[data-tela=equipe] .page-ctl,body[data-tela=equipe] .filters{display:none!important}
-.login-box h2{font-family:var(--font-d);font-size:20px;font-weight:700;text-align:center;letter-spacing:-.3px}
+.login-box h2{font-family:var(--font-d);font-size:19px;font-weight:600;text-align:center;letter-spacing:-.3px}
 .login-box p.sub{font-size:12.5px;color:var(--muted);text-align:center;margin:6px 0 22px}
 .login-box .link{background:none;border:none;color:var(--brand-2);font-size:12.5px;cursor:pointer;padding:6px 0;width:100%;text-align:center}
 .user-line{display:flex;align-items:center;gap:10px;padding:6px 10px 2px;min-width:0}
@@ -535,7 +548,7 @@ body[data-tela=equipe] .page-ctl,body[data-tela=equipe] .filters{display:none!im
 .user-line small{display:block;font-size:11px;color:var(--muted)}
 .stars{font-family:var(--font);letter-spacing:1px;color:var(--warn);font-size:12px;white-space:nowrap}
 .stars .off{color:var(--faint)}
-.rv-tag{display:inline-block;font-size:11px;font-weight:500;padding:3px 8px;border-radius:5px;background:var(--off);color:var(--text2);white-space:nowrap}
+.rv-tag{display:inline-block;font-size:11px;font-weight:500;padding:3px 8px;border-radius:4px;background:var(--off);color:var(--text2);white-space:nowrap}
 .rv-tag.investigando{background:var(--warn-soft);color:var(--warn-ink)}
 .rv-tag.contatado{background:var(--brand-soft);color:var(--brand-ink)}
 .rv-tag.follow-up{background:var(--violet-soft);color:var(--violet-ink)}
@@ -598,7 +611,7 @@ body:not(.api-v16) .v16-only{display:none!important}
 .rv-filtros{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 /* select compacto no padrao do painel (sem a seta do navegador) */
 .sel-mini{appearance:none;-webkit-appearance:none;background:var(--side) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239ea8bb' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 11px center;
-  border:1px solid var(--line);border-radius:9px;color:var(--text2);font:inherit;font-size:12.5px;padding:7px 30px 7px 11px;cursor:pointer;color-scheme:dark}
+  border:1px solid var(--line);border-radius:8px;color:var(--text2);font:inherit;font-size:12.5px;padding:7px 30px 7px 11px;cursor:pointer;color-scheme:var(--scheme)}
 .sel-mini:hover{color:var(--text)}
 .sel-mini:focus-visible{outline:2px solid var(--brand-2);outline-offset:1px}
 .sel-mini.ativo{border-color:var(--brand);color:var(--text);background-color:var(--brand-soft)}
@@ -622,11 +635,10 @@ tr.rv-row:focus{outline:none}
 .rv-list .rv[data-id]{cursor:pointer}
 .nav .badge{margin-left:auto;font-size:11px;font-weight:600;font-style:normal;padding:0 7px;border-radius:9px;
   background:var(--crit-soft);color:var(--crit-ink);line-height:18px}
-.nav button.on .badge{background:rgba(255,255,255,.22);color:#fff}
 /* follow up: dias desde o contato + barrinha (azul no prazo, ambar depois de 3 dias, vermelho depois de 6) */
 .fu{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:18px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
 .fu:last-child{border-bottom:none}
-.fu-dias b{display:block;font-family:var(--font-d);font-size:22px;font-weight:700;letter-spacing:-.6px;line-height:1.1}
+.fu-dias b{display:block;font-family:var(--font-d);font-size:20px;font-weight:600;letter-spacing:-.6px;line-height:1.1}
 .fu-dias span{display:block;font-size:11px;color:var(--muted);margin-top:2px}
 .fu-bar{display:flex;gap:2px;margin-top:8px}
 .fu-bar i{flex:1;height:4px;border-radius:1px;background:var(--track)}
@@ -641,12 +653,13 @@ tr.rv-row:focus{outline:none}
 @media(max-width:680px){.fu{grid-template-columns:1fr;gap:10px}.fu-acts{justify-content:flex-start}.rv-grid{grid-template-columns:1fr}}
 .mini-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;margin-bottom:16px}
 .mini-kpis div{background:var(--card);padding:12px 14px}
-.mini-kpis b{display:block;font-family:var(--font-d);font-size:22px;font-weight:700;letter-spacing:-.6px}
+.mini-kpis b{display:block;font-family:var(--font-d);font-size:20px;font-weight:600;letter-spacing:-.6px}
 .mini-kpis span{font-size:11.5px;color:var(--muted)}
 .eq-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:680px){.eq-row{grid-template-columns:1fr}.mini-kpis{grid-template-columns:1fr}}
 
-@media(max-width:1240px){.kpis{grid-template-columns:repeat(3,1fr)}.kpis .kpi:nth-child(n+4){grid-column:span 1}.kpis .kpi:nth-child(5):last-child{grid-column:span 2}.g-2,.g-2b{grid-template-columns:1fr}}
+@media(max-width:1240px){.kpis{grid-template-columns:repeat(3,1fr)}.kpis .kpi:nth-child(n+4){grid-column:span 1}.kpis .kpi:nth-child(5):last-child{grid-column:span 2}.g-2,.g-2b{grid-template-columns:1fr}
+  body.role-agente .kpis .kpi:nth-child(5):last-child{grid-column:span 1}}
 @media(max-width:900px){
   /* o menu lateral vira uma faixa no topo, so com icones */
   .side{position:sticky;top:0;inset:auto;width:auto;flex-direction:row;align-items:center;gap:8px;
@@ -659,8 +672,10 @@ tr.rv-row:focus{outline:none}
   .nav button{padding:9px 11px;width:auto;white-space:nowrap}
   .nav button span{display:none}
   .nav button.on span{display:inline}
-  .side-foot{margin:0 0 0 auto;flex-direction:row}
+  .side-foot{margin:0 0 0 auto;flex-direction:row;padding:0}
   .side-foot .user-line{display:none}
+  .side-acts #btnRefresh{flex:none;width:34px;padding:0}
+  .side-acts #btnRefresh span{display:none}
   .main{margin-left:0}
   .wrap{padding:18px 14px 40px}
   .page-t{font-size:21px}
@@ -668,8 +683,10 @@ tr.rv-row:focus{outline:none}
 @media(max-width:680px){
   .kpis{grid-template-columns:repeat(2,1fr)}
   .kpis .kpi:last-child:nth-child(odd){grid-column:span 2}
+  body.role-agente .kpis{grid-template-columns:repeat(2,1fr)}
+  body.role-agente .kpis .kpi:nth-child(5):last-child{grid-column:span 2}
   .kpi{padding:14px 16px 16px}
-  .kpi-v{font-size:32px} .kpi-v.sm{font-size:22px}
+  .kpi-v{font-size:28px} .kpi-v.sm{font-size:21px}
   .card{padding:20px 18px}
   .tbl-wrap{margin:0 -18px;padding:0 18px}
   .chart-box{height:240px}
@@ -692,7 +709,7 @@ tr.rv-row:focus{outline:none}
     <button data-view="geral" class="on">
       <svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
       <span>Visão geral</span></button>
-    <button data-view="metas" class="admin-only">
+    <button data-view="metas">
       <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6"/></svg>
       <span>Metas</span></button>
     <button data-view="horarios" class="admin-only">
@@ -729,14 +746,17 @@ tr.rv-row:focus{outline:none}
 
   <div class="side-foot">
     <div class="user-line"><span class="av" id="userAv"></span><div style="min-width:0"><b id="userNome">—</b><small id="userPapel"></small></div></div>
-    <div class="stat"><span class="dot live" id="stDot"></span><span id="stTxt">carregando…</span></div>
-    <div class="stat" id="stRows" title="Registros no filtro atual">—</div>
-    <button class="btn" id="btnRefresh" title="Atualizar agora (tecla R)">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5v5h-5"/></svg>
-      Atualizar
-    </button>
-    <button class="btn" id="btnTema" type="button"></button>
-    <button class="btn" id="btnLogout" title="Encerrar a sessão neste navegador">Sair</button>
+    <div class="stat"><span class="dot live" id="stDot"></span><span id="stTxt">carregando…</span><span class="stat-n" id="stRows" title="Registros no filtro atual"></span></div>
+    <div class="side-acts">
+      <button class="btn" id="btnRefresh" type="button" title="Atualizar agora (tecla R)">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 3.5v5h-5"/></svg>
+        <span>Atualizar</span>
+      </button>
+      <button class="btn so-ic" id="btnTema" type="button"></button>
+      <button class="btn so-ic" id="btnLogout" type="button" title="Sair (encerra a sessão neste navegador)" aria-label="Sair">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M9.5 20H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3.5"/><path d="m15.5 16.5 4.5-4.5-4.5-4.5"/><path d="M20 12H9.5"/></svg>
+      </button>
+    </div>
   </div>
 </aside>
 
@@ -760,7 +780,7 @@ tr.rv-row:focus{outline:none}
   </header>
 
   <div class="banner" id="banner">
-    <div class="ic" id="bannerIc">⚠</div>
+    <div class="ic" id="bannerIc"></div>
     <div><b id="bannerTitle"></b><span id="bannerBody"></span></div>
   </div>
 
@@ -810,11 +830,11 @@ tr.rv-row:focus{outline:none}
       </div>
     </div>
 
-    <div class="card admin-only" id="metaCard">
+    <div class="card" id="metaCard">
       <div class="card-h">
         <div><div class="card-t">Metas do dia</div>
         <div class="card-sub" id="metaSub">&nbsp;</div></div>
-        <button class="btn cta" id="btnMetasEdit">Definir metas</button>
+        <button class="btn cta admin-only" id="btnMetasEdit">Definir metas</button>
       </div>
       <div id="metaBox"></div>
     </div>
@@ -874,7 +894,7 @@ tr.rv-row:focus{outline:none}
       <div id="histBox"></div>
     </div>
 
-    <div class="card" id="notasCard">
+    <div class="card admin-only" id="notasCard">
       <div class="card-h">
         <div><div class="card-t">Notas do período</div>
         <div class="card-sub" id="notasSub">&nbsp;</div></div>
@@ -1491,7 +1511,7 @@ var RV_STATUS = ["Investigando", "Contatado", "Follow up", "Resolvendo", "Resolv
 var SESSAO_KEY = "emailcounter.sessao";
 var SESSAO = null;   // {token, email, nome, papel, agente}
 var USUARIOS = [];   // tela Equipe (admin)
-var VISTAS_AGENTE = ["geral", "tarefas", "trustpilot"];
+var VISTAS_AGENTE = ["geral", "metas", "tarefas", "trustpilot"];
 /* LEGADO: o Apps Script no ar ainda nao tem login (v14 ou antes). O painel
    funciona como antes, sem login, ate a v15 ser implantada — ai a API passa a
    recusar o getData sem sessao e o login aparece sozinho. */
@@ -1941,7 +1961,9 @@ function setStatus(kind, text){
 }
 function showBanner(kind,title,body){
   var b=$("banner"); b.className="banner show "+kind;
-  $("bannerIc").textContent = kind==="err" ? "✕" : "⚠";
+  $("bannerIc").innerHTML = kind==="err"
+    ? '<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m9.3 9.3 5.4 5.4M14.7 9.3l-5.4 5.4"/></svg>'
+    : '<svg class="ic" viewBox="0 0 24 24"><path d="M10.3 4.6 3.2 17.2A2 2 0 0 0 5 20h14a2 2 0 0 0 1.8-2.8L13.7 4.6a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 16.8v.2"/></svg>';
   $("bannerTitle").textContent = title; $("bannerBody").innerHTML = body;
 }
 function hideBanner(){ $("banner").className="banner"; }
@@ -2215,7 +2237,7 @@ function buildTrend(id, rows, ax, mode, empilhado){
     var arr = ax.order.map(function(){ return 0; });
     rows.forEach(function(rec){ var k=ax.keyOf(rec); if(idx[k]!==undefined) arr[idx[k]]++; });
     datasets = [{ label:"Emails", data:arr, borderColor:THEME.brand, backgroundColor:veilFill(THEME.brandRgb),
-                  fill:true, tension:.35, borderWidth:2, pointRadius:0, pointHoverRadius:5 }];
+                  fill:true, tension:.2, borderWidth:2, pointRadius:0, pointHoverRadius:4 }];
   } else {
     var field = mode === "agente" ? "agente" : "loja";
     var keys={}, tot={};
@@ -2231,7 +2253,7 @@ function buildTrend(id, rows, ax, mode, empilhado){
       var c = field==="loja" ? (STORE_COLOR[n]||agColor(n)) : agColor(n);
       return { label:n, data:arr, borderColor:c,
                backgroundColor: empilhado ? c+"99" : c+"22",
-               fill:!!empilhado, tension:.35, borderWidth:empilhado?1.5:2,
+               fill:!!empilhado, tension:.2, borderWidth:empilhado?1.5:2,
                pointRadius:0, pointHoverRadius:5 };
     });
   }
@@ -2863,8 +2885,8 @@ function doughnut(id, labels, data, colors){
   CHARTS[id] = new Chart($(id), {
     type:"doughnut",
     data:{ labels:labels, datasets:[{ data:data, backgroundColor:colors,
-      borderColor:THEME.card, borderWidth:3, borderRadius:3, hoverOffset:4 }] },
-    options:{ responsive:true, maintainAspectRatio:false, cutout:"72%", animation:{duration:350},
+      borderColor:THEME.card, borderWidth:2, borderRadius:0, hoverOffset:2 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:"76%", animation:{duration:350},
       plugins:{ legend:leg, tooltip:tip } }
   });
 }
@@ -2980,7 +3002,8 @@ function renderMetas(){
   });
   if (!comMeta.length){
     box.innerHTML = '<div class="empty" style="padding:26px">' +
-      (umaLoja ? 'Nenhuma meta de <b>'+esc(umaLoja)+'</b> definida. Clique em <b>Definir metas</b> ' +
+      (!isAdmin() ? (umaLoja ? 'Você ainda não tem meta para <b>'+esc(umaLoja)+'</b>.' : 'Sua meta ainda não foi definida. Fale com o admin.')
+      : umaLoja ? 'Nenhuma meta de <b>'+esc(umaLoja)+'</b> definida. Clique em <b>Definir metas</b> ' +
                  'para repartir a meta do agente entre as lojas.'
                : 'Nenhuma meta definida ainda. Clique em <b>Definir metas</b> para cadastrar.') + '</div>';
     return;
@@ -3006,7 +3029,7 @@ function renderMetas(){
         }).join("") + '</div>';
 
         var soma = metaStoreSum(a, day), tot = metaFor(a, day, "");
-        if (tot && soma !== tot){
+        if (tot && soma !== tot && isAdmin()){   // o aviso e para quem pode ajustar
           html += '<div class="meta-warn">As metas por loja somam '+nf(soma)+
                   ', mas a meta total é '+nf(tot)+'. Ajuste em <b>Definir metas</b>.</div>';
         }
@@ -3100,12 +3123,14 @@ function renderMetaHistory(){
     $("histSub").textContent = "";
     box.innerHTML = '<div class="empty" style="padding:26px">' +
       (METAS_HIST.length ? "Nenhum agente com meta no filtro atual."
-                         : "Defina as metas para acompanhar o atingimento.") + '</div>';
+                         : isAdmin() ? "Defina as metas para acompanhar o atingimento." : "Sua meta ainda não foi definida. Fale com o admin.") + '</div>';
     return;
   }
   if (!h.dias.length){
     $("histSub").textContent = "";
-    box.innerHTML = '<div class="empty" style="padding:26px">O período selecionado só tem o dia de hoje, que ainda está em andamento.</div>';
+    box.innerHTML = '<div class="empty" style="padding:26px">O atingimento conta só os dias já fechados, e o período escolhido tem só hoje.' +
+      '<br><button type="button" class="link-mini" id="histVer7">Ver os últimos 7 dias</button></div>';
+    $("histVer7").onclick = function(){ state.period = "7d"; render(); ensureCoverage(); };
     return;
   }
 
@@ -4405,8 +4430,8 @@ function aplicarTema(t, salvar){
   b.title = claro ? "Usar o modo escuro" : "Usar o modo claro";
   b.setAttribute("aria-label", b.title);
   b.innerHTML = claro
-    ? '<svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Modo escuro</span>'
-    : '<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg><span>Modo claro</span>';
+    ? '<svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>'
+    : '<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>';
   if (RECS.length || REVIEWS.length) render();   // graficos recriados com a paleta nova
 }
 $("btnTema").onclick = function(){ aplicarTema(temaAtual() === "claro" ? "escuro" : "claro", true); };
@@ -5300,6 +5325,10 @@ function setView(v){
   state.view = v;
   document.body.setAttribute("data-tela", v);
   document.querySelectorAll(".view").forEach(function(el){ el.classList.toggle("on", el.dataset.view === v); });
+  // "Metas do dia" mora na visao geral e sobe para o topo da tela Metas quando ela abre
+  var mc = $("metaCard");
+  if (v === "metas") $("histCard").before(mc);
+  else if (!mc.closest('[data-view="geral"]')) document.querySelector('.view[data-view="geral"] .kpis').after(mc);
   $("nav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("on", b.dataset.view === v); });
   $("pageTitle").textContent = VIEWS[v];
   try { history.replaceState(null, "", "#" + v); } catch(e){}

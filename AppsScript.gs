@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v17.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v18.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -16,8 +16,9 @@
  *   com salt). O login devolve um token de sessao (aba "Sessoes", validade
  *   SESSAO_HORAS) que vai em todas as chamadas. O getData entrega por papel:
  *     admin  -> tudo, como antes, mais os reviews.
- *     agente -> so os proprios emails e tarefas, mais os reviews. Metas, qualidade,
- *               notas e ajustes NAO saem da API para ele — esconder na tela nao bastaria.
+ *     agente -> so os proprios emails, tarefas e metas (v18), mais os reviews. As metas
+ *               dos outros, qualidade, notas e ajustes NAO saem da API para ele —
+ *               esconder na tela nao bastaria.
  *   Primeiro admin: rode criarAdmin() no editor OU, na tela de login, "Primeiro
  *   acesso" com a senha do Apps Script (ADMIN_TOKEN). So funciona enquanto nao
  *   existe nenhum usuario.
@@ -240,7 +241,7 @@ var REVIEW_ACOES = ['addReview', 'updateReview', 'delReview', 'importReviews'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 17 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 18 }, p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
     // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
@@ -1155,7 +1156,12 @@ function restringe_(base, u, compact) {
   base.rows = (base.rows || []).filter(function (r) { return ehMeu(compact ? r[2] : r.agente); });
   base.total = base.rows.length;
   base.tarefas = (base.tarefas || []).filter(function (t) { return ehMeu(t.agente); });
-  base.metas = {}; base.metasHist = []; base.qualidade = []; base.notas = []; base.ajustes = 0;
+  // metas (v18): so a do proprio agente, a atual e o historico dela
+  var minhas = {};
+  Object.keys(base.metas || {}).forEach(function (k) { if (ehMeu(k)) minhas[k] = base.metas[k]; });
+  base.metas = minhas;
+  base.metasHist = (base.metasHist || []).filter(function (m) { return ehMeu(m.agente); });
+  base.qualidade = []; base.notas = []; base.ajustes = 0;
   base.skipped = 0;
 }
 
@@ -1689,7 +1695,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 17
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 18
   };
 
   if (p.compact) {

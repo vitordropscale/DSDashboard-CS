@@ -76,7 +76,7 @@ O `AppsScript.gs` deste repositório é backup. Para alterar de verdade:
 3. Repetir em **todas** as implantações ativas — existem várias, e cada uma fica presa
    à versão em que foi publicada. Atualizar só uma deixa o resto rodando código antigo.
 
-## Acessos (Apps Script v15 e v16)
+## Acessos (Apps Script v15 a v18)
 
 O painel exige login com e-mail e senha. Cada pessoa é uma linha na aba **Usuarios**
 (senha guardada como hash com salt, nunca em texto). O login cria um token de sessão
@@ -85,10 +85,11 @@ O painel exige login com e-mail e senha. Cada pessoa é uma linha na aba **Usuar
 | Papel | Vê | Não vê |
 |---|---|---|
 | admin | tudo, mais a tela **Equipe** (criar, editar, desativar, redefinir senha); exclui reviews e traz do Review Desk | — |
-| agente | Visão geral, Tarefas e Trustpilot (com a aba Follow up), só com as **próprias** contagens e tarefas; todos os reviews, que ele também cadastra e edita | metas, horários, agentes, qualidade, notas, ajustes, report, CSV |
+| agente | Visão geral, Metas, Tarefas e Trustpilot (com a aba Follow up), só com as **próprias** contagens, meta e tarefas; todos os reviews, que ele também cadastra e edita | metas dos outros, definir metas, horários, agentes, qualidade, notas, ajustes, report, CSV |
 
 O corte é feito no Apps Script: para um agente, o `getData` já sai sem as linhas dos
-outros e sem metas, qualidade, notas e ajustes. Esconder na tela sozinho não bastaria.
+outros, só com a própria meta (a atual e o histórico dela, desde a v18) e sem qualidade,
+notas e ajustes. Esconder na tela sozinho não bastaria.
 O campo **Nome no contador** liga a pessoa às contagens: tem que ser igual ao
 `AGENT_NAME` do contador dela.
 
@@ -122,10 +123,10 @@ Desk só é lido quando o admin clica em **Trazer do Review Desk**, que acrescen
 "repetido" para o admin. `testarReviews()` no editor confere a conexão e reabre a
 autorização do Google se "Connect to an external service" tiver ficado desmarcado.
 
-**As duas implantações vão juntas para a v15.** O `getData` existe na implantação do
+**As duas implantações vão sempre juntas.** O `getData` existe na implantação do
 painel e na dos contadores (a URL que está nos `.ahk`). Se a dos contadores ficar numa
 versão antiga, qualquer agente lê tudo por ela. Conferir as duas com `?action=ping`: a
-resposta tem que trazer `"version": 15`.
+resposta tem que trazer a versão atual (`"version": 18`).
 
 **Transição**: enquanto o Apps Script no ar for anterior à v15, o painel pergunta a versão
 (`?action=ping`) e funciona como antes, sem login e sem a tela Equipe. Se a implantação
@@ -164,6 +165,10 @@ evita coleta automática, mas **não é segurança**: a proteção dos dados é 
   cores dos gráficos ficam em `TEMAS` (uma paleta por tema) e são copiadas para `THEME` na troca.
   A escolha fica em `localStorage` (`emailcounter.tema`); sem escolha, segue o tema do sistema.
   Um script no `<head>` aplica o tema antes de pintar, para a tela não piscar.
+- **Visual**: Inter no texto e Inter Tight em títulos e números, pesos até 600. "Onde estou"
+  (menu, abas, loja escolhida) é marcado em cinza; o azul fica para ações. Selects usam a
+  seta do site (`select.inp` nos formulários, `.sel-mini` nos filtros), nunca a do navegador.
+  O cartão "Metas do dia" é um só: fica na Visão geral e sobe para o topo da tela Metas.
 - **Datas**: `seletorData()` é o botão com atalhos e calendário (topo do painel e filtro do
   Trustpilot). `campoData()` troca os `<input type=date>` dos formulários pelo mesmo calendário,
   em modo de um dia, mantendo o `<input>` escondido com o mesmo id: quem lê ou grava `.value`
