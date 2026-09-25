@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CS Dashboard — Email Counter</title>
+<title>CS Dashboard</title>
 <meta name="description" content="KPIs de atendimento por agente, loja e horário.">
 <!-- Favicon embutido: logo DS. Data URI para nao depender de arquivo separado. -->
 <link rel="icon" type="image/png" href="data:image/png;base64,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">
@@ -102,7 +102,6 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
   padding:0 12px 8px}
 .nav + .side-lab{margin-top:26px}
 .brand h1{font-family:var(--font-d);font-size:16px;font-weight:600;letter-spacing:-.2px;line-height:1.2;white-space:nowrap}
-.brand p{font-size:11.5px;color:var(--muted);margin-top:2px}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav button{display:flex;align-items:center;gap:12px;width:100%;padding:9px 12px;border:none;
   border-radius:var(--pill);background:transparent;color:var(--text2);font-size:13.5px;font-weight:500;
@@ -603,6 +602,12 @@ body:not(.api-v16) .v16-only{display:none!important}
 .rv-acoes .btn{flex:1 1 auto;justify-content:center}
 .btn.perigo{color:var(--crit-ink)}
 .btn.perigo.armado{background:var(--crit);color:#fff}
+.btn.btn-mini{padding:4px 10px;font-size:12px}
+th.tar-acao,td.tar-acao{width:1%;white-space:nowrap;text-align:right}
+/* um "Excluir" vermelho em cada linha pesa: fica cinza e so avermelha no mouse ou ao confirmar */
+td.tar-acao .btn{color:var(--muted)}
+td.tar-acao .btn:hover{color:var(--crit-ink)}
+td.tar-acao .btn.armado,td.tar-acao .btn.armado:hover{color:#fff;background:var(--crit)}
 .rv-topo{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .rv-barra{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:-4px 0 16px}
 .seg-badge{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:600;font-style:normal;padding:0 6px;
@@ -701,7 +706,7 @@ tr.rv-row:focus{outline:none}
 <aside class="side">
   <div class="brand">
     <div class="logo"><img alt="" id="logoImg"><i class="brand-dot" id="brandDot"></i></div>
-    <div><h1>CS Dashboard</h1><p>Email counter</p></div>
+    <div><h1>CS Dashboard</h1></div>
   </div>
 
   <div class="side-lab">Painel</div>
@@ -1022,6 +1027,7 @@ tr.rv-row:focus{outline:none}
         <div><div class="card-t">Sessões</div>
         <div class="card-sub" id="tarSessSub">&nbsp;</div></div>
       </div>
+      <div class="msg" id="tarMsg"></div>
       <div id="tarSessoes"></div>
     </div>
   </section>
@@ -2518,9 +2524,10 @@ function renderTarefas(r){
     return ka < kb ? 1 : ka > kb ? -1 : 0;
   });
   $("tarSessSub").textContent = onde + ", " + nf(sess.length) + (sess.length === 1 ? " sessão" : " sessões");
+  var excluir = podeExcluirTarefa();
   $("tarSessoes").innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
     th("Dia") + th("Agente") + th("Tarefa") + th("Loja") + th("Feitas", 1) + th("Início", 1) + th("Fim", 1) +
-    th("Pausa", 1) + th("Tempo", 1) + th("Por tarefa", 1) +
+    th("Pausa", 1) + th("Tempo", 1) + th("Por tarefa", 1) + (excluir ? '<th class="tar-acao"></th>' : '') +
     '</tr></thead><tbody>' + sess.map(function(t){
       return '<tr>' +
         '<td style="white-space:nowrap">' + brDate(t.day) + ' <span class="zero">' + WD[dowOf(t.day)] + '</span></td>' +
@@ -2533,6 +2540,8 @@ function renderTarefas(r){
         (t.pausa ? '<td class="num">' + nf(t.pausa) + ' min</td>' : '<td class="num zero">–</td>') +
         '<td class="num">' + fmtDur(t.min) + '</td>' +
         '<td class="num">' + porTarefa(t.min, t.qtd) + '</td>' +
+        (excluir ? '<td class="tar-acao">' + (TAREFA_ID_OK.test(t.id)
+          ? '<button type="button" class="btn perigo btn-mini" data-del-tar="' + esc(t.id) + '">Excluir</button>' : '') + '</td>' : '') +
       '</tr>';
     }).join("") + '</tbody></table></div>';
 }
@@ -2561,6 +2570,37 @@ function agentesTarefa(nomes){
     return '<span class="tar-ag"><i style="background:' + agColor(a) + '"></i>' + esc(a) + '</span>';
   }).join("");
 }
+
+/* Excluir sessão (Apps Script v20): só o admin, com confirmação em dois cliques, sem a
+   caixa do navegador. A linha sai da aba Tarefas e fica guardada em "Tarefas excluidas". */
+var TAREFA_ID_OK = /^[A-Za-z0-9_.:-]{6,80}$/;
+function podeExcluirTarefa(){ return API_VERSION >= 20 && !LEGADO && isAdmin(); }
+var tarMsg = msgEm("tarMsg");
+$("tarSessoes").onclick = function(e){
+  var b = e.target.closest("button[data-del-tar]");
+  if (!b || b.disabled) return;
+  var id = b.getAttribute("data-del-tar");
+  var t = TAREFAS.filter(function(x){ return x.id === id; })[0];
+  if (!t) return;
+  if (!b.classList.contains("armado")){
+    $("tarSessoes").querySelectorAll("button.armado").forEach(function(o){ o.classList.remove("armado"); o.textContent = "Excluir"; });
+    b.classList.add("armado"); b.textContent = "Confirmar";
+    setTimeout(function(){ if (b.isConnected && !b.disabled){ b.classList.remove("armado"); b.textContent = "Excluir"; } }, 4000);
+    return;
+  }
+  b.disabled = true; b.textContent = "Excluindo…"; tarMsg(null, ""); markWrite();
+  apiPost({ action: "delTarefa", id: id }).then(function(res){
+    if (res.status !== "ok") throw new Error(res.message || "Não deu para excluir a tarefa.");
+    markWrite();
+    TAREFAS = TAREFAS.filter(function(x){ return x.id !== id; });
+    render();
+    tarMsg("ok", "Tarefa excluída: " + t.tarefa + ", " + t.agente + ", " + brDate(t.day) + ", " + nf(t.qtd) +
+      (t.qtd === 1 ? " feita." : " feitas.") + " Ela fica guardada na aba Tarefas excluidas da planilha.");
+  }).catch(function(e2){
+    tarMsg("bad", e2.message);
+    if (b.isConnected){ b.disabled = false; b.classList.remove("armado"); b.textContent = "Excluir"; }
+  });
+};
 
 /* A célula de "mesmo ticket no dia": vira botão quando existe a lista dos
    códigos (Apps Script v13 em diante). */
@@ -3922,6 +3962,7 @@ function parseApi(t){
 function apiTemLogin(){ return API_V15 || API_VERSION >= 15; }
 var ACOES_V15 = ["listUsers", "saveUser", "login", "logout", "setupAdmin", "me"];
 var ACOES_V16 = ["addReview", "updateReview", "delReview", "importReviews"];
+var ACOES_V20 = ["delTarefa"];
 function apiPost(obj){
   // acao nova numa API antiga vira contagem falsa no gravador: nao sai daqui
   if (ACOES_V15.indexOf(obj.action) > -1 && !apiTemLogin())
@@ -3929,6 +3970,9 @@ function apiPost(obj){
   // reviews pelo painel: so na v16 (numa versao antiga a acao seria recusada, ou pior, virava contagem)
   if (ACOES_V16.indexOf(obj.action) > -1 && API_VERSION < 16)
     return Promise.reject(new Error("O Apps Script no ar ainda não aceita reviews pelo painel. Cole o AppsScript.gs v16 e reimplante."));
+  // excluir tarefa: so na v20 (numa versao antiga a acao seria recusada)
+  if (ACOES_V20.indexOf(obj.action) > -1 && API_VERSION < 20)
+    return Promise.reject(new Error("O Apps Script no ar ainda não exclui tarefas. Cole o AppsScript.gs v20 e reimplante."));
   return apiPostBruto(obj).then(function(res){
     if (res && res.code === "auth" && sessaoToken()) authFail("Sua sessão venceu ou perdeu a permissão. Entre de novo.");
     return res;

@@ -28,7 +28,9 @@ o fim e os minutos de pausa. Cada tarefa finalizada vira uma linha na aba **Tare
 (`?action=addTarefa`, Apps Script v14) e aparece na tela **Tarefas** do painel. O widget
 manda o agente em `quem`, nunca em `agente`: numa implantação antiga, `agente` cairia no
 gravador de e-mails. Sem a v14, a tarefa fica na fila da máquina (`pendentes.txt`) e vai
-sozinha depois; o mesmo id não é gravado duas vezes.
+sozinha depois; o mesmo id não é gravado duas vezes. Desde a v20 o admin exclui uma sessão
+na tela Tarefas (dois cliques); a linha vai para a aba **Tarefas excluidas** e o widget,
+reenviando o mesmo id, não a traz de volta.
 
 ## Arquivos
 
@@ -84,7 +86,7 @@ O painel exige login com e-mail e senha. Cada pessoa é uma linha na aba **Usuar
 
 | Papel | Vê | Não vê |
 |---|---|---|
-| admin | tudo, mais a tela **Equipe** (criar, editar, desativar, redefinir senha); exclui reviews e traz do Review Desk | — |
+| admin | tudo, mais a tela **Equipe** (criar, editar, desativar, redefinir senha); exclui reviews e tarefas, traz do Review Desk | — |
 | agente | Visão geral, Metas, Tarefas e Trustpilot (com a aba Follow up), só com as **próprias** contagens, meta e tarefas; todos os reviews, que ele também cadastra e edita | metas dos outros, definir metas, horários, agentes, qualidade, notas, ajustes, report, CSV |
 
 O corte é feito no Apps Script: para um agente, o `getData` já sai sem as linhas dos
@@ -126,7 +128,7 @@ autorização do Google se "Connect to an external service" tiver ficado desmarc
 **As duas implantações vão sempre juntas.** O `getData` existe na implantação do
 painel e na dos contadores (a URL que está nos `.ahk`). Se a dos contadores ficar numa
 versão antiga, qualquer agente lê tudo por ela. Conferir as duas com `?action=ping`: a
-resposta tem que trazer a versão atual (`"version": 19`).
+resposta tem que trazer a versão atual (`"version": 20`).
 
 **Transição**: enquanto o Apps Script no ar for anterior à v15, o painel pergunta a versão
 (`?action=ping`) e funciona como antes, sem login e sem a tela Equipe. Se a implantação
@@ -194,6 +196,12 @@ evita coleta automática, mas **não é segurança**: a proteção dos dados é 
   Próximo passo: cruzar esses tickets com os fechamentos que o projeto do CS Reporting já
   recebe dos helpdesks (tabela `helpdesk_events`), já que no Commslayer o login é compartilhado
   e a API não sabe quem fechou.
+- **Capacidade**: `capacidade()`, rodado no editor, mostra o uso da planilha contra o limite de
+  10 milhões de células do Google (cada aba conta também as colunas vazias: aba nova nasce com
+  26), o ritmo de linhas por dia e o tempo da leitura do painel, com a projeção de cada um.
+  `enxugarPlanilha()` apaga só as colunas vazias do fim das abas do painel. O `getData` lê a aba
+  Logs inteira e só depois filtra o período: é isso que cresce com a base. O `diagnostico()`
+  antigo é outra coisa (fuso e datas).
 - **Metas**: guardadas com data de vigência, então alterar a meta hoje não reescreve
   o atingimento dos dias anteriores.
 - **Gravações na hora**: ao salvar metas ou ajustes, o painel aplica a mudança na tela

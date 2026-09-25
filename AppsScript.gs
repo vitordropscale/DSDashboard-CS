@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v19.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v20.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -125,6 +125,16 @@
  *   antiga, sem a rota addTarefa, um GET com "agente" cairia no gravador de
  *   emails e viraria um email a mais. Sem "agente", a versao antiga so devolve
  *   o "usage", e o widget guarda a sessao e tenta de novo mais tarde.
+ *   Excluir (v20): so o admin, pelo painel (acao delTarefa). A linha inteira vai
+ *   para a aba "Tarefas excluidas", com quando e quem excluiu, e o widget
+ *   reenviando o mesmo id nao traz a tarefa de volta.
+ *
+ *  CAPACIDADE (v20)
+ *   capacidade(), rodado no editor, mostra quanto da planilha ja foi usado (o
+ *   limite do Google e de 10 milhoes de celulas, e cada aba conta tambem as colunas
+ *   vazias), quantas linhas entram por dia e quanto a leitura do painel demora,
+ *   com a projecao de cada um. enxugarPlanilha() apaga so as colunas vazias do fim
+ *   das abas do painel. Nenhum dos dois roda sozinho.
  *
  *  NOTAS
  *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
@@ -161,6 +171,8 @@ var NOTA_TIPOS  = ['nota', 'bom', 'ruim', 'ausencia', 'sistema'];
 var TAREFA_SHEET  = 'Tarefas';
 var TAREFA_HEADER = ['ID', 'Registrado em', 'Agente', 'Data', 'Tarefa', 'Loja', 'Quantidade', 'Inicio', 'Fim', 'Pausa (min)', 'Tempo (min)'];
 var TAREFA_ID_RE  = /^[A-Za-z0-9_.:-]{6,80}$/;
+var TAREFA_EXCL_SHEET  = 'Tarefas excluidas';   // o widget reenviando o id nao traz a tarefa de volta
+var TAREFA_EXCL_HEADER = TAREFA_HEADER.concat(['Excluida em', 'Excluida por']);
 var USER_SHEET    = 'Usuarios';
 var USER_HEADER   = ['Email', 'Nome', 'Papel', 'Agente', 'Salt', 'Hash', 'Ativo', 'Criado em', 'Ultimo acesso'];
 var SESS_SHEET    = 'Sessoes';
@@ -241,11 +253,12 @@ var PROTEGIDAS = ['listAdjust', 'addAdjust', 'delAdjust', 'addNota', 'delNota', 
 var LIVRES     = [];   // metas voltaram a exigir admin na v15 (agentes nao podem ve-las)
 var ACESSO     = ['login', 'logout', 'me', 'setupAdmin'];
 var REVIEW_ACOES = ['addReview', 'updateReview', 'delReview', 'importReviews'];
+var TAREFA_ACOES = ['delTarefa'];
 
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 19 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 20 }, p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
     // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
@@ -255,6 +268,7 @@ function doGet(e) {
     if (LIVRES.indexOf(p.action) > -1)     return respond_(livre_(p), p.callback);
     if (PROTEGIDAS.indexOf(p.action) > -1) return respond_(protegida_(p), p.callback);
     if (REVIEW_ACOES.indexOf(p.action) > -1) return respond_(reviewAcao_(p), p.callback);
+    if (TAREFA_ACOES.indexOf(p.action) > -1) return respond_(tarefaAcao_(p), p.callback);
     // acao que este script nao conhece: erro, e nada vira contagem
     if (p.action) return respond_({ status: 'error', message: 'Acao desconhecida: ' + String(p.action).slice(0, 40) }, p.callback);
 
@@ -283,6 +297,7 @@ function doPost(e) {
     if (LIVRES.indexOf(d.action) > -1)     return respond_(livre_(d), p.callback);
     if (PROTEGIDAS.indexOf(d.action) > -1) return respond_(protegida_(d), p.callback);
     if (REVIEW_ACOES.indexOf(d.action) > -1) return respond_(reviewAcao_(d), p.callback);
+    if (TAREFA_ACOES.indexOf(d.action) > -1) return respond_(tarefaAcao_(d), p.callback);
     // So vira contagem o pedido do widget (sem acao, com agente ou contador). Antes,
     // qualquer POST desconhecido virava uma linha falsa na aba Logs.
     if (d.action) return respond_({ status: 'error', message: 'Acao desconhecida: ' + String(d.action).slice(0, 40) }, p.callback);
@@ -824,6 +839,14 @@ function addTarefa_(d) {
     for (var i = 0; i < ids.length; i++) {
       if (String(ids[i][0]) === id) return { status: 'ok', tarefa: true, id: id, duplicado: true };
     }
+    // excluida pelo admin: responde ok (o widget tira da fila) e nao grava de novo
+    var ex = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TAREFA_EXCL_SHEET);
+    if (ex && ex.getLastRow() > 1) {
+      var exIds = ex.getRange(2, 1, ex.getLastRow() - 1, 1).getDisplayValues();
+      for (var j = 0; j < exIds.length; j++) {
+        if (String(exIds[j][0]) === id) return { status: 'ok', tarefa: true, id: id, excluida: true };
+      }
+    }
     sh.appendRow([
       id,
       Utilities.formatDate(new Date(), TZ, 'dd/MM/yyyy HH:mm:ss'),
@@ -880,6 +903,39 @@ function listTarefas_(desde) {
     return ka < kb ? -1 : ka > kb ? 1 : 0;
   });
   return out;
+}
+
+/** Acoes do painel sobre as tarefas (v20). Excluir e so do admin. */
+function tarefaAcao_(d) {
+  var u = sessao_(d.token);
+  if (!u) return { status: 'error', code: 'auth', message: 'Sessao vencida. Entre de novo.' };
+  if (u.papel !== 'admin') return { status: 'error', code: 'permissao', message: 'So o admin pode excluir tarefas.' };
+  var quem = String(u.nome || u.agente || 'sem nome');
+  if (d.action === 'delTarefa') return comLock_(function () { return delTarefa_(d, quem); });
+  return { status: 'error', message: 'Acao desconhecida.' };
+}
+
+/**
+ * Exclui uma sessao do Contador de Tarefas. A linha vai inteira para a aba
+ * "Tarefas excluidas" (da para conferir e, se preciso, copiar de volta a mao).
+ */
+function delTarefa_(d, quem) {
+  var id = limpa_(d.id, 80);
+  if (!TAREFA_ID_RE.test(id)) return { status: 'error', message: 'ID da tarefa invalido.' };
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TAREFA_SHEET);
+  var last = sh ? sh.getLastRow() : 0;
+  if (last >= 2) {
+    var ids = sh.getRange(2, 1, last - 1, 1).getDisplayValues();
+    for (var i = ids.length - 1; i >= 0; i--) {
+      if (String(ids[i][0]) !== id) continue;
+      var linha = sh.getRange(i + 2, 1, 1, TAREFA_HEADER.length).getDisplayValues()[0];
+      ensureSheet_(TAREFA_EXCL_SHEET, TAREFA_EXCL_HEADER).appendRow(linha.concat([iso_(agora_()), quem]).map(txt_));
+      sh.deleteRow(i + 2);
+      return { status: 'ok', apagado: id };
+    }
+  }
+  // ja nao existe (ex.: o mesmo pedido repetido depois de a exclusao dar certo)
+  return { status: 'ok', apagado: '' };
 }
 
 /* ============================================================
@@ -1475,6 +1531,116 @@ function testarReviews() {
   Logger.log('Tudo certo (' + (f.tipo === 'api' ? 'API do Review Desk' : 'planilha') + '): ' + brutos.length + ' reviews encontrados.');
 }
 
+/* ============================================================
+   CAPACIDADE (v20): rodar no editor, nunca roda sozinho
+   ============================================================ */
+
+/** 1234567 -> "1.234.567" */
+function milhar_(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+
+/**
+ * Executar › capacidade: ate quando a planilha e o painel aguentam no ritmo atual.
+ * So le, nao grava nada. O resultado sai no registro de execucao. (O diagnostico(),
+ * mais abaixo, e outra coisa: confere fuso e datas da leitura.)
+ */
+function capacidade() {
+  var LIMITE = 10000000;   // celulas por planilha no Google Planilhas
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), hoje = new Date(), dia = 86400000;
+  var abas = {}, total = 0;
+  ss.getSheets().forEach(function (sh) {
+    var a = { linhas: Math.max(0, sh.getLastRow() - 1), mr: sh.getMaxRows(), mc: sh.getMaxColumns(), lc: sh.getLastColumn() };
+    abas[sh.getName()] = a;
+    total += a.mr * a.mc;
+  });
+  Logger.log('Planilha: ' + milhar_(total) + ' celulas de ' + milhar_(LIMITE) + ' (' + (total / LIMITE * 100).toFixed(1) + ' por cento do limite do Google).');
+  Object.keys(abas).forEach(function (n) {
+    var a = abas[n];
+    Logger.log('  ' + n + ': ' + milhar_(a.linhas) + ' linhas, grade de ' + milhar_(a.mr) + ' x ' + a.mc + ' colunas (' + a.lc + ' com dado) = ' + milhar_(a.mr * a.mc) + ' celulas');
+  });
+
+  // linhas por dia nos ultimos 30 dias corridos (fim de semana entra na media)
+  var corte = ymd_(new Date(hoje.getTime() - 30 * dia));
+  var ritmo = function (nome, colData) {
+    var sh = ss.getSheetByName(nome);
+    if (!sh || sh.getLastRow() < 2) return 0;
+    var n = sh.getLastRow() - 1, ini = Math.max(0, n - 60000);
+    var v = sh.getRange(2 + ini, colData, n - ini, 1).getDisplayValues(), c = 0;
+    for (var i = 0; i < v.length; i++) { var d = parseAny_(v[i][0]); if (d && ymd_(d) > corte) c++; }
+    return c / 30;
+  };
+  var g = { logs: ritmo(SHEET_NAME, 4), tent: ritmo(TENT_SHEET, 3), tar: ritmo(TAREFA_SHEET, 4) };
+  var cols = function (n, h) { return abas[n] ? abas[n].mc : h; };
+  var usadas = function (n, h) { return abas[n] ? Math.max(abas[n].lc, h) : h; };
+  var porDia = g.logs * cols(SHEET_NAME, 26) + g.tent * cols(TENT_SHEET, 26) + g.tar * cols(TAREFA_SHEET, 26);
+  Logger.log('Ritmo dos ultimos 30 dias: ' + milhar_(g.logs) + ' linhas por dia em Logs, ' + milhar_(g.tent) + ' em Tentativas, ' +
+             g.tar.toFixed(1) + ' em Tarefas = ' + milhar_(porDia) + ' celulas por dia.');
+  // prazo em dias -> "~420 dias (11/2027)"; longe demais nao cabe numa data
+  var prazo = function (dias) {
+    return !isFinite(dias) || dias > 3650 ? 'mais de 10 anos' : '~' + milhar_(dias) + ' dias (' + fmt_(new Date(hoje.getTime() + dias * dia), 'MM/yyyy') + ')';
+  };
+  if (porDia > 0) {
+    var dias = Math.max(0, Math.floor((LIMITE - total) / porDia));
+    Logger.log('Limite de celulas: no ritmo atual, chega em ' + prazo(dias) + '.');
+    var totalEnx = 0;
+    Object.keys(abas).forEach(function (n) {
+      var a = abas[n];
+      totalEnx += a.mr * (abasDoPainel_().indexOf(n) > -1 ? Math.max(1, a.lc) : a.mc);
+    });
+    var porDiaEnx = g.logs * usadas(SHEET_NAME, HEADER.length) + g.tent * usadas(TENT_SHEET, TENT_HEADER.length) +
+                    g.tar * usadas(TAREFA_SHEET, TAREFA_HEADER.length);
+    var diasEnx = Math.max(0, Math.floor((LIMITE - totalEnx) / porDiaEnx));
+    Logger.log('Com enxugarPlanilha() (apaga so as colunas vazias do fim): libera ' + milhar_(total - totalEnx) +
+               ' celulas e o limite passa para ' + prazo(diasEnx) + '.');
+  }
+
+  // leitura do painel: o getData le a aba Logs inteira e so depois filtra o periodo,
+  // entao o tempo cresce junto com a aba
+  var since = ymd_(new Date(hoje.getTime() - 27 * dia));
+  var t = Date.now(), r1 = getData_({ since: since, compact: '1' });
+  listReviews_(); nomesEquipe_();
+  var t1 = (Date.now() - t) / 1000, kb1 = Math.round(JSON.stringify(r1).length / 1024);
+  t = Date.now();
+  var r2 = getData_({ compact: '1' });
+  var t2 = (Date.now() - t) / 1000, kb2 = Math.round(JSON.stringify(r2).length / 1024);
+  var nLogs = abas[SHEET_NAME] ? abas[SHEET_NAME].linhas : 0;
+  Logger.log('Leitura do painel (28 dias): ' + t1.toFixed(1) + ' s e ' + milhar_(kb1) + ' KB. "Todo o periodo": ' +
+             t2.toFixed(1) + ' s e ' + milhar_(kb2) + ' KB. Logs tem ' + milhar_(nLogs) + ' linhas.');
+  if (nLogs > 1000 && g.logs > 0 && t1 > 0) {
+    [30, 90].forEach(function (lim) {
+      var linhas = lim / (t1 / nLogs), d = Math.max(0, Math.floor((linhas - nLogs) / g.logs));
+      Logger.log('A leitura do painel passa de ' + lim + ' s com ~' + milhar_(Math.min(linhas, 1e9)) + ' linhas em Logs: em ' +
+                 prazo(d) + '.' + (lim === 90 ? ' Com 90 s o painel desiste de esperar.' : ''));
+    });
+  }
+}
+
+/** Abas que este script cria e usa (as unicas que o enxugarPlanilha mexe). */
+function abasDoPainel_() {
+  return [SHEET_NAME, TENT_SHEET, ADJ_SHEET, META_SHEET, NOTA_SHEET, TAREFA_SHEET, TAREFA_EXCL_SHEET,
+          USER_SHEET, SESS_SHEET, REVIEW_SHEET, REVIEW_EXCL_SHEET];
+}
+
+/**
+ * Executar › enxugarPlanilha: apaga, nas abas do painel, so as colunas vazias do fim
+ * (depois da ultima coluna com qualquer dado). Nenhuma celula com conteudo e apagada.
+ * Toda aba nova nasce com 26 colunas, e cada linha gravada conta as 26 no limite.
+ */
+function enxugarPlanilha() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), liberadas = 0;
+  comLock_(function () {
+    abasDoPainel_().forEach(function (n) {
+      var sh = ss.getSheetByName(n);
+      if (!sh) return;
+      var mc = sh.getMaxColumns(), lc = Math.max(1, sh.getLastColumn());
+      if (mc <= lc) return;
+      liberadas += (mc - lc) * sh.getMaxRows();
+      sh.deleteColumns(lc + 1, mc - lc);
+      Logger.log(n + ': ' + (mc - lc) + ' colunas vazias apagadas (ficaram ' + lc + ').');
+    });
+  });
+  Logger.log('Pronto: ' + milhar_(liberadas) + ' celulas liberadas.');
+}
+
 /**
  * Traz do Review Desk o que ainda nao esta na aba Reviews (pelo ID). Nao mexe no
  * que ja esta aqui. Chamar com o lock (comLock_ ou garantirAbaReviews_).
@@ -1701,7 +1867,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 19
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 20
   };
 
   if (p.compact) {
