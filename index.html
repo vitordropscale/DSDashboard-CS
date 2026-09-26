@@ -4191,7 +4191,7 @@ function reportDados(qual, eodTxt, jhon){
     metaDias: metaDias, metaBatidos: metaBatidos,
     metaPct: metaDias ? Math.round(metaBatidos / metaDias * 100) : null,
     tp: tp, tar: tar, notas: notas, destaques: destaques, eod: eod, conf: conf,
-    jhonErro: jhon && jhon.erro ? jhon.erro : "",
+    jhonErro: jhon && jhon.erro ? jhon.erro : !jhon || jhon.carregando ? "os números não chegaram a tempo; gere de novo" : "",
     autor: SESSAO ? String(SESSAO.nome || SESSAO.agente || "") : "",
     geradoEm: brDate(iso(today())) + "/" + today().getFullYear()
   };
@@ -4598,12 +4598,18 @@ function buscarJhon(qual){
     RP_JHON[k] = { erro: "o Apps Script no ar é a versão " + API_VERSION + "; a conferência precisa da v21" };
     return;
   }
-  RP_JHON[k] = { carregando: true };
-  apiPost({ action: "conferencia", de: p.de, ate: p.ate }).then(function(res){
+  var prom = apiPost({ action: "conferencia", de: p.de, ate: p.ate }).then(function(res){
     RP_JHON[k] = res && res.status === "ok" && res.jhon ? { dados: res.jhon }
                : { erro: String(res && res.message || "resposta inesperada").replace(/^Conferencia indisponivel:\s*/i, "") };
   }, function(e){ RP_JHON[k] = { erro: e && e.message || String(e) }; })
   .then(function(){ if ($("ovReport").classList.contains("show")) renderReport(); });
+  RP_JHON[k] = { carregando: true, prom: prom };
+}
+/** Espera a busca do Dashboard Jhon da semana terminar (o botão de baixar não pode sair na frente). */
+function esperarJhon(qual){
+  if (!reportJhon(qual)) buscarJhon(qual);
+  var j = reportJhon(qual);
+  return j && j.carregando && j.prom ? j.prom : Promise.resolve();
 }
 function reportEods(){ return $("rpEods").value; }
 
@@ -4662,8 +4668,13 @@ $("rpEods").oninput = function(){
 $("rpBaixar").onclick = function(){
   var b = $("rpBaixar"), m = $("rpMsg");
   b.disabled = true; b.textContent = "Gerando o PowerPoint…"; m.className = "msg";
+  var q = reportQual(), gerador = null;
   carregarPptx().then(function(P){
-    var q = reportQual();
+    gerador = P;
+    b.textContent = "Buscando os números do Dashboard Jhon…";
+    return esperarJhon(q);
+  }).then(function(){
+    var P = gerador;
     var d = reportDados(q, reportEods(), reportJhon(q));
     d.logo = reportLogo();
     return montarPptx(P, d, reportPassos()).writeFile({ fileName: "Report semanal DS " + d.w.from + ".pptx" });
