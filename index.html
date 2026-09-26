@@ -3999,6 +3999,53 @@ function conferenciaSemana(eods, jhon, de, ate){
   };
 }
 
+function mediana(v){
+  if (!v.length) return null;
+  var s = v.slice().sort(function(a, b){ return a - b; }), m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+function percentil(v, p){
+  if (!v.length) return null;
+  var s = v.slice().sort(function(a, b){ return a - b; });
+  return s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)];
+}
+/** 0,4 -> "24 min"; 5,5 -> "5h 30"; 30 -> "30h" */
+function fmtHoras(h){
+  if (h === null || h === undefined) return "—";
+  if (h < 1) return Math.max(1, Math.round(h * 60)) + " min";
+  var hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  if (mm === 60){ hh++; mm = 0; }
+  return hh + "h" + (mm && hh < 48 ? " " + pad(mm) : "");
+}
+
+/**
+ * Primeira resposta (frt) e resolução (res) por loja, na semana e no mesmo
+ * período da semana anterior, a partir das listas por conversa do Dashboard Jhon.
+ */
+function temposSemana(jhon, de, ate, pDe, pAte){
+  if (!jhon || !jhon.dias) return { tem: false, lojas: [] };
+  var junta = function(a, b){ for (var i = 0; i < b.length; i++) a.push(b[i]); };
+  var L = {}, geral = { frt: [], res: [], frtAnt: [], resAnt: [] };
+  jhon.dias.forEach(function(x){
+    var agora = x.dia >= de && x.dia <= ate, antes = x.dia >= pDe && x.dia <= pAte;
+    if (!agora && !antes) return;
+    var o = L[x.loja] || (L[x.loja] = { nome: x.loja, frt: [], res: [], frtAnt: [], resAnt: [] });
+    var f = x.frt || [], r = x.res || [];
+    if (agora){ junta(o.frt, f); junta(o.res, r); junta(geral.frt, f); junta(geral.res, r); }
+    else { junta(o.frtAnt, f); junta(o.resAnt, r); junta(geral.frtAnt, f); junta(geral.resAnt, r); }
+  });
+  var resumo = function(o){
+    var ate24 = o.frt.filter(function(h){ return h <= 24; }).length;
+    return { nome: o.nome, n: o.frt.length, frt: mediana(o.frt), frt90: percentil(o.frt, 0.9), frtAnt: mediana(o.frtAnt),
+             pct24: o.frt.length ? Math.round(ate24 / o.frt.length * 100) : null,
+             nRes: o.res.length, res: mediana(o.res), resAnt: mediana(o.resAnt) };
+  };
+  var lojas = Object.keys(L).map(function(k){ return resumo(L[k]); }).filter(function(o){ return o.n || o.nRes; })
+    .sort(function(a, b){ return (b.frt || 0) - (a.frt || 0); });
+  var temAlgum = !!jhon.dias.length && (geral.frt.length || geral.res.length) && jhon.dias.some(function(x){ return x.frt !== undefined; });
+  return { tem: !!temAlgum, lojas: lojas, geral: resumo({ nome: "Todas", frt: geral.frt, res: geral.res, frtAnt: geral.frtAnt, resAnt: geral.resAnt }) };
+}
+
 /** Tarefas lidas dos EODs (semanas antes do Contador de Tarefas). */
 function tarefasEod(eods, de, ate){
   var g = {};
@@ -4157,6 +4204,7 @@ function reportDados(qual, eodTxt, jhon){
   eodsSem.forEach(function(e){ pessoasEod[e.agente] = 1; });
   var jhonDados = jhon && jhon.dados ? jhon.dados : null;
   var conf = conferenciaSemana(eodsSem, jhonDados, w.from, fim);
+  var tempos = temposSemana(jhonDados, w.from, fim, pFrom, pTo);
   var eod = { qtd: eodsSem.length, pessoas: Object.keys(pessoasEod).sort(), avisos: eodAvisos,
               tarefas: tarefasEod(eodsSem, w.from, fim), frentes: frentesEod(eodsSem, w.from, fim),
               tarefasDoEod: w.to < RP_TAREFAS_DESDE };
@@ -4168,6 +4216,8 @@ function reportDados(qual, eodTxt, jhon){
   var lojaTop = lojas.filter(function(l){ return l.total; })[0];
   if (lojaTop) destaques.push(lojaTop.nome + " teve o maior volume: " + nf(lojaTop.total) +
     " e-mails (" + Math.round(lojaTop.total / total * 100) + "%).");
+  if (tempos.tem && tempos.geral.n) destaques.push("Primeira resposta: mediana de " + fmtHoras(tempos.geral.frt) + ", " +
+    tempos.geral.pct24 + "% respondidas em até 24h.");
   if (tp.ok && tp.atrasados) destaques.push(tp.atrasados + (tp.atrasados === 1 ? " review está" : " reviews estão") +
     " com follow up atrasado hoje.");
   if (conf.agDias) destaques.push("EOD × painel: " + conf.agDiv + " de " + conf.agDias + " dias-agente divergiram.");
@@ -4190,7 +4240,7 @@ function reportDados(qual, eodTxt, jhon){
     total: total, antes: P.total, agentes: agentes, lojas: lojas, dias: dias, pico: pico,
     metaDias: metaDias, metaBatidos: metaBatidos,
     metaPct: metaDias ? Math.round(metaBatidos / metaDias * 100) : null,
-    tp: tp, tar: tar, notas: notas, destaques: destaques, eod: eod, conf: conf,
+    tp: tp, tar: tar, notas: notas, destaques: destaques, eod: eod, conf: conf, tempos: tempos,
     jhonErro: jhon && jhon.erro ? jhon.erro : !jhon || jhon.carregando ? "os números não chegaram a tempo; gere de novo" : "",
     autor: SESSAO ? String(SESSAO.nome || SESSAO.agente || "") : "",
     geradoEm: brDate(iso(today())) + "/" + today().getFullYear()
@@ -4433,6 +4483,29 @@ function montarPptx(PptxGenJS, d, passos){
     }), M + 6.4, 1.7, CW - 6.4, [1.75, 1.15, 0.95, 0.94, 0.943], Math.min(0.42, 5.0 / (bls.length + 1)));
   } else vazio(s, M, 1.7, CW, 5.0, d.jhonErro ? "Dashboard Jhon indisponível: " + d.jhonErro : "Sem dados do Dashboard Jhon para esta semana.");
 
+  /* 4d. Tempo de primeira resposta e de resolução (Dashboard Jhon) */
+  s = nova("Tempo de resposta e resolução", "Mediana por loja (metade das conversas foi mais rápida que isso), comparada com " + compara + ".");
+  var tpo = d.tempos;
+  if (tpo.tem && tpo.lojas.length){
+    var g = tpo.geral;
+    [[fmtHoras(g.frt), "primeira resposta (mediana)", g.frtAnt !== null ? "semana anterior: " + fmtHoras(g.frtAnt) : ""],
+     [g.pct24 === null ? "—" : g.pct24 + "%", "respondidas em até 24h", nf(g.n) + " conversas respondidas"],
+     [fmtHoras(g.res), "resolução (mediana)", g.resAnt !== null ? "semana anterior: " + fmtHoras(g.resAnt) : ""]].forEach(function(it, i){
+      cartao(s, M, 1.7 + i * 1.65, 3.1, 1.45, it[0], it[1], it[2]);
+    });
+    var tl2 = tpo.lojas.slice(0, 9);
+    tabela(s, ["Loja", "Respondidas", "1ª resposta", "Antes", "Até 24h", "90% até", "Resolução", "Antes"], tl2.map(function(o){
+      var pior = o.frt !== null && o.frtAnt !== null && o.frt > o.frtAnt * 1.1, pior2 = o.res !== null && o.resAnt !== null && o.res > o.resAnt * 1.1;
+      return [cel(o.nome, { bold: true }), cel(nf(o.n), { al: "right", cor: C.text2 }),
+              cel(fmtHoras(o.frt), { al: "right", bold: true, cor: pior ? C.bad : C.ink }), cel(fmtHoras(o.frtAnt), { al: "right", cor: C.muted }),
+              cel(o.pct24 === null ? "—" : o.pct24 + "%", { al: "right", cor: C.text2 }), cel(fmtHoras(o.frt90), { al: "right", cor: C.text2 }),
+              cel(fmtHoras(o.res), { al: "right", bold: true, cor: pior2 ? C.bad : C.ink }), cel(fmtHoras(o.resAnt), { al: "right", cor: C.muted })];
+    }), M + 3.5, 1.7, CW - 3.5, [1.65, 1.15, 1.1, 0.9, 0.95, 1.0, 1.05, 0.833], Math.min(0.42, 4.9 / (tl2.length + 1)));
+    txt(s, "Em vermelho: piorou mais de 10% em relação à semana anterior. Horas corridas; o dia é o de UTC. Resolução vai da criação ao último fechamento (a equipe fecha a cada resposta). Old World Healing (Gorgias) não está no Dashboard Jhon.",
+        { x: M + 3.5, y: 1.7 + Math.min(0.42, 4.9 / (tl2.length + 1)) * (tl2.length + 1) + 0.15, w: CW - 3.5, h: 0.45, fontSize: 10, color: C.muted });
+  } else vazio(s, M, 1.7, CW, 5.0, d.jhonErro ? "Dashboard Jhon indisponível: " + d.jhonErro
+    : "O Dashboard Jhon ainda não manda os tempos (falta atualizar a função report-semanal).");
+
   /* 5. Trustpilot */
   s = nova("Trustpilot", "Reviews de 1 a 3 estrelas. Em aberto e atrasados mostram a fila no dia em que o report foi gerado.");
   if (d.tp.ok){
@@ -4598,7 +4671,8 @@ function buscarJhon(qual){
     RP_JHON[k] = { erro: "o Apps Script no ar é a versão " + API_VERSION + "; a conferência precisa da v21" };
     return;
   }
-  var prom = apiPost({ action: "conferencia", de: p.de, ate: p.ate }).then(function(res){
+  // pede também a semana anterior: os tempos de resposta comparam com ela
+  var prom = apiPost({ action: "conferencia", de: iso(addDays(new Date(p.de + "T00:00:00"), -7)), ate: p.ate }).then(function(res){
     RP_JHON[k] = res && res.status === "ok" && res.jhon ? { dados: res.jhon }
                : { erro: String(res && res.message || "resposta inesperada").replace(/^Conferencia indisponivel:\s*/i, "") };
   }, function(e){ RP_JHON[k] = { erro: e && e.message || String(e) }; })
