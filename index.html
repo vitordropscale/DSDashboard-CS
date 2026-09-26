@@ -417,6 +417,11 @@ tbody tr:last-child td{border-bottom:none}
 /* ---------- report ---------- */
 .rp-per{font-size:12px;color:var(--muted);line-height:1.55;margin:0 0 12px}
 .mini-kpis.rp-kpis{grid-template-columns:repeat(4,1fr)}
+.mini-kpis.rp-kpis b small{font-family:var(--font);font-size:12px;font-weight:500;letter-spacing:0;color:var(--muted)}
+.rp-erro{color:var(--crit-ink)}
+.rp-avisos{margin-top:10px;padding:10px 14px;border-radius:var(--r-sm);background:var(--well);font-size:12px;color:var(--text2);line-height:1.5}
+.rp-avisos b{display:block;font-weight:600;color:var(--text);margin-bottom:4px}
+.rp-avisos ul{margin:0;padding-left:18px}
 @media (max-width:560px){.mini-kpis.rp-kpis{grid-template-columns:repeat(2,1fr)}}
 
 /* ---------- matriz hora x agente ---------- */
@@ -1377,7 +1382,7 @@ tr.rv-row:focus{outline:none}
       <div class="modal-h">
         <div>
           <h2>Report semanal</h2>
-          <p>PowerPoint da semana para a reunião com a direção, com todas as lojas e todos os agentes.</p>
+          <p>PowerPoint da semana para a reunião com a direção, com todas as lojas e todos os agentes, os EODs e a conferência com o Dashboard Jhon.</p>
         </div>
         <button class="x" id="reportClose" title="Fechar">×</button>
       </div>
@@ -1387,6 +1392,13 @@ tr.rv-row:focus{outline:none}
           <button data-w="passada">Semana passada</button>
         </div>
         <div id="reportBox"></div>
+        <div class="field">
+          <label for="rpEods">EODs da semana</label>
+          <textarea class="inp" id="rpEods" rows="5" spellcheck="false"
+                    placeholder="Cole aqui os EODs da semana, do jeito que estão no Slack"></textarea>
+          <div class="hint" id="rpEodInfo"></div>
+          <div class="rp-avisos" id="rpAvisos" hidden></div>
+        </div>
         <div class="field">
           <label for="rpPassos">Próximos passos</label>
           <textarea class="inp" id="rpPassos" rows="4" maxlength="2000"
@@ -3684,6 +3696,9 @@ var PPTX_SRC = "https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundl
 var PPTX_SRI = "sha384-Cck14aA9cifjYolcnjebXRfWGkz5ltHMBiG4px/j8GS+xQcb7OhNQWZYyWjQ+UwQ";
 var RP_PASSOS_KEY = "emailcounter.report.passos.";   // + primeiro dia da semana
 var RP_SEMANA = "";                                   // semana aberta no modal
+/* Tarefas avulsas entram no report só a partir desta data (decisão de 26/09:
+   o que foi registrado antes era teste). */
+var RP_TAREFAS_DESDE = "2026-09-28";
 var MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 
 function weekRange(qual){
@@ -3703,12 +3718,342 @@ function fmtDelta(atual, antes){
   return (p > 0 ? "+" : "") + p + "%";
 }
 
+/* ---------- EODs colados do Slack ----------
+   Cada agente escreve do seu jeito, então a leitura procura padrões e o que não
+   se encaixa vira texto (tarefa ou frente), nunca número inventado:
+     cabeçalho   "Gustavo - 23/09", "Anne (23/09)", "EOD — 23/09/2026" + nome na linha seguinte
+     tickets     "* Lumvalle (tickets 155)", "* Elevare - (Ticktes 240) 05:30", "* Vigewell (294)",
+                 ou a loja numa linha e "Tickets feitos: 38" embaixo
+     backlog     "* Lumvelle: 135 fechados / 72 backlog" (depois de "fechados e backlog")
+     ignorados   linha do Slack "Nome  [14h]", "(editado)", "Tarefas passadas para os outros",
+                 "Tickets feitos por outros", "Total de ..."
+     frentes     título sem marcador que não é loja ("QUASI", "FEM+", "RELIVEX"...) e os itens dele */
+
+var EOD_ALIAS = { "lumvalle": "Lumvelle", "lumvele": "Lumvelle", "lumvelle": "Lumvelle", "owh": "Old World Healing",
+                  "old world": "Old World Healing", "vige well": "Vigewell", "old harvest": "Old Harvest" };
+var CONF_TOL = 0.10, CONF_MIN = 3;   // diverge: diferença acima de 10% E de pelo menos 3 tickets
+
+function semAcento(s){ return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+function chaveEod(s){ return semAcento(s).replace(/\([^)]*\)/g, " ").replace(/[^a-z0-9+ ]/g, " ").replace(/\s+/g, " ").trim(); }
+
+/** Loja quando o texto É uma loja ("Lumvalle", "ELEVARE", "Old World Healing"); "" se não. */
+function lojaEod(t){
+  var k = chaveEod(t);
+  if (!k) return "";
+  var c = STORE_CANON[k] || STORE_ALIAS[k] || EOD_ALIAS[k] || "";
+  return LOJAS.indexOf(c) > -1 ? c : "";
+}
+/** Loja citada em qualquer ponto do texto ("Disputas Elevare (6)") ou "". */
+function lojaCitada(t){
+  var k = " " + chaveEod(t) + " ", achou = "";
+  var nomes = LOJAS.map(function(l){ return [semAcento(l), l]; });
+  Object.keys(EOD_ALIAS).forEach(function(a){ nomes.push([a, EOD_ALIAS[a]]); });
+  nomes.forEach(function(p){ if (!achou && k.indexOf(" " + p[0] + " ") > -1) achou = p[1]; });
+  return achou;
+}
+function nomeAgente(t, conhecidos){
+  var p = semAcento(t).split(" ")[0];
+  for (var i = 0; i < conhecidos.length; i++) if (semAcento(conhecidos[i]).split(" ")[0] === p) return conhecidos[i];
+  return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : "";
+}
+/** Pares "nome (N ...)" de uma linha; sem parênteses, "texto -> N". */
+function paresQtd(t){
+  var out = [], re = /([^()]+?)\s*\(\s*(\d+)[^)]*\)/g, m;
+  while ((m = re.exec(t))) out.push({ nome: m[1].replace(/^\s*(?:e|,|;|-)\s+/i, "").replace(/[-–—:\s]+$/, "").trim(), qtd: +m[2] });
+  if (!out.length){
+    var s = /^(.*?)\s*-+>\s*(\d+)/.exec(t);
+    out.push(s ? { nome: s[1].trim(), qtd: +s[2] } : { nome: t.replace(/[-–—\s]+$/, "").trim(), qtd: null });
+  }
+  return out.filter(function(p){ return p.nome; });
+}
+
+/**
+ * Lê os EODs colados. `ano` completa "23/09"; `conhecidos` = nomes dos agentes
+ * (grafia do painel). Devolve {eods:[...], avisos:[...]} — um EOD por pessoa e dia.
+ */
+function lerEods(texto, ano, conhecidos){
+  var linhas = String(texto || "").replace(/\r/g, "").split("\n");
+  var RE_CAB = /^(?:eod\s*[—–-]\s*)?(?:([a-zà-úç]+)(?:\s+[a-zà-úç]+)?\s*[—–-]?\s*)?\(?\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*\)?\s*(.*)$/i;
+  var RE_POSTER = /^(.+?)\s+\[\d{1,2}h\d{0,2}\]\s*$/;
+  var RE_MARCA = /^\s*(?:[*•·]|[-–—](?!>)|\d+[.)])\s+/;
+  var eods = [], avisos = [], atual = null, poster = "", faltaNome = false, ctx = null;
+  var novo = function(agente, dia){
+    atual = { agente: agente, dia: dia, poster: poster, tickets: {}, alt: {}, backlog: {}, tarefas: [], frentes: {}, frenteOrdem: [] };
+    eods.push(atual); ctx = null;
+  };
+  var frente = function(nome){
+    var k = chaveEod(nome).toUpperCase();
+    if (!atual.frentes[k]){ atual.frentes[k] = { nome: nome.replace(/\s*\([^)]*\)\s*$/, "").trim(), itens: [] }; atual.frenteOrdem.push(k); }
+    return k;
+  };
+  var ultimo = null;   // último item gravado: sub-linha recuada depois de "...:" continua nele
+  var tarefa = function(t, loja){
+    paresQtd(t).forEach(function(p){
+      // "Trustpilot - 01:00", "Old Harvest ... 50min": o horário fica de fora do nome
+      var nome = p.nome.replace(/lumvalle/ig, "Lumvelle").replace(/\s*[-–—]?\s*\d{1,2}:\d{2}\s*$/, "").replace(/\s*\d+\s*min\s*$/i, "").trim();
+      if (nome){ ultimo = { nome: nome, qtd: p.qtd, loja: loja || lojaCitada(nome) }; atual.tarefas.push(ultimo); }
+    });
+  };
+
+  linhas.forEach(function(bruta){
+    var l = bruta.replace(/\s+$/, "");
+    var t = l.trim();
+    if (!t || /^\(editado\)$/i.test(t) || t === "]") return;
+    var pm = RE_POSTER.exec(t);
+    if (pm){ poster = nomeAgente(pm[1].split(/\s+/)[0], conhecidos); return; }
+    var marcado = RE_MARCA.test(l), recuado = /^\s/.test(l);
+    var texto = t.replace(RE_MARCA, "").trim();
+    // "Designei uma loja para cada agente:" + linhas recuadas: tudo num item só
+    if (ultimo && recuado && !marcado && (ultimo.segue || /:$/.test(ultimo.nome || ultimo.texto)) && !/tickets?\s+feitos?/i.test(texto)){
+      var sep = ultimo.segue ? "; " : " ";
+      ultimo.segue = true;
+      if (ultimo.nome !== undefined) ultimo.nome += sep + texto; else ultimo.texto += sep + texto;
+      return;
+    }
+    if (!recuado) ultimo = null;
+
+    // cabeçalho do EOD
+    var cm = !marcado ? RE_CAB.exec(t) : null;
+    if (cm && cm[5].length < 30 && +cm[3] >= 1 && +cm[3] <= 12 && +cm[2] >= 1 && +cm[2] <= 31){
+      var dia = ano + "-" + pad(+cm[3]) + "-" + pad(+cm[2]);
+      if (cm[1] && !/^eod$/i.test(cm[1])){ novo(nomeAgente(cm[1], conhecidos), dia); faltaNome = false; }
+      else { novo("", dia); faltaNome = true; }
+      return;
+    }
+    if (!atual) return;
+    if (faltaNome){
+      faltaNome = false;
+      if (/^[a-zà-úç]+$/i.test(t)){ atual.agente = nomeAgente(t, conhecidos); return; }
+      atual.agente = poster;
+    }
+
+    // linhas que só resumem ou repetem o que outro agente já informa
+    if (/^total de /i.test(texto)) return;
+    if (/passadas? para (os )?outros/i.test(texto)){ ctx = { tipo: "pula" }; return; }
+    if (/feitos? por outros/i.test(texto)){ ctx = { tipo: "pula" }; return; }
+    if (/^feitos? por mim/i.test(texto)){ ctx = null; return; }
+    if (/fechados e backlog/i.test(texto)){ ctx = { tipo: "backlog" }; return; }
+
+    var loja = lojaEod(texto);
+    // título de seção: linha curta sem marcador (a loja pode vir recuada, "Feitos por mim")
+    if (loja && !/\d/.test(texto)){ ctx = { tipo: "loja", loja: loja }; return; }
+    if (!marcado && !recuado && texto.length <= 45 && !/\d/.test(texto.replace(/fem\+/i, "")) && !/[.:;]$/.test(texto)){
+      ctx = /lojas do jhon|^geral$/i.test(chaveEod(texto)) ? { tipo: "geral" } : { tipo: "frente", k: frente(texto) };
+      return;
+    }
+    if (ctx && ctx.tipo === "pula") return;
+
+    if (ctx && ctx.tipo === "backlog"){
+      var bm = /^(.+?):\s*(\d+)\s*fechados?\s*\/\s*(?:backlog\s*)?(\d+)/i.exec(texto);
+      var lb = bm && lojaEod(bm[1]);
+      if (lb) atual.backlog[lb] = { fechados: +bm[2], backlog: +bm[3] };
+      return;
+    }
+    if (ctx && ctx.tipo === "loja"){
+      var tf = /tickets?\s+feitos?\s*:?\s*(\d+)/i.exec(texto);
+      if (tf){ atual.tickets[ctx.loja] = +tf[1]; return; }
+      var al = /^(\d+)\s+(?:e-?mails?|tickets?)\s+feitos?/i.exec(texto) || /^fiz\s+(\d+)\s+(?:e-?mails?|tickets?)/i.exec(texto);
+      if (al){ atual.alt[ctx.loja] = +al[1]; return; }
+      tarefa(texto, ctx.loja);
+      return;
+    }
+    if (ctx && ctx.tipo === "frente"){
+      var q = paresQtd(texto);
+      ultimo = { texto: texto, qtd: q.length === 1 ? q[0].qtd : null };
+      atual.frentes[ctx.k].itens.push(ultimo);
+      return;
+    }
+    // sem seção (ou "Geral"): "Loja (tickets N)" é ticket; o resto é tarefa
+    var ab = texto.indexOf("("), fe = texto.indexOf(")", ab);
+    if (ab > 0 && fe > ab){
+      var lj = lojaEod(texto.slice(0, ab).replace(/[-–—:\s]+$/, ""));
+      var dentro = /^\s*(?:[a-z]+\s+)?(\d+)\s*$/i.exec(texto.slice(ab + 1, fe));
+      if (lj && dentro){ atual.tickets[lj] = (atual.tickets[lj] || 0) + +dentro[1]; return; }
+    }
+    tarefa(texto, "");
+  });
+
+  // e-mails escritos como "60 e-mails feitos" valem quando não há "Tickets feitos"
+  eods.forEach(function(e){
+    Object.keys(e.alt).forEach(function(l){ if (e.tickets[l] === undefined) e.tickets[l] = e.alt[l]; });
+    e.total = Object.keys(e.tickets).reduce(function(s, l){ return s + e.tickets[l]; }, 0);
+    e.temTickets = Object.keys(e.tickets).length > 0;
+    if (!e.agente) avisos.push("EOD de " + brDate(e.dia) + " sem nome do agente: ficou de fora.");
+  });
+  eods = eods.filter(function(e){ return e.agente; });
+
+  // mesma pessoa e dia duas vezes: vale o último para os números, o texto soma
+  var vistos = {}, unicos = [];
+  eods.forEach(function(e){
+    var k = e.agente + "|" + e.dia, a = vistos[k];
+    if (!a){ vistos[k] = e; unicos.push(e); return; }
+    avisos.push("O EOD de " + e.agente + " de " + brDate(e.dia) + " aparece 2 vezes (confira a data). Nos números vale o último.");
+    if (e.temTickets){ a.tickets = e.tickets; a.total = e.total; a.temTickets = true; }
+    Object.keys(e.backlog).forEach(function(l){ a.backlog[l] = e.backlog[l]; });
+    a.tarefas = a.tarefas.concat(e.tarefas);
+    e.frenteOrdem.forEach(function(k){
+      if (!a.frentes[k]){ a.frentes[k] = e.frentes[k]; a.frenteOrdem.push(k); }
+      else a.frentes[k].itens = a.frentes[k].itens.concat(e.frentes[k].itens);
+    });
+  });
+  unicos.forEach(function(e){
+    if (e.poster && e.poster !== e.agente) avisos.push("O EOD de " + e.agente + " de " + brDate(e.dia) + " foi postado pela conta de " + e.poster + ".");
+  });
+
+  // fechados/backlog copiados do dia anterior (mesmos números em 3 lojas ou mais)
+  var porAgente = {};
+  unicos.forEach(function(e){ if (Object.keys(e.backlog).length) (porAgente[e.agente] = porAgente[e.agente] || []).push(e); });
+  Object.keys(porAgente).forEach(function(a){
+    var lista = porAgente[a].sort(function(x, y){ return x.dia < y.dia ? -1 : 1; });
+    for (var i = 1; i < lista.length; i++){
+      var ant = lista[i - 1].backlog, cur = lista[i].backlog;
+      var iguais = Object.keys(cur).filter(function(l){ return ant[l] && ant[l].fechados === cur[l].fechados; });
+      if (iguais.length >= 3) avisos.push("No EOD de " + a + " de " + brDate(lista[i].dia) + ", os fechados de " + iguais.length +
+        " lojas estão iguais aos de " + brDate(lista[i - 1].dia) + " (" + iguais.join(", ") + "). Pode ter sido copiado.");
+    }
+  });
+
+  unicos.sort(function(x, y){ return x.dia < y.dia ? -1 : x.dia > y.dia ? 1 : x.agente < y.agente ? -1 : 1; });
+  return { eods: unicos, avisos: avisos };
+}
+
+/** a e b divergem? (diferença acima de CONF_TOL e de pelo menos CONF_MIN) */
+function diverge(a, b){
+  var d = Math.abs(a - b);
+  return d >= CONF_MIN && d > CONF_TOL * Math.max(a, b);
+}
+
+/**
+ * Conferência da semana: EOD × painel por agente e dia; painel × Dashboard Jhon
+ * (fechamentos) por loja e dia, com o EOD ao lado. `jhon` pode faltar.
+ */
+function conferenciaSemana(eods, jhon, de, ate){
+  var porAgDia = {}, porLojaDia = {};
+  RECS.forEach(function(r){
+    if (r.day < de || r.day > ate) return;
+    porAgDia[r.agente + "|" + r.day] = (porAgDia[r.agente + "|" + r.day] || 0) + 1;
+    porLojaDia[r.loja + "|" + r.day] = (porLojaDia[r.loja + "|" + r.day] || 0) + 1;
+  });
+
+  // agentes: só os dias em que o EOD traz número de tickets
+  var ag = {}, detalhes = [];
+  eods.forEach(function(e){
+    if (!e.temTickets || e.dia < de || e.dia > ate) return;
+    var p = porAgDia[e.agente + "|" + e.dia] || 0;
+    var a = ag[e.agente] || (ag[e.agente] = { nome: e.agente, eod: 0, painel: 0, dias: 0, div: 0 });
+    a.eod += e.total; a.painel += p; a.dias++;
+    if (diverge(e.total, p)){ a.div++; detalhes.push({ quem: e.agente, dia: e.dia, eod: e.total, painel: p }); }
+  });
+  var agentes = Object.keys(ag).map(function(k){ return ag[k]; })
+    .sort(function(x, y){ return y.div - x.div || Math.abs(y.eod - y.painel) - Math.abs(x.eod - x.painel); });
+  detalhes.sort(function(x, y){ return Math.abs(y.eod - y.painel) - Math.abs(x.eod - x.painel); });
+
+  // lojas: EOD somado de todos os agentes
+  var eodLojaDia = {};
+  eods.forEach(function(e){
+    if (e.dia < de || e.dia > ate) return;
+    Object.keys(e.tickets).forEach(function(l){ eodLojaDia[l + "|" + e.dia] = (eodLojaDia[l + "|" + e.dia] || 0) + e.tickets[l]; });
+  });
+  var jh = {}, temJhon = !!(jhon && jhon.dias);
+  if (temJhon) jhon.dias.forEach(function(x){ if (x.dia >= de && x.dia <= ate) jh[x.loja + "|" + x.dia] = x; });
+  var lj = {}, detLoja = [];
+  dayList(de, ate).forEach(function(dia){
+    LOJAS.forEach(function(l){
+      var p = porLojaDia[l + "|" + dia] || 0, e = eodLojaDia[l + "|" + dia], j = jh[l + "|" + dia];
+      if (!p && e === undefined && !j) return;
+      var o = lj[l] || (lj[l] = { nome: l, painel: 0, eod: 0, temEod: false, jhon: 0, temJhon: false, dias: 0, div: 0 });
+      o.painel += p;
+      if (e !== undefined){ o.eod += e; o.temEod = true; }
+      if (j){
+        o.jhon += j.closes; o.temJhon = true;
+        if (p || j.closes){ o.dias++; if (diverge(p, j.closes)){ o.div++; detLoja.push({ loja: l, dia: dia, painel: p, jhon: j.closes }); } }
+      }
+    });
+  });
+  var lojas = LOJAS.filter(function(l){ return lj[l]; }).map(function(l){ return lj[l]; })
+    .sort(function(x, y){ return (y.painel + y.jhon) - (x.painel + x.jhon); });
+  detLoja.sort(function(x, y){ return Math.abs(y.jhon - y.painel) - Math.abs(x.jhon - x.painel); });
+
+  // fechamentos e backlog (Dashboard Jhon)
+  var bl = [];
+  if (temJhon){
+    var porLoja = {};
+    jhon.dias.forEach(function(x){
+      if (x.dia < de || x.dia > ate) return;
+      var o = porLoja[x.loja] || (porLoja[x.loja] = { nome: x.loja, closes: 0, reopened: 0, created: 0, ini: null, fim: null, iniDia: "", fimDia: "" });
+      o.closes += x.closes || 0; o.reopened += x.reopened || 0; o.created += x.created || 0;
+      if (x.backlog !== null && x.backlog !== undefined){
+        if (!o.iniDia || x.dia < o.iniDia){ o.ini = x.backlog; o.iniDia = x.dia; }
+        if (!o.fimDia || x.dia > o.fimDia){ o.fim = x.backlog; o.fimDia = x.dia; }
+      }
+    });
+    bl = Object.keys(porLoja).map(function(k){ return porLoja[k]; }).sort(function(x, y){ return y.closes - x.closes; });
+  }
+
+  var soma = function(lista, k){ return lista.reduce(function(s, x){ return s + x[k]; }, 0); };
+  return {
+    agentes: agentes, detalhes: detalhes, lojas: lojas, detLoja: detLoja, backlog: bl, temJhon: temJhon,
+    agDias: soma(agentes, "dias"), agDiv: soma(agentes, "div"),
+    ljDias: soma(lojas, "dias"), ljDiv: soma(lojas, "div"),
+    montadoEm: temJhon ? jhon.montado_em : null
+  };
+}
+
+/** Tarefas lidas dos EODs (semanas antes do Contador de Tarefas). */
+function tarefasEod(eods, de, ate){
+  var g = {};
+  eods.forEach(function(e){
+    if (e.dia < de || e.dia > ate) return;
+    e.tarefas.forEach(function(t){
+      var k = chaveEod(t.nome.replace(/lumvalle/ig, "Lumvelle"));
+      if (!k || k.length < 3) return;
+      var x = g[k] || (g[k] = { nomes: {}, qtd: 0, temQtd: false, vezes: 0, agentes: {}, dias: {} });
+      x.nomes[t.nome] = (x.nomes[t.nome] || 0) + 1;
+      if (t.qtd !== null){ x.qtd += t.qtd; x.temQtd = true; }
+      x.vezes++; x.agentes[e.agente] = 1; x.dias[e.dia] = 1;
+    });
+  });
+  return Object.keys(g).map(function(k){
+    var x = g[k];
+    var nome = Object.keys(x.nomes).sort(function(a, b){ return x.nomes[b] - x.nomes[a] || b.length - a.length; })[0];
+    return { nome: nome, qtd: x.temQtd ? x.qtd : null, vezes: x.vezes, agentes: Object.keys(x.agentes).sort(), dias: Object.keys(x.dias).length };
+  }).sort(function(a, b){ return (b.qtd || 0) - (a.qtd || 0) || b.vezes - a.vezes; });
+}
+
+/** Outras frentes: itens agrupados por frente, repetidos juntados (soma o número quando todos têm). */
+function frentesEod(eods, de, ate){
+  var f = {}, ordem = [];
+  eods.forEach(function(e){
+    if (e.dia < de || e.dia > ate) return;
+    e.frenteOrdem.forEach(function(k){
+      var fr = f[k] || (f[k] = { nome: e.frentes[k].nome, itens: {}, ordem: [], pessoas: {} });
+      if (ordem.indexOf(k) < 0) ordem.push(k);
+      fr.pessoas[e.agente] = 1;
+      e.frentes[k].itens.forEach(function(it){
+        var ki = chaveEod(it.texto.replace(/-+>\s*\d+/, "").replace(/\d+/g, "")) || chaveEod(it.texto);
+        var x = fr.itens[ki] || (fr.itens[ki] = { texto: it.texto.replace(/\s*-+>\s*\d+\s*$/, ""), qtd: 0, todosQtd: true, dias: {}, pessoas: {} });
+        if (fr.ordem.indexOf(ki) < 0) fr.ordem.push(ki);
+        if (it.qtd === null) x.todosQtd = false; else x.qtd += it.qtd;
+        x.dias[e.dia] = 1; x.pessoas[e.agente] = 1;
+      });
+    });
+  });
+  return ordem.map(function(k){
+    var fr = f[k];
+    return { nome: fr.nome, pessoas: Object.keys(fr.pessoas).sort(), itens: fr.ordem.map(function(ki){
+      var x = fr.itens[ki], n = Object.keys(x.dias).length;
+      return { texto: x.texto, qtd: x.todosQtd ? x.qtd : null, dias: n, pessoas: Object.keys(x.pessoas).sort() };
+    }) };
+  }).filter(function(fr){ return fr.itens.length; })
+    .sort(function(a, b){ return b.itens.length - a.itens.length; });
+}
+
 /**
  * Números da semana para o PowerPoint. Semana em andamento vai de segunda até
  * hoje e é comparada com os mesmos dias da semana anterior; a meta só é julgada
  * nos dias que já fecharam (hoje ainda não acabou).
  */
-function reportDados(qual){
+function reportDados(qual, eodTxt, jhon){
   var w = weekRange(qual);
   var hojeIso = iso(today());
   var fim = w.to < hojeIso ? w.to : hojeIso;
@@ -3779,7 +4124,7 @@ function reportDados(qual){
   });
 
   // tarefas avulsas, agrupadas pelo nome (a grafia mais usada vira o rótulo)
-  var tl = TAREFAS.filter(function(t){ return naSemana(t.day); });
+  var tl = TAREFAS.filter(function(t){ return naSemana(t.day) && t.day >= RP_TAREFAS_DESDE; });
   var grupos = {}, tarLoja = {}, tar = { sessoes: tl.length, qtd: 0, min: 0, lista: [], lojas: [] };
   tl.forEach(function(t){
     var g = grupos[t.chave] || (grupos[t.chave] = { nomes: {}, sessoes: 0, qtd: 0, min: 0, agentes: {} });
@@ -3799,6 +4144,23 @@ function reportDados(qual){
   var notas = NOTAS.filter(function(n){ return naSemana(n.data); }).slice()
                    .sort(function(a, b){ return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
 
+  // EODs colados + conferência com o painel e com o Dashboard Jhon
+  var conhecidos = {};
+  RECS.forEach(function(r){ conhecidos[r.agente] = 1; });
+  EQUIPE_NOMES.forEach(function(n){ if (n) conhecidos[n] = 1; });
+  var lidos = lerEods(eodTxt || "", w.fromD.getFullYear(), Object.keys(conhecidos));
+  var eodsSem = lidos.eods.filter(function(e){ return naSemana(e.dia); });
+  var fora = lidos.eods.length - eodsSem.length;
+  var eodAvisos = lidos.avisos.slice();
+  if (fora) eodAvisos.push(fora + (fora === 1 ? " EOD é" : " EODs são") + " de fora desta semana e " + (fora === 1 ? "ficou" : "ficaram") + " de fora.");
+  var pessoasEod = {};
+  eodsSem.forEach(function(e){ pessoasEod[e.agente] = 1; });
+  var jhonDados = jhon && jhon.dados ? jhon.dados : null;
+  var conf = conferenciaSemana(eodsSem, jhonDados, w.from, fim);
+  var eod = { qtd: eodsSem.length, pessoas: Object.keys(pessoasEod).sort(), avisos: eodAvisos,
+              tarefas: tarefasEod(eodsSem, w.from, fim), frentes: frentesEod(eodsSem, w.from, fim),
+              tarefasDoEod: w.to < RP_TAREFAS_DESDE };
+
   var total = A.total;
   var destaques = [];
   if (agentes.length) destaques.push(agentes[0].nome + " respondeu mais: " + nf(agentes[0].total) +
@@ -3806,11 +4168,14 @@ function reportDados(qual){
   var lojaTop = lojas.filter(function(l){ return l.total; })[0];
   if (lojaTop) destaques.push(lojaTop.nome + " teve o maior volume: " + nf(lojaTop.total) +
     " e-mails (" + Math.round(lojaTop.total / total * 100) + "%).");
-  if (pico !== null) destaques.push("Horário de pico: " + pad(pico) + "h, com " + nf(A.byHour[pico]) + " e-mails.");
   if (tp.ok && tp.atrasados) destaques.push(tp.atrasados + (tp.atrasados === 1 ? " review está" : " reviews estão") +
     " com follow up atrasado hoje.");
+  if (conf.agDias) destaques.push("EOD × painel: " + conf.agDiv + " de " + conf.agDias + " dias-agente divergiram.");
+  if (conf.ljDias) destaques.push("Painel × Dashboard Jhon: " + conf.ljDiv + " de " + conf.ljDias + " dias-loja divergiram.");
   if (notas.length) destaques.push(notas.length + (notas.length === 1 ? " ocorrência anotada" : " ocorrências anotadas") +
     " na semana (último slide).");
+  if (pico !== null) destaques.push("Horário de pico: " + pad(pico) + "h, com " + nf(A.byHour[pico]) + " e-mails.");
+  destaques = destaques.slice(0, 5);   // o que mais importa vem primeiro; o painel dos destaques cabe 5
 
   var fimD = new Date(+fim.slice(0,4), +fim.slice(5,7) - 1, +fim.slice(8,10));
   var titulo = w.fromD.getMonth() === w.toD.getMonth()
@@ -3825,7 +4190,8 @@ function reportDados(qual){
     total: total, antes: P.total, agentes: agentes, lojas: lojas, dias: dias, pico: pico,
     metaDias: metaDias, metaBatidos: metaBatidos,
     metaPct: metaDias ? Math.round(metaBatidos / metaDias * 100) : null,
-    tp: tp, tar: tar, notas: notas, destaques: destaques,
+    tp: tp, tar: tar, notas: notas, destaques: destaques, eod: eod, conf: conf,
+    jhonErro: jhon && jhon.erro ? jhon.erro : "",
     autor: SESSAO ? String(SESSAO.nome || SESSAO.agente || "") : "",
     geradoEm: brDate(iso(today())) + "/" + today().getFullYear()
   };
@@ -3929,11 +4295,15 @@ function montarPptx(PptxGenJS, d, passos){
   s = nova("Resumo da semana", d.parcial ? "Semana em andamento, comparada com " + compara + "." : "Comparada com a semana anterior.");
   var dt = fmtDelta(d.total, d.antes);
   cartoes(s, 1.65, 1.5, [
-    [nf(d.total), "e-mails respondidos", dt ? dt + " vs semana anterior" : "sem base de comparação"],
+    [nf(d.total), "e-mails respondidos", dt ? dt + " vs anterior" : "sem comparação"],
     [d.metaPct === null ? "—" : d.metaPct + "%", "dias com meta batida",
-      d.metaDias ? d.metaBatidos + " de " + d.metaDias + " dias-agente" + (d.parcial ? ", até ontem" : "") : "metas não definidas"],
+      d.metaDias ? d.metaBatidos + " de " + d.metaDias + (d.parcial ? ", até ontem" : " dias-agente") : "metas não definidas"],
+    [d.conf.agDias || d.conf.ljDias ? nf(d.conf.agDiv + d.conf.ljDiv) : "—", "dias com divergência",
+      d.conf.agDias || d.conf.ljDias ? "de " + nf(d.conf.agDias + d.conf.ljDias) + " conferidos" : "sem dados para conferir"],
     [d.tp.ok ? nf(d.tp.resolv) : "—", "reviews resolvidos", d.tp.ok ? nf(d.tp.abertos) + " em aberto hoje" : "Trustpilot indisponível"],
-    [fmtDur(d.tar.min), "em tarefas avulsas", nf(d.tar.qtd) + " itens em " + nf(d.tar.sessoes) + (d.tar.sessoes === 1 ? " sessão" : " sessões")]
+    d.eod.tarefasDoEod
+      ? [nf(d.eod.tarefas.reduce(function(s, t){ return s + (t.qtd || 0); }, 0)), "itens em tarefas", "lidos dos EODs"]
+      : [fmtDur(d.tar.min), "em tarefas avulsas", nf(d.tar.qtd) + " itens em " + nf(d.tar.sessoes) + (d.tar.sessoes === 1 ? " sessão" : " sessões")]
   ]);
   if (d.total || d.antes){
     s.addChart(pres.charts.BAR, [
@@ -3969,6 +4339,39 @@ function montarPptx(PptxGenJS, d, passos){
                 title: "E-mails na semana", catAxisOrientation: "maxMin", valAxisHidden: true, valGridLine: { style: "none" } }));
   } else vazio(s, M, 1.7, CW, 5.0, "Nenhum e-mail contado nesta semana.");
 
+  var regra = "Diverge: diferença acima de " + Math.round(CONF_TOL * 100) + "% e de pelo menos " + CONF_MIN + " tickets no dia.";
+  var cartoesLado = function(s, itens){
+    itens.forEach(function(it, i){ cartao(s, M, 1.7 + i * 1.75, 3.1, 1.5, it[0], it[1], it[2]); });
+  };
+  // lista curta embaixo da tabela: só as linhas que cabem até `ate` (0,25 pol. por linha)
+  var listaMiuda = function(s, titulo, linhas, x, y, w, ate){
+    linhas = linhas.slice(0, Math.max(0, Math.floor(((ate || 6.8) - y - 0.32) / 0.25)));
+    if (!linhas.length) return;
+    txt(s, titulo, { x: x, y: y, w: w, h: 0.3, fontSize: 12, bold: true, color: C.text2 });
+    txt(s, linhas.map(function(l, i){ return { text: l, options: { bullet: { indent: 14 }, breakLine: i < linhas.length - 1 } }; }),
+        { x: x, y: y + 0.32, w: w, h: linhas.length * 0.25, fontSize: 11, color: C.text2, paraSpaceAfter: 2 });
+  };
+  var sinal = function(n){ return (n > 0 ? "+" : "") + nf(n); };
+
+  /* 3b. Conferência EOD × painel, por agente */
+  s = nova("Conferência dos EODs", "Tickets que cada agente informou no EOD × e-mails contados no painel, nos dias em que o EOD traz o número. " + regra);
+  if (d.conf.agentes.length){
+    cartoesLado(s, [[nf(d.conf.agDias), "dias-agente conferidos", d.eod.qtd + " EODs de " + d.eod.pessoas.length + " pessoas"],
+                    [nf(d.conf.agDiv), "com divergência", d.conf.agDias ? Math.round(d.conf.agDiv / d.conf.agDias * 100) + "% dos dias" : ""]]);
+    var ca = d.conf.agentes.slice(0, 8), xT = M + 3.5, wT = CW - 3.5;
+    tabela(s, ["Agente", "EOD", "Painel", "Diferença", "Dias divergentes"], ca.map(function(a){
+      return [cel(a.nome, { bold: true }), cel(nf(a.eod), { al: "right" }), cel(nf(a.painel), { al: "right" }),
+              cel(sinal(a.eod - a.painel), { al: "right", bold: true, cor: diverge(a.eod, a.painel) ? C.bad : C.text2 }),
+              cel(a.div + " de " + a.dias, { al: "right", bold: !!a.div, cor: a.div ? C.bad : C.good })];
+    }), xT, 1.7, wT, [2.4, 1.3, 1.3, 1.5, 2.133], 0.4);
+    listaMiuda(s, "Maiores diferenças", d.conf.detalhes.slice(0, 5).map(function(x){
+      return x.quem + ", " + WD[dowOf(x.dia)] + " " + brDate(x.dia) + ": EOD " + nf(x.eod) + ", painel " + nf(x.painel) + " (" + sinal(x.eod - x.painel) + ")";
+    }), xT, 1.7 + 0.4 * (ca.length + 1) + 0.3, wT);
+  } else vazio(s, M, 1.7, CW, 5.0, d.eod.qtd
+    ? "Os EODs colados desta semana não trazem número de tickets."
+    : "Cole os EODs da semana no painel (Report semanal) para esta conferência sair preenchida.");
+  if (d.eod.avisos.length) s.addNotes("Avisos da leitura dos EODs:\n- " + d.eod.avisos.join("\n- "));
+
   /* 4. Lojas */
   s = nova("Lojas", "Onde o volume de e-mails ficou, comparado com " + compara + ".");
   var lj = d.lojas.slice(0, 11);
@@ -3987,6 +4390,48 @@ function montarPptx(PptxGenJS, d, passos){
                 cel(nf(l.agentes), { al: "right", cor: C.text2 })];
       }), M + 6.8, 1.7, CW - 6.8, [1.85, 0.85, 0.95, 0.95, 0.73], Math.min(0.42, 5.1 / (lj.length + 1)));
   } else vazio(s, M, 1.7, CW, 5.0, "Nenhum e-mail contado nesta semana.");
+
+  /* 4b. Conferência painel × Dashboard Jhon, por loja */
+  s = nova("Conferência com o Dashboard Jhon", "E-mails contados no painel × fechamentos registrados no helpdesk (a equipe fecha a cada resposta), por loja e dia. " + regra);
+  if (d.conf.temJhon && d.conf.lojas.length){
+    cartoesLado(s, [[nf(d.conf.ljDias), "dias-loja conferidos", "7 lojas no Dashboard Jhon"],
+                    [nf(d.conf.ljDiv), "com divergência", d.conf.ljDias ? Math.round(d.conf.ljDiv / d.conf.ljDias * 100) + "% dos dias" : ""]]);
+    var cl = d.conf.lojas.slice(0, 9), xL = M + 3.5, wL = CW - 3.5;
+    tabela(s, ["Loja", "Painel", "EOD", "Dashboard Jhon", "Diferença", "Dias divergentes"], cl.map(function(l){
+      return [cel(l.nome, { bold: true }), cel(nf(l.painel), { al: "right" }),
+              cel(l.temEod ? nf(l.eod) : "—", { al: "right", cor: C.text2 }),
+              cel(l.temJhon ? nf(l.jhon) : "fora do Jhon", { al: "right", cor: l.temJhon ? C.ink : C.muted }),
+              cel(l.temJhon ? sinal(l.painel - l.jhon) : "—", { al: "right", bold: l.temJhon, cor: l.temJhon && diverge(l.painel, l.jhon) ? C.bad : C.text2 }),
+              cel(l.temJhon ? l.div + " de " + l.dias : "—", { al: "right", bold: !!l.div, cor: l.div ? C.bad : C.text2 })];
+    }), xL, 1.7, wL, [2.1, 1.0, 1.0, 1.5, 1.2, 1.833], 0.4);
+    listaMiuda(s, "Maiores diferenças", d.conf.detLoja.slice(0, 4).map(function(x){
+      return x.loja + ", " + WD[dowOf(x.dia)] + " " + brDate(x.dia) + ": painel " + nf(x.painel) + ", Dashboard Jhon " + nf(x.jhon) + " (" + sinal(x.painel - x.jhon) + ")";
+    }), xL, 1.7 + 0.4 * (cl.length + 1) + 0.3, wL, 6.65);
+    txt(s, "O Dashboard Jhon conta o dia em UTC (vira às 21h de Brasília). Old World Healing (Gorgias) não está nele.",
+        { x: M, y: 6.72, w: CW, h: 0.22, fontSize: 10, color: C.muted });
+  } else vazio(s, M, 1.7, CW, 5.0, d.jhonErro ? "Dashboard Jhon indisponível: " + d.jhonErro : "Sem dados do Dashboard Jhon para esta semana.");
+
+  /* 4c. Fechados e backlog (Dashboard Jhon) */
+  s = nova("Fechados e backlog", "Do Dashboard Jhon. Backlog = clientes esperando resposta da equipe no fim do dia.");
+  var bls = d.conf.backlog.filter(function(b){ return b.closes || b.fim !== null; });
+  if (bls.length){
+    var comBl = bls.filter(function(b){ return b.ini !== null && b.fim !== null; });
+    var iniRot = comBl.length ? brDate(comBl[0].iniDia) : "", fimRot = comBl.length ? brDate(comBl[0].fimDia) : "";
+    if (comBl.length){
+      s.addChart(pres.charts.BAR, [
+        { name: "Backlog " + iniRot, labels: comBl.map(function(b){ return b.nome; }), values: comBl.map(function(b){ return b.ini; }) },
+        { name: "Backlog " + fimRot, labels: comBl.map(function(b){ return b.nome; }), values: comBl.map(function(b){ return b.fim; }) }
+      ], grafico({ x: M, y: 1.6, w: 6.0, h: 5.2, barDir: "bar", barGrouping: "clustered", chartColors: [C.antes, C.brand],
+                   showLegend: true, legendPos: "b", title: "Backlog no começo e no fim da semana", catAxisOrientation: "maxMin",
+                   valAxisHidden: true, valGridLine: { style: "none" }, dataLabelFontSize: 9 }));
+    } else vazio(s, M, 1.7, 6.0, 5.0, "Sem medição de backlog nesta semana.");
+    tabela(s, ["Loja", "Fechamentos", "Reabertos", "Backlog " + (iniRot || "início"), "Backlog " + (fimRot || "fim")], bls.map(function(b){
+      var sobe = b.ini !== null && b.fim !== null && b.fim > b.ini;
+      return [cel(b.nome, { bold: true }), cel(nf(b.closes), { al: "right", bold: true }), cel(nf(b.reopened), { al: "right", cor: C.text2 }),
+              cel(b.ini === null ? "—" : nf(b.ini), { al: "right", cor: C.text2 }),
+              cel(b.fim === null ? "—" : nf(b.fim), { al: "right", bold: true, cor: sobe ? C.bad : C.ink })];
+    }), M + 6.4, 1.7, CW - 6.4, [1.75, 1.15, 0.95, 0.94, 0.943], Math.min(0.42, 5.0 / (bls.length + 1)));
+  } else vazio(s, M, 1.7, CW, 5.0, d.jhonErro ? "Dashboard Jhon indisponível: " + d.jhonErro : "Sem dados do Dashboard Jhon para esta semana.");
 
   /* 5. Trustpilot */
   s = nova("Trustpilot", "Reviews de 1 a 3 estrelas. Em aberto e atrasados mostram a fila no dia em que o report foi gerado.");
@@ -4016,7 +4461,26 @@ function montarPptx(PptxGenJS, d, passos){
     }
   } else vazio(s, M, 1.7, CW, 5.0, "Os reviews do Trustpilot não estavam disponíveis quando o report foi gerado.");
 
-  /* 6. Tarefas */
+  /* 6. Tarefas: antes de RP_TAREFAS_DESDE vêm dos EODs; depois, do Contador de Tarefas */
+  if (d.eod.tarefasDoEod){
+    s = nova("Tarefas avulsas", "O que a equipe fez além dos e-mails, lido dos EODs. O Contador de Tarefas passa a valer a partir de " + brDate(RP_TAREFAS_DESDE) + ".");
+    var te = d.eod.tarefas;
+    if (te.length){
+      var itens = te.reduce(function(s2, t){ return s2 + (t.qtd || 0); }, 0), quem = {};
+      te.forEach(function(t){ t.agentes.forEach(function(a){ quem[a] = 1; }); });
+      [[nf(itens), "itens com quantidade"], [nf(te.length), "tarefas diferentes"], [nf(Object.keys(quem).length), "pessoas"]].forEach(function(it, i){
+        cartao(s, M, [1.7, 3.45, 5.2][i], 3.3, 1.5, it[0], it[1], "");
+      });
+      var tq = te.slice(0, 10);
+      tabela(s, ["Tarefa", "Quantidade", "Vezes", "Quem"], tq.map(function(t){
+        return [cel(corta(t.nome.replace(/:$/, ""), 44), { bold: true }), cel(t.qtd === null ? "—" : nf(t.qtd), { al: "right", bold: t.qtd !== null }),
+                cel(nf(t.vezes), { al: "right", cor: C.text2 }), cel(corta(t.agentes.join(", "), 32), { al: "right", cor: C.text2, fs: 11 })];
+      }), M + 3.7, 1.7, CW - 3.7, [3.9, 1.2, 0.9, 2.433], Math.min(0.42, 5.0 / (tq.length + 1)));
+      if (te.length > tq.length)
+        txt(s, "+ " + (te.length - tq.length) + " tarefas nos EODs", { x: M + 3.7, y: 1.7 + Math.min(0.42, 5.0 / (tq.length + 1)) * (tq.length + 1) + 0.1,
+            w: 5, h: 0.25, fontSize: 11, color: C.muted });
+    } else vazio(s, M, 1.7, CW, 5.0, d.eod.qtd ? "Os EODs desta semana não trazem tarefas além dos tickets." : "Cole os EODs da semana no painel para as tarefas saírem aqui.");
+  } else {
   s = nova("Tarefas avulsas", "O que a equipe fez além dos e-mails, registrado no Contador de Tarefas.");
   if (d.tar.lista.length){
     var cw3 = 3.3, ys = [1.7, 3.45, 5.2];
@@ -4033,6 +4497,38 @@ function montarPptx(PptxGenJS, d, passos){
     if (d.tar.lista.length > tt.length)
       txt(s, "+ " + (d.tar.lista.length - tt.length) + " tarefas menores", { x: M + cw3 + 0.4, y: 6.62, w: 5, h: 0.25, fontSize: 11, color: C.muted });
   } else vazio(s, M, 1.7, CW, 5.0, "Nenhuma tarefa avulsa registrada nesta semana.");
+  }
+
+  /* 6b. Outras frentes (EODs): 4 por slide, no máximo 3 slides */
+  var fr = d.eod.frentes, porSlide = 4, maxSlides = 3;
+  if (fr.length){
+    var nSl = Math.min(maxSlides, Math.ceil(fr.length / porSlide));
+    for (var p = 0; p < nSl; p++){
+      s = nova("Outras frentes" + (nSl > 1 ? " (" + (p + 1) + " de " + nSl + ")" : ""),
+               "O que saiu nos EODs além das lojas: outros clientes, projetos e rotinas.");
+      var bw = (CW - 0.4) / 2, bh = 2.4;
+      fr.slice(p * porSlide, p * porSlide + porSlide).forEach(function(f, i){
+        var bx = M + (i % 2) * (bw + 0.4), by = 1.7 + Math.floor(i / 2) * (bh + 0.3);
+        painel(s, bx, by, bw, bh);
+        txt(s, f.nome + "  ", { x: bx + 0.3, y: by + 0.2, w: bw - 0.6, h: 0.32, fontSize: 14, bold: true });
+        txt(s, f.pessoas.join(", "), { x: bx + 0.3, y: by + 0.52, w: bw - 0.6, h: 0.25, fontSize: 11, color: C.muted });
+        // cabem ~6 linhas de ~80 letras na caixa: para quando a próxima não couber
+        var its = [], linhasUsadas = 0;
+        f.itens.forEach(function(it){
+          var n = Math.ceil(Math.min(it.texto.length + 14, 150) / 80);
+          if (its.length < 5 && linhasUsadas + n <= 6){ its.push(it); linhasUsadas += n; }
+        });
+        txt(s, its.map(function(it, j){
+          var extra = it.dias > 1 ? (it.qtd !== null ? ": " + nf(it.qtd) + " no total" : "") + " (" + it.dias + " dias)" : "";
+          return { text: corta(it.texto, extra ? 120 : 150) + extra, options: { bullet: { indent: 14 }, breakLine: j < its.length - 1 } };
+        }), { x: bx + 0.3, y: by + 0.85, w: bw - 0.6, h: bh - 1.05, fontSize: 11.5, color: C.text2, paraSpaceAfter: 2, fit: "shrink" });
+        if (f.itens.length > its.length)
+          txt(s, "+ " + (f.itens.length - its.length) + (f.itens.length - its.length === 1 ? " item" : " itens"), { x: bx + bw - 1.6, y: by + 0.22, w: 1.3, h: 0.25, fontSize: 10.5, color: C.muted, align: "right" });
+      });
+    }
+    if (fr.length > porSlide * maxSlides)
+      txt(s, "+ " + (fr.length - porSlide * maxSlides) + " frentes nos EODs", { x: M, y: 6.72, w: 5, h: 0.22, fontSize: 10, color: C.muted });
+  }
 
   /* 7. Ocorrências e próximos passos */
   s = nova("Ocorrências e próximos passos", "Notas do dia registradas no painel e o plano para a próxima semana.");
@@ -4086,24 +4582,63 @@ function reportLogo(){
   return /^data:image\/png;base64,/.test(h) ? h.slice(5) : "";
 }
 
+/* Números do Dashboard Jhon por semana ("de|ate" -> {dados} | {erro} | {carregando}).
+   Vêm pelo Apps Script (v21), que guarda a chave; o painel nunca fala com o Supabase. */
+var RP_JHON = {};
+var RP_EODS_KEY = "emailcounter.report.eods.";   // + primeiro dia da semana
+function reportPeriodo(qual){
+  var w = weekRange(qual), hoje = iso(today());
+  return { de: w.from, ate: w.to < hoje ? w.to : hoje };
+}
+function reportJhon(qual){ var p = reportPeriodo(qual); return RP_JHON[p.de + "|" + p.ate]; }
+function buscarJhon(qual){
+  var p = reportPeriodo(qual), k = p.de + "|" + p.ate;
+  if (RP_JHON[k] && !RP_JHON[k].erro) return;
+  if (API_VERSION && API_VERSION < 21){
+    RP_JHON[k] = { erro: "o Apps Script no ar é a versão " + API_VERSION + "; a conferência precisa da v21" };
+    return;
+  }
+  RP_JHON[k] = { carregando: true };
+  apiPost({ action: "conferencia", de: p.de, ate: p.ate }).then(function(res){
+    RP_JHON[k] = res && res.status === "ok" && res.jhon ? { dados: res.jhon }
+               : { erro: String(res && res.message || "resposta inesperada").replace(/^Conferencia indisponivel:\s*/i, "") };
+  }, function(e){ RP_JHON[k] = { erro: e && e.message || String(e) }; })
+  .then(function(){ if ($("ovReport").classList.contains("show")) renderReport(); });
+}
+function reportEods(){ return $("rpEods").value; }
+
 function renderReport(){
-  var d = reportDados(reportQual());
+  var qual = reportQual();
+  var jh = reportJhon(qual);
+  var d = reportDados(qual, reportEods(), jh);
   var k = function(v, t){ return '<div><b>' + v + '</b><span>' + t + '</span></div>'; };
+  var conferidos = d.conf.agDias + d.conf.ljDias;
   $("reportBox").innerHTML =
     '<p class="rp-per">' + esc(d.periodoTxt) + '</p>' +
     '<div class="mini-kpis rp-kpis">' +
       k(nf(d.total), "e-mails") +
       k(d.metaPct === null ? "—" : d.metaPct + "%", "dias com meta") +
-      k(d.tp.ok ? nf(d.tp.resolv) : "—", "reviews resolvidos") +
-      k(fmtDur(d.tar.min), "em tarefas") + '</div>' +
-    '<p class="rp-per">Slides: capa, resumo, equipe, lojas, Trustpilot, tarefas, ocorrências e próximos passos.</p>';
+      k(conferidos ? nf(d.conf.agDiv + d.conf.ljDiv) + '<small> de ' + nf(conferidos) + '</small>' : "—", "dias com divergência") +
+      k(d.tp.ok ? nf(d.tp.resolv) : "—", "reviews resolvidos") + '</div>' +
+    '<p class="rp-per">Dashboard Jhon: ' + (!jh || jh.carregando ? "buscando os números…"
+      : jh.erro ? '<span class="rp-erro">indisponível (' + esc(jh.erro) + ')</span>'
+      : "ligado" + (jh.dados.montado_em ? ", números de " + esc(quandoTxt(String(jh.dados.montado_em).replace("Z", ""))) + " (UTC)" : "")) + '.</p>';
   if (RP_SEMANA !== d.w.from){
     RP_SEMANA = d.w.from;
-    var salvo = "";
-    try { salvo = localStorage.getItem(RP_PASSOS_KEY + d.w.from) || ""; } catch(e){}
+    var salvo = "", eodSalvo = "";
+    try { salvo = localStorage.getItem(RP_PASSOS_KEY + d.w.from) || ""; eodSalvo = localStorage.getItem(RP_EODS_KEY + d.w.from) || ""; } catch(e){}
     $("rpPassos").value = salvo;
+    if ($("rpEods").value !== eodSalvo){ $("rpEods").value = eodSalvo; renderReport(); return; }
   }
+  var info = !reportEods().trim() ? "Cole os EODs de segunda a domingo. Eles entram na conferência, nas tarefas e em Outras frentes."
+    : d.eod.qtd ? nf(d.eod.qtd) + (d.eod.qtd === 1 ? " EOD lido" : " EODs lidos") + " de " + d.eod.pessoas.join(", ") + "."
+    : "Nenhum EOD desta semana encontrado no texto colado.";
+  $("rpEodInfo").textContent = info;
+  $("rpAvisos").innerHTML = d.eod.avisos.length
+    ? '<b>Confira antes de apresentar</b><ul>' + d.eod.avisos.map(function(a){ return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : "";
+  $("rpAvisos").hidden = !d.eod.avisos.length;
   $("rpMsg").className = "msg";
+  if (!jh) buscarJhon(qual);
 }
 
 $("rpPassos").oninput = function(){
@@ -4113,12 +4648,23 @@ $("rpPassos").oninput = function(){
     else localStorage.removeItem(RP_PASSOS_KEY + RP_SEMANA);
   } catch(e){}
 };
+var RP_EOD_TIMER = null;
+$("rpEods").oninput = function(){
+  try {
+    var v = $("rpEods").value;
+    if (v.trim()) localStorage.setItem(RP_EODS_KEY + RP_SEMANA, v);
+    else localStorage.removeItem(RP_EODS_KEY + RP_SEMANA);
+  } catch(e){}
+  clearTimeout(RP_EOD_TIMER);
+  RP_EOD_TIMER = setTimeout(renderReport, 350);
+};
 
 $("rpBaixar").onclick = function(){
   var b = $("rpBaixar"), m = $("rpMsg");
   b.disabled = true; b.textContent = "Gerando o PowerPoint…"; m.className = "msg";
   carregarPptx().then(function(P){
-    var d = reportDados(reportQual());
+    var q = reportQual();
+    var d = reportDados(q, reportEods(), reportJhon(q));
     d.logo = reportLogo();
     return montarPptx(P, d, reportPassos()).writeFile({ fileName: "Report semanal DS " + d.w.from + ".pptx" });
   }).then(function(){
@@ -4167,6 +4713,7 @@ function apiTemLogin(){ return API_V15 || API_VERSION >= 15; }
 var ACOES_V15 = ["listUsers", "saveUser", "login", "logout", "setupAdmin", "me"];
 var ACOES_V16 = ["addReview", "updateReview", "delReview", "importReviews"];
 var ACOES_V20 = ["delTarefa"];
+var ACOES_V21 = ["conferencia"];
 function apiPost(obj){
   // acao nova numa API antiga vira contagem falsa no gravador: nao sai daqui
   if (ACOES_V15.indexOf(obj.action) > -1 && !apiTemLogin())
@@ -4177,6 +4724,8 @@ function apiPost(obj){
   // excluir tarefa: so na v20 (numa versao antiga a acao seria recusada)
   if (ACOES_V20.indexOf(obj.action) > -1 && API_VERSION < 20)
     return Promise.reject(new Error("O Apps Script no ar ainda não exclui tarefas. Cole o AppsScript.gs v20 e reimplante."));
+  if (ACOES_V21.indexOf(obj.action) > -1 && API_VERSION < 21)
+    return Promise.reject(new Error("o Apps Script no ar ainda não tem a conferência. Cole o AppsScript.gs v21 e reimplante"));
   return apiPostBruto(obj).then(function(res){
     if (res && res.code === "auth" && sessaoToken()) authFail("Sua sessão venceu ou perdeu a permissão. Entre de novo.");
     return res;

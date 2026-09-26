@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews)  v20.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia)  v21.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -136,6 +136,16 @@
  *   com a projecao de cada um. enxugarPlanilha() apaga so as colunas vazias do fim
  *   das abas do painel. Nenhum dos dois roda sozinho.
  *
+ *  CONFERENCIA COM O DASHBOARD JHON (v21)
+ *   O report semanal do painel confere a contagem dos agentes com o que o Dashboard
+ *   Jhon registrou nos helpdesks (fechamentos e backlog por loja e dia). Quem busca e
+ *   este script, para a chave nao ficar no navegador:
+ *   POST {action:'conferencia', token, de:'2026-09-21', ate:'2026-09-27'}   (admin)
+ *     -> {status:'ok', jhon:{lojas, dias:[{loja, dia, closes, closed, created, reopened, backlog}], fuso, montado_em}}
+ *   Propriedades do script: JHON_REPORT_URL (endereco da funcao report-semanal do
+ *   Supabase) e JHON_REPORT_KEY (a REPORT_KEY dela). testarJhon() no editor confere.
+ *   A resposta fica 10 minutos no cache.
+ *
  *  NOTAS
  *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
  *   sistema, promocao, elogio). Sao lidas junto com getData e entram no report
@@ -249,7 +259,7 @@ function adminTokenOk_(t) {
    ROTEAMENTO
    ============================================================ */
 
-var PROTEGIDAS = ['listAdjust', 'addAdjust', 'delAdjust', 'addNota', 'delNota', 'setMetas', 'delMeta', 'listUsers', 'saveUser'];
+var PROTEGIDAS = ['listAdjust', 'addAdjust', 'delAdjust', 'addNota', 'delNota', 'setMetas', 'delMeta', 'listUsers', 'saveUser', 'conferencia'];
 var LIVRES     = [];   // metas voltaram a exigir admin na v15 (agentes nao podem ve-las)
 var ACESSO     = ['login', 'logout', 'me', 'setupAdmin'];
 var REVIEW_ACOES = ['addReview', 'updateReview', 'delReview', 'importReviews'];
@@ -258,7 +268,7 @@ var TAREFA_ACOES = ['delTarefa'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 20 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 21 }, p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
     // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
@@ -323,6 +333,7 @@ function protegida_(d) {
   if (d.action === 'delMeta')    return delMeta_(d);
   if (d.action === 'listUsers')  return { status: 'ok', usuarios: listUsers_() };
   if (d.action === 'saveUser')   return saveUser_(d);
+  if (d.action === 'conferencia') return conferencia_(d);
   return { status: 'error', message: 'Acao desconhecida.' };
 }
 
@@ -1532,6 +1543,54 @@ function testarReviews() {
 }
 
 /* ============================================================
+   CONFERENCIA COM O DASHBOARD JHON (v21)
+   ============================================================ */
+
+var DIA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Busca na funcao report-semanal do Supabase. Lanca erro com a causa em portugues. */
+function jhonBuscar_(de, ate) {
+  var pr = PropertiesService.getScriptProperties();
+  var url = String(pr.getProperty('JHON_REPORT_URL') || '').trim();
+  var key = String(pr.getProperty('JHON_REPORT_KEY') || '').trim();
+  if (!url || !key) throw new Error('Crie as propriedades JHON_REPORT_URL e JHON_REPORT_KEY no Apps Script.');
+  if (!/^https:\/\//.test(url)) throw new Error('JHON_REPORT_URL precisa comecar com https://');
+  var resp = UrlFetchApp.fetch(url + (url.indexOf('?') > -1 ? '&' : '?') + 'de=' + de + '&ate=' + ate,
+    { muteHttpExceptions: true, followRedirects: true, headers: { 'x-report-key': key } });
+  var code = resp.getResponseCode();
+  if (code === 401) throw new Error('o Dashboard Jhon recusou a chave (confira JHON_REPORT_KEY)');
+  if (code !== 200) throw new Error('o Dashboard Jhon respondeu HTTP ' + code + ' (confira JHON_REPORT_URL)');
+  var j;
+  try { j = JSON.parse(resp.getContentText()); } catch (eJ) { throw new Error('o Dashboard Jhon nao devolveu JSON'); }
+  if (!j || !j.ok || Object.prototype.toString.call(j.dias) !== '[object Array]') throw new Error('resposta inesperada do Dashboard Jhon');
+  return j;
+}
+
+function conferencia_(d) {
+  var de = String(d.de || ''), ate = String(d.ate || '');
+  if (!DIA_RE.test(de) || !DIA_RE.test(ate) || de > ate) return { status: 'error', message: 'Periodo invalido.' };
+  var cache = null, ck = 'jhon:' + de + ':' + ate;
+  try { cache = CacheService.getScriptCache(); var c = cache.get(ck); if (c) return { status: 'ok', jhon: JSON.parse(c), cache: true }; } catch (eC) {}
+  var j;
+  try { j = jhonBuscar_(de, ate); }
+  catch (e) { return { status: 'error', message: 'Conferencia indisponivel: ' + String((e && e.message) || e) }; }
+  var out = { lojas: j.lojas || [], dias: j.dias, fuso: j.fuso || 'UTC', montado_em: j.montado_em || null, erro_montagem: j.erro_montagem || null };
+  try { var s = JSON.stringify(out); if (s.length < 90000) cache.put(ck, s, 600); } catch (eP) {}
+  return { status: 'ok', jhon: out };
+}
+
+/** Executar › testarJhon: confere a ligacao com o Dashboard Jhon (ultimos 7 dias). */
+function testarJhon() {
+  if (typeof ScriptApp.requireScopes === 'function') {
+    ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ['https://www.googleapis.com/auth/script.external_request']);
+  }
+  var hoje = new Date(), ate = Utilities.formatDate(hoje, TZ, 'yyyy-MM-dd');
+  var de = Utilities.formatDate(new Date(hoje.getTime() - 6 * 86400000), TZ, 'yyyy-MM-dd');
+  var j = jhonBuscar_(de, ate);
+  Logger.log('Tudo certo: ' + j.dias.length + ' linhas (loja x dia) de ' + de + ' a ' + ate + ', montado em ' + j.montado_em + '.');
+}
+
+/* ============================================================
    CAPACIDADE (v20): rodar no editor, nunca roda sozinho
    ============================================================ */
 
@@ -1867,7 +1926,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 20
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 21
   };
 
   if (p.compact) {
