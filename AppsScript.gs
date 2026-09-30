@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia)  v21.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon)  v22.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -146,6 +146,13 @@
  *   Supabase) e JHON_REPORT_KEY (a REPORT_KEY dela). testarJhon() no editor confere.
  *   A resposta fica 10 minutos no cache.
  *
+ *  REVIEWS PARA O DASHBOARD JHON (v22)
+ *   O Dashboard Jhon mostra, so para leitura, o andamento dos reviews das lojas dele:
+ *   GET/POST {action:'reviewsJhon', key} -> {status:'ok', reviews:[{id, store_id, date, stars,
+ *   status, risk, contacted_at, follow_up_at, follow_ups, ...}]}. Sem notas e sem responsavel.
+ *   A chave e a propriedade JHON_REVIEWS_KEY (criarChaveReviewsJhon() cria e mostra), que so
+ *   serve para isto. A resposta fica 5 minutos no cache.
+ *
  *  NOTAS
  *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
  *   sistema, promocao, elogio). Sao lidas junto com getData e entram no report
@@ -268,7 +275,8 @@ var TAREFA_ACOES = ['delTarefa'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 21 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 22 }, p.callback);
+    if (p.action === 'reviewsJhon') return respond_(reviewsJhon_(p), p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
     // Contador de Tarefas. Tem que vir antes do "p.agente || p.contador" la embaixo.
@@ -302,6 +310,7 @@ function doPost(e) {
     for (var b in body) d[b] = body[b];
 
     if (d.action === 'getData') return respond_(getDataAuth_(d), p.callback);
+    if (d.action === 'reviewsJhon') return respond_(reviewsJhon_(d), p.callback);
     if (ACESSO.indexOf(d.action) > -1)     return respond_(acesso_(d), p.callback);
     if (d.action === 'addTarefa') return respond_(addTarefa_(d), p.callback);
     if (LIVRES.indexOf(d.action) > -1)     return respond_(livre_(d), p.callback);
@@ -1543,6 +1552,75 @@ function testarReviews() {
 }
 
 /* ============================================================
+   REVIEWS PARA O DASHBOARD JHON (v22) — so leitura
+   ============================================================ */
+
+// Lojas do Jhon, pelo nome sem acento/espaco -> store_id do Dashboard Jhon.
+var JHON_LOJAS = { lumvelle: 'lumvelle', vellum: 'vellum', elevare: 'elevare', vigewell: 'vigewell',
+                   oldharvest: 'old_harvest', stratum: 'stratum', stratumlab: 'stratum', nouveian: 'nouveian' };
+
+function normLoja_(s) {
+  var t = String(s || '').toLowerCase();
+  try { t = t.normalize('NFD'); } catch (ignore) {}
+  return t.replace(/[^a-z0-9]/g, '');
+}
+
+/** "25/09/2026 14:30", Date ou serial -> "2026-09-25T14:30"; vazio fica vazio. */
+function isoMinuto_(v) {
+  var d = parseAny_(v);
+  return d ? Utilities.formatDate(d, TZ, "yyyy-MM-dd'T'HH:mm") : '';
+}
+
+/**
+ * GET/POST {action:'reviewsJhon', key}. A chave e a propriedade JHON_REVIEWS_KEY,
+ * que so serve para isto: ler. Nao vai notas nem responsavel (quem fez o que fica
+ * no Email Counter), so o andamento de cada review das lojas do Jhon.
+ */
+function reviewsJhon_(d) {
+  var k = String(PropertiesService.getScriptProperties().getProperty('JHON_REVIEWS_KEY') || '');
+  if (k.length < 20 || String(d.key || '') !== k) return { status: 'error', code: 'auth', message: 'Chave invalida.' };
+
+  var cache = null;
+  try { cache = CacheService.getScriptCache(); var c = cache.get('reviewsJhon'); if (c) return JSON.parse(c); } catch (eC) {}
+
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REVIEW_SHEET);
+  var v = sh ? linhasReviews_(sh) : [];
+  var out = [];
+  for (var i = 0; i < v.length; i++) {
+    var r = v[i];
+    if (!String(r[RV.id]).trim()) continue;
+    var loja = JHON_LOJAS[normLoja_(r[RV.loja])];
+    if (!loja) continue;
+    out.push({
+      id: String(r[RV.id]), store_id: loja, date: isoMinuto_(r[RV.data]).slice(0, 10),
+      stars: Number(r[RV.nota]) || 0, status: String(r[RV.status]),
+      risk: String(r[RV.risco]).toUpperCase() === 'SIM',
+      status_since: isoMinuto_(r[RV.desde]), contacted_at: isoMinuto_(r[RV.contatado]),
+      follow_up_at: isoMinuto_(r[RV.followEm]), follow_ups: Number(r[RV.follows]) || 0,
+      created_at: isoMinuto_(r[RV.criado]), updated_at: isoMinuto_(r[RV.atualizado]),
+      has_ticket: !!String(r[RV.ticket] || '').trim(), link: String(r[RV.link] || '')
+    });
+  }
+  var res = { status: 'ok', read_at: nowStr_(), follow_up_days: FOLLOW_UP_DIAS_SERVIDOR, reviews: out };
+  try { var s = JSON.stringify(res); if (cache && s.length < 90000) cache.put('reviewsJhon', s, 300); } catch (eP) {}
+  return res;
+}
+
+// O mesmo prazo de follow up do painel (FOLLOW_UP_DIAS no index.html).
+var FOLLOW_UP_DIAS_SERVIDOR = 3;
+
+/** Executar › criarChaveReviewsJhon: cria a chave e mostra no registro (copiar para o Cloudflare). */
+function criarChaveReviewsJhon() {
+  var pr = PropertiesService.getScriptProperties();
+  var k = pr.getProperty('JHON_REVIEWS_KEY');
+  if (!k) {
+    k = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+    pr.setProperty('JHON_REVIEWS_KEY', k);
+  }
+  Logger.log('Chave JHON_REVIEWS_KEY (cole no Cloudflare como REVIEWS_TOKEN): ' + k);
+}
+
+/* ============================================================
    CONFERENCIA COM O DASHBOARD JHON (v21)
    ============================================================ */
 
@@ -1926,7 +2004,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 21
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 22
   };
 
   if (p.compact) {
