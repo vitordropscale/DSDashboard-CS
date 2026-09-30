@@ -1388,6 +1388,9 @@ function reviewAcao_(d) {
   // quem fez: o nome, nunca o e-mail (os agentes veem esse campo)
   var quem = String(u.nome || u.agente || 'sem nome');
   garantirAbaReviews_();   // fora do lock: a criacao da aba pega o lock sozinha
+  // Qualquer mudanca num review apaga a copia que o Dashboard Jhon le (v22),
+  // para ele ver a mudanca na proxima leitura, sem esperar os 5 minutos.
+  try { CacheService.getScriptCache().remove('reviewsJhon'); } catch (eCache) {}
   if (d.action === 'addReview')     return comLock_(function () { return addReview_(d, u, quem); });
   if (d.action === 'updateReview')  return comLock_(function () { return updateReview_(d, quem); });
   if (d.action === 'delReview')     return comLock_(function () { return delReview_(d, quem); });
