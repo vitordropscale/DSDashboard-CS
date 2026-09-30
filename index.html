@@ -1050,6 +1050,7 @@ tr.rv-row:focus{outline:none}
           <button data-m="abertos" class="on">Em aberto</button>
           <button data-m="followup" class="v16-only">Follow up<b class="seg-badge" id="fuSegBadge" hidden></b></button>
           <button data-m="risco">Com risco</button>
+          <button data-m="resolvidos">Resolvidos</button>
           <button data-m="todos">Todos</button>
         </div>
         <div class="rv-filtros">
@@ -1060,6 +1061,7 @@ tr.rv-row:focus{outline:none}
               <svg class="dp-ch" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4"/></svg>
             </button>
           </div>
+          <select class="sel-mini" id="rvStatusSel" title="Filtra pelo status" aria-label="Status"></select>
           <select class="sel-mini" id="rvRespSel" title="Filtra pelo responsável" aria-label="Responsável"></select>
           <button class="link-mini" id="rvLimpar" type="button" hidden>Limpar filtros</button>
         </div>
@@ -5611,11 +5613,26 @@ function rvPassaResp(x){
   return x.owner === r;
 }
 function rvTemFiltro(){ return !!(rvFaixa() || state.rvResp); }
-/** Texto dos filtros ligados, para o subtitulo: ", ultimos 7 dias, com Julio". */
-function rvFiltrosTxt(){
+/** Status: filtra so as listas em tabela; a aba Follow up tem a sua propria logica de status. */
+function rvPassaStatus(x){
+  var st = state.rvStatus || "";
+  return !st || String(x.status).toLowerCase() === st.toLowerCase();
+}
+function rvTemFiltroTab(){ return rvTemFiltro() || !!state.rvStatus; }
+/** O status escolhido aparece na aba? "Em aberto" nao tem Resolvido; "Resolvidos" so tem ele. */
+function rvStatusCabe(modo, st){
+  if (!st) return true;
+  var resolvido = st.toLowerCase() === "resolvido";
+  if (modo === "abertos" || modo === "risco") return !resolvido;
+  if (modo === "resolvidos") return resolvido;
+  return true;   // todos (e Follow up, que ignora este filtro)
+}
+/** Texto dos filtros ligados, para o subtitulo: ", ultimos 7 dias, com Julio, status Contatado". */
+function rvFiltrosTxt(comStatus){
   var p = [], f = rvFaixa(), r = state.rvResp || "";
   if (f) p.push(f.txt);
   if (r === "__meus") p.push("só os seus"); else if (r === "__sem") p.push("sem responsável"); else if (r) p.push("com " + r);
+  if (comStatus && state.rvStatus) p.push("status " + state.rvStatus);
   return p.length ? ", " + p.join(", ") : "";
 }
 /** Reviews da tela Trustpilot: loja (filtro de cima), data do review e responsavel. */
@@ -5625,6 +5642,20 @@ function rvDaTela(){
     if (f && (!x.date || x.date < f.de || x.date > f.ate)) return false;
     return rvPassaResp(x);
   });
+}
+/** Reviews das abas em tabela: os da tela, mais o filtro de status. */
+function rvDaTabela(){ return rvDaTela().filter(rvPassaStatus); }
+/** Filtro de status: as opcoes sao fixas; some na aba Follow up (la nao se aplica). */
+function rvFillStatus(){
+  var sel = $("rvStatusSel"), atual = state.rvStatus || "";
+  if (!sel.dataset.pronto){
+    sel.innerHTML = '<option value="">Todos os status</option>' +
+      RV_STATUS.map(function(x){ return '<option value="' + esc(x) + '">' + esc(x) + '</option>'; }).join("");
+    sel.dataset.pronto = "1";
+  }
+  sel.hidden = state.rvMode === "followup";
+  sel.value = atual;
+  sel.classList.toggle("ativo", !!atual);
 }
 /** Opcoes do filtro de responsavel; so refaz se a lista mudou (nao fecha o menu aberto). */
 function rvFillResp(){
@@ -5642,7 +5673,8 @@ function rvFillResp(){
   if (sel.value !== atual){ state.rvResp = ""; sel.value = ""; }
   sel.classList.toggle("ativo", !!state.rvResp);
   DP_RV.atualizar(!!rvFaixa());
-  $("rvLimpar").hidden = !rvTemFiltro();
+  rvFillStatus();
+  $("rvLimpar").hidden = !(state.rvMode === "followup" ? rvTemFiltro() : rvTemFiltroTab());
 }
 function rvSetModo(m){
   state.rvMode = m;
@@ -5696,18 +5728,21 @@ function renderReviews(r){
   $("fuArea").hidden = !fu;
   if (fu) return;   // renderFollowUp (chamado logo depois) desenha a aba
   rvFillResp();
-  var tela = rvDaTela();
+  var tela = rvDaTabela();
   var tAbertos = tela.filter(rvAberto), tRisco = tela.filter(function(x){ return x.risk && rvAberto(x); });
-  var lista = modo === "abertos" ? tAbertos : modo === "risco" ? tRisco : tela;
+  var tResolvidos = tela.filter(function(x){ return !rvAberto(x); });
+  var lista = modo === "abertos" ? tAbertos : modo === "risco" ? tRisco : modo === "resolvidos" ? tResolvidos : tela;
   var reps = tela.filter(function(x){ return x.dup; }).length;
-  $("rvSub").textContent = lojaTxt + rvFiltrosTxt() + ", " + nf(lista.length) + (lista.length === 1 ? " review" : " reviews") +
+  $("rvSub").textContent = lojaTxt + rvFiltrosTxt(true) + ", " + nf(lista.length) + (lista.length === 1 ? " review" : " reviews") +
     (reps && isAdmin() ? ", " + nf(reps) + " com link repetido" : "");
   var box = $("rvBox");
   if (!lista.length){
     box.innerHTML = '<div class="empty" style="padding:30px">' + (LEGADO ? "Os reviews aparecem aqui depois que o Apps Script v15 for implantado."
       : REVIEWS_OK && REVIEWS_ERRO && !todos.length ? rvErroTxt()
       : !REVIEWS_OK ? rvSemConfigTxt()
-      : rvTemFiltro() && !tela.length && todos.length ? "Nenhum review com esses filtros. Use <b>Limpar filtros</b> para ver todos."
+      : rvTemFiltroTab() && !tela.length && todos.length ? "Nenhum review com esses filtros. Use <b>Limpar filtros</b> para ver todos."
+      : modo === "resolvidos" && todos.length ? "Nenhum review resolvido" + (rvTemFiltroTab() ? " com esses filtros" : " ainda") +
+        ". Quando um review passar para <b>Resolvido</b>, ele aparece aqui."
       : todos.length ? "Nenhum review nesta lista."
       : "Nenhum review cadastrado ainda." + (v16 ? " Use <b>Novo review</b> e cole o link do review no Trustpilot." : "")) + '</div>';
     return;
@@ -5727,11 +5762,22 @@ function renderReviews(r){
     }).join("") + '</tbody></table></div>';
 }
 $("segRv").querySelectorAll("button").forEach(function(b){
-  b.onclick = function(){ rvCardMsg(null, ""); rvSetModo(b.dataset.m); render(); };
+  b.onclick = function(){
+    rvCardMsg(null, "");
+    // o clique na aba manda: um status que nao cabe nela (Resolvido em "Em aberto") sai do filtro
+    if (!rvStatusCabe(b.dataset.m, state.rvStatus || "")) state.rvStatus = "";
+    rvSetModo(b.dataset.m); render();
+  };
 });
 $("rvRespSel").onchange = function(){ state.rvResp = this.value; render(); };
+$("rvStatusSel").onchange = function(){
+  state.rvStatus = this.value;
+  // status que a aba atual nao mostra: vai para "Todos" em vez de deixar a lista vazia
+  if (!rvStatusCabe(state.rvMode || "abertos", state.rvStatus)) rvSetModo("todos");
+  render();
+};
 $("rvLimpar").onclick = function(){
-  state.rvData = "tudo"; state.rvResp = ""; state.rvDe = state.rvAte = "";
+  state.rvData = "tudo"; state.rvResp = ""; state.rvStatus = ""; state.rvDe = state.rvAte = "";
   render();
 };
 
@@ -5865,6 +5911,7 @@ function voltaEm(n){
 /** O que o clique fez, dito com clareza, e o botao Desfazer (Apps Script v17). */
 function msgFollowUp(n){ return "Follow up registrado: " + n.store + ", " + n.follow_ups + "º. Ele foi para Aguardando resposta e volta para Precisam de follow up em " + voltaEm(n) + " se o cliente não responder."; }
 function msgRespondeu(n){ return n.store + " foi para Resolvendo e saiu do follow up. Continua na aba Em aberto."; }
+function msgResolvido(n){ return n.store + " foi para Resolvido e saiu de Em aberto. Está na aba Resolvidos."; }
 function rvDesfazerAcao(n, msg){
   if (API_VERSION < 17) return null;
   return { rotulo: "Desfazer", fn: function(){
@@ -5984,6 +6031,7 @@ function abrirReview(id){
   $("rvSalvar").textContent = x ? "Salvar alterações" : "Salvar review";
   var ac = "";
   if (x && (x.status === "Contatado" || x.status === "Follow up")) ac += '<button class="btn" data-rv="follow">Registrar follow up</button><button class="btn" data-rv="respondeu">Cliente respondeu</button>';
+  if (x && String(x.status).toLowerCase() !== "resolvido") ac += '<button class="btn" data-rv="resolver">Marcar como resolvido</button>';
   if (x && isAdmin()) ac += '<button class="btn perigo" data-rv="excluir">Excluir review</button>';
   $("rvAcoes").innerHTML = ac;
   $("ovRv").classList.add("show");
@@ -6050,6 +6098,9 @@ $("rvAcoes").onclick = function(e){
   var x = rvEditando;
   if (b.dataset.rv === "follow") return rvAtualizar(x, { followUp: true }, b, rvMsg, "", function(n){
     abrirReview(n.id); rvMsg("ok", msgFollowUp(n), rvDesfazerAcao(n, rvMsg));
+  });
+  if (b.dataset.rv === "resolver") return rvAtualizar(x, { status: "Resolvido" }, b, rvMsg, "", function(n){
+    abrirReview(n.id); rvMsg("ok", msgResolvido(n), rvDesfazerAcao(n, rvMsg));
   });
   if (b.dataset.rv === "respondeu") return rvAtualizar(x, { status: "Resolvendo" }, b, rvMsg, "", function(n){
     abrirReview(n.id); rvMsg("ok", msgRespondeu(n), rvDesfazerAcao(n, rvMsg));

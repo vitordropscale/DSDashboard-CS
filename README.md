@@ -117,6 +117,12 @@ estão atrasados, e "Só os meus" filtra pelo responsável. Depois de cada cliqu
 diz para onde o review foi, com um "Desfazer" (Apps Script v17) que volta o status e as
 datas, desde que ninguém tenha mexido no review nesse meio tempo.
 
+**Abas e filtros**: Em aberto, Follow up, Com risco, Resolvidos e Todos. Data do review, status
+e responsável se combinam (o status não vale na aba Follow up, que já é só de Contatado e Follow
+up). Escolher um status que a aba não mostra, como Resolvido em Em aberto, leva para Todos; clicar
+numa aba tira do filtro o status que não cabe nela. No review aberto, **Marcar como resolvido**
+troca o status de uma vez (com Desfazer, Apps Script v17). Só o painel mudou; o Apps Script é o mesmo.
+
 **Review Desk**: na primeira leitura depois da v16, a aba Reviews é criada e recebe tudo o
 que estava no Review Desk, pela API dele: propriedades `REVIEWS_API_URL` (a URL `/exec`) e
 `REVIEWS_SECRET` (o `SHARED_SECRET` dele), ou `REVIEWS_SHEET_ID`. Depois disso o Review
