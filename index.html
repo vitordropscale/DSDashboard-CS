@@ -617,6 +617,19 @@ td.tar-acao .btn.armado,td.tar-acao .btn.armado:hover{color:#fff;background:var(
   border-radius:8px;background:var(--crit-soft);color:var(--crit-ink);line-height:16px}
 .mini-seg button.on .seg-badge{background:var(--crit);color:#fff}
 .rv-filtros{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+/* v23: nome do cliente e pesquisa por nome, review e ticket */
+body:not(.api-v23) .v23-only{display:none!important}
+.rv-busca{background:var(--well);border:1px solid var(--line);border-radius:var(--r-sm);padding:16px 16px 6px;margin:0 0 16px}
+.rv-busca-g{display:flex;flex-wrap:wrap;gap:0 12px;align-items:flex-end}
+.rv-busca-g .field{flex:1 1 190px;min-width:0;margin-bottom:10px}
+.rv-busca-ac{display:flex;gap:8px;margin-bottom:10px;flex:none}
+.rv-busca-ac .btn{padding:11px 16px}
+.rv-busca-dica{font-size:11.5px;color:var(--muted);line-height:1.5;margin:0 0 10px}
+.rv-buscando .rv-barra{display:none}
+.rv-tag.bateu{background:var(--good-soft);color:var(--good-ink)}
+.rv-bateu{display:flex;gap:4px;flex-wrap:wrap}
+.rv-cli{display:block;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fu-cli{color:var(--text2);font-weight:400}
 /* select compacto no padrao do painel (sem a seta do navegador) */
 .sel-mini{appearance:none;-webkit-appearance:none;background:var(--side) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239ea8bb' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 11px center;
   border:1px solid var(--line);border-radius:8px;color:var(--text2);font:inherit;font-size:12.5px;padding:7px 30px 7px 11px;cursor:pointer;color-scheme:var(--scheme)}
@@ -1041,9 +1054,20 @@ tr.rv-row:focus{outline:none}
       <div class="card-h">
         <div><div class="card-t">Reviews</div><div class="card-sub" id="rvSub">&nbsp;</div></div>
         <div class="rv-topo">
+          <button class="btn" id="btnBuscar" type="button" aria-expanded="false" aria-controls="rvBusca" title="Procura um review pelo nome do cliente, pelo link do review ou pelo ticket">
+            <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>Pesquisar</button>
           <button class="btn v16-only admin-only" id="btnImportRd" title="Acrescenta o que foi cadastrado no Review Desk e ainda não está aqui">Trazer do Review Desk</button>
           <button class="btn cta v16-only" id="btnNovoReview">Novo review</button>
         </div>
+      </div>
+      <div class="rv-busca" id="rvBusca" hidden>
+        <div class="rv-busca-g">
+          <div class="field v23-only"><label for="rvQNome">Nome do cliente</label><input class="inp" id="rvQNome" autocomplete="off" placeholder="nome como aparece no review"></div>
+          <div class="field"><label for="rvQLink">Review</label><input class="inp" id="rvQLink" autocomplete="off" spellcheck="false" placeholder="link do review ou o código dele"></div>
+          <div class="field"><label for="rvQTicket">Ticket</label><input class="inp" id="rvQTicket" autocomplete="off" placeholder="link do ticket ou o número"></div>
+          <div class="rv-busca-ac"><button class="btn cta" id="rvQIr" type="button">Pesquisar</button><button class="btn" id="rvQLimpar" type="button">Limpar</button></div>
+        </div>
+        <div class="rv-busca-dica">Preencha um, dois ou os três. A pesquisa olha todos os reviews, de todas as lojas, e mostra os que têm a mesma informação. Quem bate em mais campos vem primeiro.</div>
       </div>
       <div class="rv-barra">
         <div class="mini-seg" id="segRv">
@@ -1130,6 +1154,11 @@ tr.rv-row:focus{outline:none}
           <label for="rvLink">Link do review</label>
           <input class="inp" id="rvLink" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.trustpilot.com/reviews/…">
           <div class="hint">O link do review em si, com /reviews/ no endereço. O da página da loja não serve.</div>
+        </div>
+        <div class="field v23-only">
+          <label for="rvCliente">Nome do cliente <span class="opt">se souber</span></label>
+          <input class="inp" id="rvCliente" autocomplete="off" maxlength="80" placeholder="como aparece no review">
+          <div class="hint">Ajuda a achar esse review depois, na pesquisa.</div>
         </div>
         <div class="rv-grid">
           <div class="field"><label for="rvData">Data do review</label><input class="inp" id="rvData" type="date"></div>
@@ -1763,7 +1792,8 @@ function normalizeReviews(raw){
       created_at: String(r.created_at || ""), updated_at: String(r.updated_at || ""),
       created_by: String(r.created_by || ""), updated_by: String(r.updated_by || ""),
       status_since: String(r.status_since || ""), contacted_at: String(r.contacted_at || ""),
-      follow_up_at: String(r.follow_up_at || ""), follow_ups: +r.follow_ups || 0, origin: String(r.origin || "")
+      follow_up_at: String(r.follow_up_at || ""), follow_ups: +r.follow_ups || 0, origin: String(r.origin || ""),
+      customer: String(r.customer || "").trim()
     };
   }).filter(function(r){ return r.id && (r.stars > 0 || r.status); }).sort(rvOrdem);
   marcarRepetidos(out);
@@ -1937,6 +1967,7 @@ function loadData(manual){
       API_VERSION = Number(payload.version) || 0;
       if (API_VERSION >= 15) API_V15 = true;
       document.body.classList.toggle("api-v16", API_VERSION >= 16);
+    document.body.classList.toggle("api-v23", API_VERSION >= 23);
       indexMetas(); indexNotas();
       LAST_OK = new Date();
       try { localStorage.setItem(cacheKey(), JSON.stringify({ at:LAST_OK.getTime(), since:since, payload:payload })); } catch(e){}
@@ -2010,6 +2041,7 @@ function loadCache(){
     TAREFAS = normalizeTarefas(c.payload.tarefas);
     API_VERSION = Number(c.payload.version) || 0;
     document.body.classList.toggle("api-v16", API_VERSION >= 16);
+    document.body.classList.toggle("api-v23", API_VERSION >= 23);
     indexMetas(); indexNotas();
     LAST_OK = new Date(c.at);
     if (RECS.length){ buildFilters(); render(); setStatus("warn","cache local"); }
@@ -5677,6 +5709,7 @@ function rvFillResp(){
   $("rvLimpar").hidden = !(state.rvMode === "followup" ? rvTemFiltro() : rvTemFiltroTab());
 }
 function rvSetModo(m){
+  rvBuscaFechar();   // escolher uma aba (ou vir do link do follow up) encerra a pesquisa
   state.rvMode = m;
   $("segRv").querySelectorAll("button").forEach(function(x){ x.classList.toggle("on", x.dataset.m === m); });
 }
@@ -5723,6 +5756,14 @@ function renderReviews(r){
   // tela Trustpilot: tabela nas abas Em aberto, Com risco e Todos; listas na aba Follow up
   var modo = state.rvMode || "abertos";
   if (modo === "followup" && !v16) rvSetModo(modo = "abertos");
+  // pesquisa por nome, review e ticket: no lugar das abas e dos filtros enquanto estiver ativa
+  $("rvBox").closest(".card").classList.toggle("rv-buscando", !!state.rvBusca);
+  $("rvBusca").hidden = !state.rvBuscaAberta;
+  if (state.rvBusca){
+    $("rvBox").hidden = false; $("fuArea").hidden = true;
+    rvRenderBusca(state.rvBusca);
+    return;
+  }
   var fu = modo === "followup";
   $("rvBox").hidden = fu;
   $("fuArea").hidden = !fu;
@@ -5748,12 +5789,13 @@ function renderReviews(r){
     return;
   }
   var th = function(t){ return '<th style="cursor:default">' + t + '</th>'; };
-  box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' + th("Data") + th("Loja") + th("Nota") + th("Status") +
+  box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' + th("Data") + th("Loja") + '<th class="v23-only" style="cursor:default">Cliente</th>' + th("Nota") + th("Status") +
     th("Responsável") + th("Risco") + th("Notas") + th("Links") + '</tr></thead><tbody>' +
     lista.map(function(x){
       return '<tr' + (v16 ? ' class="rv-row" tabindex="0" data-id="' + esc(x.id) + '" title="Abrir para editar"' : '') + '>' +
         '<td style="white-space:nowrap">' + (x.date ? brDate(x.date) : '<span class="zero">–</span>') + '</td>' +
         '<td style="white-space:nowrap"><i class="sw" style="background:' + (STORE_COLOR[x.store] || THEME.muted) + '"></i>' + esc(x.store) + '</td>' +
+        '<td class="v23-only">' + (x.customer ? '<span class="rv-cli" title="' + esc(x.customer) + '">' + esc(x.customer) + '</span>' : '<span class="zero">–</span>') + '</td>' +
         '<td>' + starsHTML(x.stars) + '</td><td style="white-space:nowrap">' + rvTag(x.status) + (x.dup && isAdmin() ? '<span class="rv-tag repetido" title="Outro review tem o mesmo link">repetido</span>' : '') + '</td>' +
         '<td>' + (x.owner ? esc(x.owner) : '<span class="zero">–</span>') + '</td>' +
         '<td>' + (x.risk ? '<span class="rv-risk">chargeback</span>' : '<span class="zero">–</span>') + '</td>' +
@@ -5780,6 +5822,162 @@ $("rvLimpar").onclick = function(){
   state.rvData = "tudo"; state.rvResp = ""; state.rvStatus = ""; state.rvDe = state.rvAte = "";
   render();
 };
+
+/* =============================================================================
+   PESQUISA DE REVIEWS: nome, review e ticket (os tres campos se cruzam)
+   O agente preenche um, dois ou os tres; o painel procura em TODOS os reviews
+   (qualquer loja, status ou data) e mostra os que tem a mesma informacao, com a
+   marca do que bateu. Quem bate em mais campos vem primeiro. Tudo no navegador,
+   em cima da lista de reviews que ele ja recebeu.
+   ========================================================================== */
+/** Sem acento, minuscula, espacos unicos: "  João   da Silva " -> "joao da silva". */
+function rvNorm(s){
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+}
+/** O campo Review: o link inteiro (qualquer dominio do Trustpilot, com ou sem ?query) ou so o codigo dele. */
+function rvBuscaLinkQ(txt){
+  var t = String(txt || "").trim();
+  if (!t) return null;
+  var lk = linkTrustpilot(t);
+  if (lk) return { k: chaveLinkRv(lk) };
+  var frag = t.toLowerCase().replace(/^.*[/]reviews[/]/, "").replace(/[?#].*$/, "").replace(/[/]+$/, "");
+  return frag.length >= 6 ? { frag: frag } : { curto: true };
+}
+/** O numero do ticket: tirado do link do Commslayer, do Richpanel ou do Gorgias, ou o proprio numero digitado. */
+function rvTicketId(v){
+  var t = String(v || "").trim().toLowerCase();
+  if (!t) return "";
+  if (/^https?:/.test(t)){
+    var m = t.match(/conversations[/](\d+)/) || t.match(/conversationno=(\d+)/) || t.match(/[/]tickets?[/](\d+)/) || t.match(/[/]views[/]\d+[/](\d+)/);
+    if (m) return m[1];
+    m = t.match(/(\d+)(?!.*\d)/);   // sem padrao conhecido: o ultimo numero do endereco
+    return m ? m[1] : t;
+  }
+  return t.replace(/^#/, "").replace(/\s+/g, "");
+}
+/** Confere o que foi digitado. Devolve {q} so com os campos preenchidos, ou {erro}. */
+function rvBuscaPreparar(nome, link, ticket){
+  var q = {}, n = 0;
+  var nn = rvNorm(nome);
+  if (nn){
+    if (nn.length < 2) return { erro: "Digite pelo menos 2 letras do nome." };
+    q.nome = nn.split(" "); n++;
+  }
+  var lk = rvBuscaLinkQ(link);
+  if (lk){
+    if (lk.curto) return { erro: "Cole o link do review ou o código dele (pelo menos 6 caracteres)." };
+    q.link = lk; n++;
+  }
+  var tk = rvTicketId(ticket);
+  if (tk){ q.ticket = tk; n++; }
+  if (!n) return { erro: "Preencha pelo menos um dos três campos." };
+  q.n = n;
+  return { q: q };
+}
+/** Quais campos deste review batem com a pesquisa: "nome", "review", "ticket". */
+function rvBuscaBate(x, q){
+  var hits = [];
+  if (q.nome){
+    var nm = rvNorm(x.customer);   // todas as palavras digitadas tem que aparecer no nome
+    if (nm && q.nome.every(function(p){ return nm.indexOf(p) > -1; })) hits.push("nome");
+  }
+  if (q.link){
+    var s = chaveLinkRv(x.review_link);
+    // so o codigo: o codigo inteiro ou o comeco dele (um pedaco do meio acharia review que nao tem nada a ver)
+    var cod = s.replace(/^[/]reviews[/]/, "");
+    if (s && (q.link.k ? s === q.link.k : cod.indexOf(q.link.frag) === 0)) hits.push("review");
+  }
+  if (q.ticket){
+    var t = rvTicketId(x.ticket);
+    if (t && t === q.ticket) hits.push("ticket");
+  }
+  return hits;
+}
+function rvBuscar(q){
+  var achados = [];
+  REVIEWS.forEach(function(x){
+    var h = rvBuscaBate(x, q);
+    if (h.length) achados.push({ x: x, hits: h });
+  });
+  achados.sort(function(a, b){ return b.hits.length - a.hits.length || rvOrdem(a.x, b.x); });
+  return achados;
+}
+/** "nome, review e ticket" (so os campos preenchidos). */
+function rvBuscaCampos(q){
+  var p = [];
+  if (q.nome) p.push("nome");
+  if (q.link) p.push("review");
+  if (q.ticket) p.push("ticket");
+  return p.length > 1 ? p.slice(0, -1).join(", ") + " e " + p[p.length - 1] : p[0];
+}
+function rvRenderBusca(q){
+  var achados = rvBuscar(q);
+  var tudo = achados.filter(function(a){ return a.hits.length === q.n; }).length;
+  $("rvSub").textContent = "Pesquisa por " + rvBuscaCampos(q) + " em todas as lojas, " + nf(achados.length) +
+    (achados.length === 1 ? " review com informação igual" : " reviews com informação igual") +
+    (q.n > 1 && tudo ? ", " + nf(tudo) + (tudo === 1 ? " bate" : " batem") + " em todos os campos" : "");
+  var box = $("rvBox");
+  if (!achados.length){
+    box.innerHTML = '<div class="empty" style="padding:30px">Nenhum review com essa informação. Confira ' +
+      (q.n > 1 ? "os campos preenchidos" : "o campo preenchido") + ' e tente de novo.' +
+      (q.nome && API_VERSION >= 23 ? '<br>Reviews cadastrados antes do campo de nome não têm nome: procure pelo link do review ou pelo ticket.' : '') + '</div>';
+    return;
+  }
+  var v16 = API_VERSION >= 16;
+  var link = function(u, t){ return '<a href="' + esc(u) + '" target="_blank" rel="noopener" class="nt-edit" style="text-decoration:none">' + t + '</a>'; };
+  var th = function(t, cls){ return '<th' + (cls ? ' class="' + cls + '"' : '') + ' style="cursor:default">' + t + '</th>'; };
+  box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' + th("Bateu em") + th("Data") + th("Loja") + th("Cliente", "v23-only") + th("Nota") +
+    th("Status") + th("Responsável") + th("Links") + '</tr></thead><tbody>' +
+    achados.map(function(a){
+      var x = a.x;
+      return '<tr' + (v16 ? ' class="rv-row" tabindex="0" data-id="' + esc(x.id) + '" title="Abrir para editar"' : '') + '>' +
+        '<td><div class="rv-bateu">' + a.hits.map(function(h){ return '<span class="rv-tag bateu">mesmo ' + h + '</span>'; }).join("") + '</div></td>' +
+        '<td style="white-space:nowrap">' + (x.date ? brDate(x.date) : '<span class="zero">–</span>') + '</td>' +
+        '<td style="white-space:nowrap"><i class="sw" style="background:' + (STORE_COLOR[x.store] || THEME.muted) + '"></i>' + esc(x.store) + '</td>' +
+        '<td class="v23-only">' + (x.customer ? '<span class="rv-cli" title="' + esc(x.customer) + '">' + esc(x.customer) + '</span>' : '<span class="zero">–</span>') + '</td>' +
+        '<td>' + starsHTML(x.stars) + '</td><td style="white-space:nowrap">' + rvTag(x.status) + '</td>' +
+        '<td>' + (x.owner ? esc(x.owner) : '<span class="zero">–</span>') + '</td>' +
+        '<td style="white-space:nowrap">' + (x.review_link ? link(x.review_link, "review") + ' ' : '') + rvTicketHTML(x) + '</td></tr>';
+    }).join("") + '</tbody></table></div>';
+}
+/** Abre o painel de pesquisa (os campos ficam como estao). */
+function rvBuscaAbrir(){
+  state.rvBuscaAberta = true;
+  $("rvBusca").hidden = false;
+  $("btnBuscar").setAttribute("aria-expanded", "true");
+  var primeiro = $("rvQNome").offsetParent !== null ? $("rvQNome") : $("rvQLink");
+  setTimeout(function(){ primeiro.focus(); }, 30);
+}
+/** Fecha o painel e sai da pesquisa: volta para a lista com as abas e os filtros. */
+function rvBuscaFechar(){
+  state.rvBuscaAberta = false; state.rvBusca = null;
+  ["rvQNome", "rvQLink", "rvQTicket"].forEach(function(id){ $(id).value = ""; });
+  $("rvBusca").hidden = true;
+  $("btnBuscar").setAttribute("aria-expanded", "false");
+}
+function rvBuscaIr(){
+  var p = rvBuscaPreparar($("rvQNome").value, $("rvQLink").value, $("rvQTicket").value);
+  if (p.erro){ rvCardMsg("bad", p.erro); return; }
+  rvCardMsg(null, "");
+  state.rvBusca = p.q;
+  render();
+}
+$("btnBuscar").onclick = function(){
+  rvCardMsg(null, "");
+  if (state.rvBuscaAberta){ rvBuscaFechar(); render(); } else rvBuscaAbrir();
+};
+$("rvQIr").onclick = rvBuscaIr;
+$("rvQLimpar").onclick = function(){
+  ["rvQNome", "rvQLink", "rvQTicket"].forEach(function(id){ $(id).value = ""; });
+  rvCardMsg(null, "");
+  state.rvBusca = null;
+  render();
+  $("rvQNome").offsetParent !== null ? $("rvQNome").focus() : $("rvQLink").focus();
+};
+["rvQNome", "rvQLink", "rvQTicket"].forEach(function(id){
+  $(id).onkeydown = function(e){ if (e.key === "Enter"){ e.preventDefault(); rvBuscaIr(); } };
+});
+
 
 /* =============================================================================
    REVIEWS: cadastro, edicao e follow up (Apps Script v16)
@@ -5866,7 +6064,7 @@ function fuLinha(x, fi){
   var links = (x.review_link ? '<a href="' + esc(x.review_link) + '" target="_blank" rel="noopener" class="nt-edit" style="text-decoration:none">review</a> ' : '') + rvTicketHTML(x);
   return '<div class="fu" data-id="' + esc(x.id) + '">' +
     '<div class="fu-dias"><b>' + fi.dias + (fi.dias === 1 ? ' dia' : ' dias') + '</b><span>' + (contato ? "desde o contato" : "desde o follow up") + '</span>' + fuBarra(fi) + '</div>' +
-    '<div><div class="fu-t"><i class="sw" style="background:' + (STORE_COLOR[x.store] || THEME.muted) + '"></i>' + esc(x.store) + ' ' + starsHTML(x.stars) + rvTag(x.status) +
+    '<div><div class="fu-t"><i class="sw" style="background:' + (STORE_COLOR[x.store] || THEME.muted) + '"></i>' + esc(x.store) + (x.customer ? ' <span class="fu-cli">' + esc(x.customer) + '</span>' : '') + ' ' + starsHTML(x.stars) + rvTag(x.status) +
       (x.risk ? '<span class="rv-risk">chargeback</span>' : '') + '</div>' +
       '<small>' + oque + ', ' + (x.owner ? esc(x.owner) : "sem responsável") + '. ' + prox + '.</small>' +
       (x.notes ? '<small class="rv-note" title="' + esc(x.notes) + '">' + esc(x.notes) + '</small>' : '') +
@@ -5885,7 +6083,7 @@ function renderFollowUp(){
   if (v16) rvDaTela().forEach(function(x){ var fi = fuInfo(x); if (fi) (fi.venceu ? venc : esp).push({ x: x, fi: fi }); });
   var sb = $("fuSegBadge");
   sb.hidden = !venc.length; sb.textContent = venc.length;
-  if (!v16 || state.rvMode !== "followup") return;
+  if (!v16 || state.rvMode !== "followup" || state.rvBusca) return;
   venc.sort(function(a, b){ return b.fi.horas - a.fi.horas; });
   esp.sort(function(a, b){ return b.fi.horas - a.fi.horas; });
   var lojaTxt = state.store === "__all" ? "todas as lojas" : state.store;
@@ -6016,6 +6214,7 @@ function abrirReview(id){
   rvOpcoes($("rvStatus"), RV_STATUS, x && RV_STATUS.indexOf(x.status) > -1 ? x.status : "Investigando");
   rvOpcoes($("rvResp"), rvNomes(x ? x.owner : ""), x ? x.owner : meuNome(), "Sem responsável");
   $("rvRisco").checked = !!(x && x.risk);
+  $("rvCliente").value = x ? x.customer || "" : "";
   $("rvTicket").value = x ? x.ticket || "" : "";
   $("rvNotas").value = x ? x.notes || "" : "";
   var meta = [];
@@ -6039,9 +6238,11 @@ function abrirReview(id){
 }
 function fecharReview(){ $("ovRv").classList.remove("show"); rvEditando = null; }
 function rvCampos(){
-  return { link: $("rvLink").value.trim(), data: $("rvData").value, loja: $("rvLoja").value, nota: rvNotaSel,
-           status: $("rvStatus").value, responsavel: $("rvResp").value, risco: $("rvRisco").checked,
-           ticket: $("rvTicket").value.trim(), notas: $("rvNotas").value.trim() };
+  var c = { link: $("rvLink").value.trim(), data: $("rvData").value, loja: $("rvLoja").value, nota: rvNotaSel,
+            status: $("rvStatus").value, responsavel: $("rvResp").value, risco: $("rvRisco").checked,
+            ticket: $("rvTicket").value.trim(), notas: $("rvNotas").value.trim() };
+  if (API_VERSION >= 23) c.cliente = $("rvCliente").value.replace(/\s+/g, " ").trim();   // numa API antiga o nome seria descartado
+  return c;
 }
 /** As mesmas regras do Apps Script, antes de mandar: a resposta vem na hora. */
 function rvValida(c){

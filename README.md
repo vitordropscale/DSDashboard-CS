@@ -78,7 +78,7 @@ O `AppsScript.gs` deste repositório é backup. Para alterar de verdade:
 3. Repetir em **todas** as implantações ativas — existem várias, e cada uma fica presa
    à versão em que foi publicada. Atualizar só uma deixa o resto rodando código antigo.
 
-## Acessos (Apps Script v15 a v18)
+## Acessos (Apps Script v15 a v23)
 
 O painel exige login com e-mail e senha. Cada pessoa é uma linha na aba **Usuarios**
 (senha guardada como hash com salt, nunca em texto). O login cria um token de sessão
@@ -122,6 +122,19 @@ e responsável se combinam (o status não vale na aba Follow up, que já é só 
 up). Escolher um status que a aba não mostra, como Resolvido em Em aberto, leva para Todos; clicar
 numa aba tira do filtro o status que não cabe nela. No review aberto, **Marcar como resolvido**
 troca o status de uma vez (com Desfazer, Apps Script v17). Só o painel mudou; o Apps Script é o mesmo.
+
+**Nome do cliente e pesquisa (Apps Script v23)**: o formulário do review ganha o campo **Nome do
+cliente** (opcional, até 80 caracteres), guardado na coluna **Cliente** da aba Reviews. O botão
+**Pesquisar**, no alto da tela Trustpilot, abre três campos: Nome, Review e Ticket. O agente preenche
+um, dois ou os três e o painel procura em **todos** os reviews, de qualquer loja, status ou data, e
+mostra os que têm a mesma informação, com a marca do que bateu ("mesmo nome", "mesmo review",
+"mesmo ticket"). Quem bate em mais campos vem primeiro. Regras: o nome ignora acento e maiúscula e
+todas as palavras digitadas têm que estar no nome; o review aceita o link (de qualquer domínio do
+Trustpilot, com ou sem ?query) ou o código dele, inteiro ou o começo; o ticket aceita o link do
+Commslayer, do Richpanel ou do Gorgias ou só o número, e compara o número. A pesquisa roda no
+navegador, sobre os reviews que o painel já recebeu, e o nome não sai pelo `reviewsJhon`. Os reviews
+anteriores à v23 não têm nome: achar esses é pelo link ou pelo ticket. Com um Apps Script mais antigo
+o campo de nome e a coluna Cliente ficam escondidos.
 
 **Review Desk**: na primeira leitura depois da v16, a aba Reviews é criada e recebe tudo o
 que estava no Review Desk, pela API dele: propriedades `REVIEWS_API_URL` (a URL `/exec`) e
@@ -202,6 +215,12 @@ evita coleta automática, mas **não é segurança**: a proteção dos dados é 
   Próximo passo: cruzar esses tickets com os fechamentos que o projeto do CS Reporting já
   recebe dos helpdesks (tabela `helpdesk_events`), já que no Commslayer o login é compartilhado
   e a API não sabe quem fechou.
+- **Coluna nova numa aba enxugada**: depois do `enxugarPlanilha()` cada aba fica só com as colunas
+  usadas, então cabeçalho que ganha coluna estoura "fora das dimensões" se a grade não crescer
+  junto. `garanteColunas_(sh, n)` cria a coluna (`insertColumnsAfter`) e é chamada por
+  `garantirAbaReviews_` e pela importação; `linhasReviews_` lê só as colunas que existem e completa.
+  O mock dos testes (`gsmock.js`) agora também recusa ler ou gravar fora da grade. Quem criar uma
+  coluna nova em outra aba precisa do mesmo cuidado.
 - **Capacidade**: `capacidade()`, rodado no editor, mostra o uso da planilha contra o limite de
   10 milhões de células do Google (cada aba conta também as colunas vazias: aba nova nasce com
   26), o ritmo de linhas por dia e o tempo da leitura do painel, com a projeção de cada um.

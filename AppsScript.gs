@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon)  v22.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon + Nome do cliente)  v23.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -153,6 +153,13 @@
  *   A chave e a propriedade JHON_REVIEWS_KEY (criarChaveReviewsJhon() cria e mostra), que so
  *   serve para isto. A resposta fica 5 minutos no cache.
  *
+ *  NOME DO CLIENTE NO REVIEW (v23)
+ *   O review ganha a coluna "Cliente" (ate 80 caracteres, opcional): addReview e updateReview
+ *   aceitam "cliente" e o painel devolve "customer". A pesquisa por nome, review e ticket
+ *   roda no painel, em cima dos reviews que ele ja recebe. O nome NAO sai pelo reviewsJhon.
+ *   Coluna nova numa aba que o enxugarPlanilha() deixou com as colunas justas: o script
+ *   cria a coluna antes de gravar (garanteColunas_), e a leitura aguenta a aba mais estreita.
+ *
  *  NOTAS
  *   Aba "Notas": o que aconteceu de especial em cada dia (falta, queda de
  *   sistema, promocao, elogio). Sao lidas junto com getData e entram no report
@@ -199,9 +206,9 @@ var PAPEIS        = ['admin', 'agente'];
 var REVIEW_SHEET  = 'Reviews';
 var REVIEW_HEADER = ['ID', 'Criado em', 'Atualizado em', 'Criado por', 'Atualizado por', 'Data do review', 'Loja', 'Nota',
                      'Status', 'Responsavel', 'Risco', 'Notas', 'Link do review', 'Ticket', 'Status desde',
-                     'Contatado em', 'Follow up em', 'Follow ups', 'Origem', 'Anterior', 'Operacao'];
+                     'Contatado em', 'Follow up em', 'Follow ups', 'Origem', 'Anterior', 'Operacao', 'Cliente'];
 var RV = { id: 0, criado: 1, atualizado: 2, criadoPor: 3, atualizadoPor: 4, data: 5, loja: 6, nota: 7, status: 8,
-           resp: 9, risco: 10, notas: 11, link: 12, ticket: 13, desde: 14, contatado: 15, followEm: 16, follows: 17, origem: 18, anterior: 19, op: 20 };
+           resp: 9, risco: 10, notas: 11, link: 12, ticket: 13, desde: 14, contatado: 15, followEm: 16, follows: 17, origem: 18, anterior: 19, op: 20, cliente: 21 };
 var REVIEW_EXCL_SHEET  = 'Reviews excluidos';   // o que o admin excluiu nao volta pela importacao
 var REVIEW_EXCL_HEADER = ['ID', 'Link do review', 'Excluido em', 'Excluido por'];
 var ID_PAINEL_RE = /^P-[0-9]{6}-[0-9]{5}$/;     // P- (painel) nunca colide com os R- do Review Desk
@@ -275,7 +282,7 @@ var TAREFA_ACOES = ['delTarefa'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 22 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 23 }, p.callback);
     if (p.action === 'reviewsJhon') return respond_(reviewsJhon_(p), p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
@@ -1287,14 +1294,29 @@ function chaveLink_(v) {
   return String(v || '').trim().toLowerCase();
 }
 
+/**
+ * A grade da aba tem pelo menos n colunas? O enxugarPlanilha() deixa so as colunas
+ * usadas, entao coluna nova precisa ser criada antes de gravar nela (senao a gravacao
+ * estoura com "fora das dimensoes"). Chamar com o lock quando houver mais de uma execucao.
+ */
+function garanteColunas_(sh, n) {
+  var mc = sh.getMaxColumns();
+  if (mc < n) sh.insertColumnsAfter(mc, n - mc);
+}
+
 /** A aba Reviews; na primeira vez cria e traz o que ja existia no Review Desk. */
 function garantirAbaReviews_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(REVIEW_SHEET);
   if (sh) {
-    // aba criada numa versao anterior: acrescenta o cabecalho das colunas novas
-    var n = sh.getLastColumn();
-    if (n < REVIEW_HEADER.length) sh.getRange(1, n + 1, 1, REVIEW_HEADER.length - n).setValues([REVIEW_HEADER.slice(n)]);
+    // aba criada numa versao anterior: cria a coluna que falta e acrescenta o cabecalho
+    if (sh.getMaxColumns() < REVIEW_HEADER.length || sh.getLastColumn() < REVIEW_HEADER.length) {
+      comLock_(function () {
+        garanteColunas_(sh, REVIEW_HEADER.length);
+        var n = sh.getLastColumn();
+        if (n < REVIEW_HEADER.length) sh.getRange(1, n + 1, 1, REVIEW_HEADER.length - n).setValues([REVIEW_HEADER.slice(n)]);
+      });
+    }
     return sh;
   }
   return comLock_(function () {
@@ -1309,7 +1331,11 @@ function garantirAbaReviews_() {
 function linhasReviews_(sh) {
   var last = sh.getLastRow();
   if (last < 2) return [];
-  return sh.getRange(2, 1, last - 1, REVIEW_HEADER.length).getDisplayValues();
+  // aba mais estreita que o cabecalho (antes de a coluna nova ser criada): le o que existe e completa
+  var n = Math.min(REVIEW_HEADER.length, sh.getMaxColumns());
+  var v = sh.getRange(2, 1, last - 1, n).getDisplayValues();
+  if (n < REVIEW_HEADER.length) v = v.map(function (r) { while (r.length < REVIEW_HEADER.length) r.push(''); return r; });
+  return v;
 }
 
 /** Uma linha da aba no formato do painel. */
@@ -1323,7 +1349,8 @@ function reviewObj_(r) {
     notes: String(r[RV.notas]), review_link: String(r[RV.link]), ticket: tk,
     ticket_link: /^https?:[/][/]/i.test(tk) ? tk : '',   // painel antigo (v15) so entende link
     status_since: String(r[RV.desde]), contacted_at: String(r[RV.contatado]),
-    follow_up_at: String(r[RV.followEm]), follow_ups: Number(r[RV.follows]) || 0, origin: String(r[RV.origem])
+    follow_up_at: String(r[RV.followEm]), follow_ups: Number(r[RV.follows]) || 0, origin: String(r[RV.origem]),
+    customer: String(r[RV.cliente] || '')
   };
 }
 
@@ -1362,6 +1389,7 @@ function camposReview_(d, parcial) {
   if (tem('responsavel')) c.responsavel = limpa_(d.responsavel, 40);
   if (tem('risco')) c.risco = simNao_(d.risco);
   if (tem('notas')) c.notas = limpa_(d.notas, 2000);
+  if (tem('cliente')) c.cliente = limpa_(String(d.cliente === undefined || d.cliente === null ? '' : d.cliente).replace(/\s+/g, ' '), 80);
   if (tem('ticket')) {
     c.ticket = limpa_(d.ticket, 300);
     if (/^https?:/i.test(c.ticket) && /[ ]/.test(c.ticket)) return { erro: 'O link do ticket tem espacos. Confira o endereco.' };
@@ -1430,6 +1458,7 @@ function addReview_(d, u, quem) {
   // "Sem responsavel" escolhido no painel e respeitado; sem o campo, fica quem cadastrou
   linha[RV.resp] = Object.prototype.hasOwnProperty.call(d, 'responsavel') ? c.responsavel : String(u.agente || u.nome || '');
   linha[RV.risco] = c.risco; linha[RV.notas] = c.notas; linha[RV.link] = c.link; linha[RV.ticket] = c.ticket;
+  linha[RV.cliente] = c.cliente || '';
   linha[RV.desde] = agoraIso;
   linha[RV.contatado] = c.status === 'Contatado' ? agoraIso : '';
   linha[RV.followEm] = c.status === 'Follow up' ? agoraIso : '';
@@ -1491,6 +1520,7 @@ function updateReview_(d, quem) {
   if (c.risco !== undefined) linha[RV.risco] = c.risco;
   if (c.notas !== undefined) linha[RV.notas] = c.notas;
   if (c.ticket !== undefined) linha[RV.ticket] = c.ticket;
+  if (c.cliente !== undefined) linha[RV.cliente] = c.cliente;
 
   var fez = d.followUp === true || String(d.followUp) === 'true' || String(d.followUp) === '1';
   var novo = fez ? 'Follow up' : (c.status !== undefined ? c.status : linha[RV.status]);
@@ -1823,7 +1853,10 @@ function importarReviewDesk_() {
     ids[id] = 'novo';
     novas.push(linhaImportada_(brutos[i]).map(txt_));
   }
-  if (novas.length) sh.getRange(sh.getLastRow() + 1, 1, novas.length, REVIEW_HEADER.length).setValues(novas);
+  if (novas.length) {
+    garanteColunas_(sh, REVIEW_HEADER.length);
+    sh.getRange(sh.getLastRow() + 1, 1, novas.length, REVIEW_HEADER.length).setValues(novas);
+  }
   return { status: 'ok', importados: novas.length, jaExistiam: ja, repetidos: repetidos, excluidos: excluidos };
 }
 
@@ -2007,7 +2040,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 22
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 23
   };
 
   if (p.compact) {
