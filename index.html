@@ -627,6 +627,7 @@ body:not(.api-v23) .v23-only{display:none!important}
 .rv-busca-dica{font-size:11.5px;color:var(--muted);line-height:1.5;margin:0 0 10px}
 .rv-buscando .rv-barra{display:none}
 .rv-tag.bateu{background:var(--good-soft);color:var(--good-ink)}
+.inp:disabled{opacity:.55;cursor:not-allowed}
 .rv-bateu{display:flex;gap:4px;flex-wrap:wrap}
 .rv-cli{display:block;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fu-cli{color:var(--text2);font-weight:400}
@@ -1062,12 +1063,13 @@ tr.rv-row:focus{outline:none}
       </div>
       <div class="rv-busca" id="rvBusca" hidden>
         <div class="rv-busca-g">
-          <div class="field v23-only"><label for="rvQNome">Nome do cliente</label><input class="inp" id="rvQNome" autocomplete="off" placeholder="nome como aparece no review"></div>
+          <div class="field"><label for="rvQNome">Nome do cliente</label><input class="inp" id="rvQNome" autocomplete="off" placeholder="nome como aparece no review"></div>
           <div class="field"><label for="rvQLink">Review</label><input class="inp" id="rvQLink" autocomplete="off" spellcheck="false" placeholder="link do review ou o código dele"></div>
           <div class="field"><label for="rvQTicket">Ticket</label><input class="inp" id="rvQTicket" autocomplete="off" placeholder="link do ticket ou o número"></div>
           <div class="rv-busca-ac"><button class="btn cta" id="rvQIr" type="button">Pesquisar</button><button class="btn" id="rvQLimpar" type="button">Limpar</button></div>
         </div>
         <div class="rv-busca-dica">Preencha um, dois ou os três. A pesquisa olha todos os reviews, de todas as lojas, e mostra os que têm a mesma informação. Quem bate em mais campos vem primeiro.</div>
+        <div class="rv-busca-dica" id="rvQNomeAviso" hidden></div>
       </div>
       <div class="rv-barra">
         <div class="mini-seg" id="segRv">
@@ -1155,10 +1157,10 @@ tr.rv-row:focus{outline:none}
           <input class="inp" id="rvLink" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.trustpilot.com/reviews/…">
           <div class="hint">O link do review em si, com /reviews/ no endereço. O da página da loja não serve.</div>
         </div>
-        <div class="field v23-only">
+        <div class="field">
           <label for="rvCliente">Nome do cliente <span class="opt">se souber</span></label>
           <input class="inp" id="rvCliente" autocomplete="off" maxlength="80" placeholder="como aparece no review">
-          <div class="hint">Ajuda a achar esse review depois, na pesquisa.</div>
+          <div class="hint" id="rvClienteHint">Ajuda a achar esse review depois, na pesquisa.</div>
         </div>
         <div class="rv-grid">
           <div class="field"><label for="rvData">Data do review</label><input class="inp" id="rvData" type="date"></div>
@@ -5759,6 +5761,7 @@ function renderReviews(r){
   // pesquisa por nome, review e ticket: no lugar das abas e dos filtros enquanto estiver ativa
   $("rvBox").closest(".card").classList.toggle("rv-buscando", !!state.rvBusca);
   $("rvBusca").hidden = !state.rvBuscaAberta;
+  if (state.rvBuscaAberta) rvSyncV23();   // o Apps Script pode ter sido atualizado com o painel aberto
   if (state.rvBusca){
     $("rvBox").hidden = false; $("fuArea").hidden = true;
     rvRenderBusca(state.rvBusca);
@@ -5940,12 +5943,28 @@ function rvRenderBusca(q){
         '<td style="white-space:nowrap">' + (x.review_link ? link(x.review_link, "review") + ' ' : '') + rvTicketHTML(x) + '</td></tr>';
     }).join("") + '</tbody></table></div>';
 }
+/**
+ * O nome do cliente precisa do Apps Script v23 (coluna Cliente). Antes disso os dois campos
+ * de nome continuam na tela, desligados, dizendo o que falta, em vez de sumir sem explicar.
+ */
+function rvSyncV23(){
+  var ok = API_VERSION >= 23;
+  var aviso = isAdmin()
+    ? "O Apps Script no ar " + (API_VERSION ? "é a v" + API_VERSION : "é antigo") + ". Cole o AppsScript.gs v23 na planilha e crie uma Nova versão nas duas implantações para liberar o nome do cliente."
+    : "O nome do cliente ainda não foi liberado: o admin precisa atualizar o Apps Script.";
+  var f = $("rvCliente"), q = $("rvQNome");
+  f.disabled = !ok; f.placeholder = ok ? "como aparece no review" : "ainda não liberado";
+  $("rvClienteHint").textContent = ok ? "Ajuda a achar esse review depois, na pesquisa." : aviso;
+  q.disabled = !ok; q.placeholder = ok ? "nome como aparece no review" : "ainda não liberado";
+  $("rvQNomeAviso").hidden = ok; $("rvQNomeAviso").textContent = ok ? "" : aviso;
+}
 /** Abre o painel de pesquisa (os campos ficam como estao). */
 function rvBuscaAbrir(){
+  rvSyncV23();
   state.rvBuscaAberta = true;
   $("rvBusca").hidden = false;
   $("btnBuscar").setAttribute("aria-expanded", "true");
-  var primeiro = $("rvQNome").offsetParent !== null ? $("rvQNome") : $("rvQLink");
+  var primeiro = !$("rvQNome").disabled ? $("rvQNome") : $("rvQLink");
   setTimeout(function(){ primeiro.focus(); }, 30);
 }
 /** Fecha o painel e sai da pesquisa: volta para a lista com as abas e os filtros. */
@@ -5972,7 +5991,7 @@ $("rvQLimpar").onclick = function(){
   rvCardMsg(null, "");
   state.rvBusca = null;
   render();
-  $("rvQNome").offsetParent !== null ? $("rvQNome").focus() : $("rvQLink").focus();
+  !$("rvQNome").disabled ? $("rvQNome").focus() : $("rvQLink").focus();
 };
 ["rvQNome", "rvQLink", "rvQTicket"].forEach(function(id){
   $(id).onkeydown = function(e){ if (e.key === "Enter"){ e.preventDefault(); rvBuscaIr(); } };
@@ -6214,6 +6233,7 @@ function abrirReview(id){
   rvOpcoes($("rvStatus"), RV_STATUS, x && RV_STATUS.indexOf(x.status) > -1 ? x.status : "Investigando");
   rvOpcoes($("rvResp"), rvNomes(x ? x.owner : ""), x ? x.owner : meuNome(), "Sem responsável");
   $("rvRisco").checked = !!(x && x.risk);
+  rvSyncV23();
   $("rvCliente").value = x ? x.customer || "" : "";
   $("rvTicket").value = x ? x.ticket || "" : "";
   $("rvNotas").value = x ? x.notes || "" : "";

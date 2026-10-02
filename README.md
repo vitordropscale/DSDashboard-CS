@@ -134,7 +134,8 @@ Trustpilot, com ou sem ?query) ou o código dele, inteiro ou o começo; o ticket
 Commslayer, do Richpanel ou do Gorgias ou só o número, e compara o número. A pesquisa roda no
 navegador, sobre os reviews que o painel já recebeu, e o nome não sai pelo `reviewsJhon`. Os reviews
 anteriores à v23 não têm nome: achar esses é pelo link ou pelo ticket. Com um Apps Script mais antigo
-o campo de nome e a coluna Cliente ficam escondidos.
+os dois campos de nome continuam na tela, desligados e dizendo o que falta (para o admin: colar o
+v23 e criar a Nova versão); a coluna Cliente das listas fica escondida.
 
 **Review Desk**: na primeira leitura depois da v16, a aba Reviews é criada e recebe tudo o
 que estava no Review Desk, pela API dele: propriedades `REVIEWS_API_URL` (a URL `/exec`) e
