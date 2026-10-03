@@ -299,9 +299,14 @@ td .sw{margin-right:8px;vertical-align:1px}
 .kpi-s{font-size:13px;color:var(--muted);margin-top:0;display:flex;align-items:center;gap:8px;
   min-height:20px;flex-wrap:wrap;line-height:1.45}
 /* mini-grafico: a serie dos ultimos 14 dias, ou das horas, em azul */
-.kpi-sp{margin-top:auto;padding-top:6px;height:40px}
-.kpi-sp svg{display:block;width:100%;height:34px;overflow:visible}
-.kpi-sp polyline{fill:none;stroke:var(--acc);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.kpi-sp{margin-top:auto;padding-top:12px}
+.kpi-cmp{display:flex;gap:0;border-top:1px solid var(--line);padding-top:10px}
+.kpi-cmp > div{flex:1 1 0;min-width:0;padding-left:12px;border-left:1px solid var(--line)}
+.kpi-cmp > div:first-child{padding-left:0;border-left:0}
+.kpi-cmp span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-cmp b{display:block;font-size:15px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-cmp small{font-size:12px;font-weight:400;color:var(--muted);margin-left:3px}
+@media(max-width:680px){.kpi-cmp small{display:block;margin-left:0}}
 .kpis.k4{grid-template-columns:repeat(4,minmax(0,1fr))}
 button.kpi-btn{font:inherit;color:inherit;text-align:left;cursor:pointer;transition:border-color .15s}
 button.kpi-btn:hover:not(:disabled){border-color:var(--line2)}
@@ -2386,25 +2391,31 @@ function renderKPIs(A, rows, prows, r){
     $("kPicoS").textContent = nf(A.byHour[hk[0]])+" emails nessa faixa";
   } else { $("kPico").textContent="—"; $("kPicoS").innerHTML="&nbsp;"; }
 
-  // mini-graficos: a mesma conta dos numeros, dia a dia (os 14 dias ate o fim do periodo) ou hora a hora
+  // comparacao em numeros (no lugar dos mini-graficos): os 14 dias ate o fim do periodo e o 2o colocado
   var dias = sparkDias(r), base = dias.length ? applyFilters(dias[0], dias[dias.length-1]) : [];
-  var porDia = {}, agDia = {}, topDia = {};
+  var porDia = {}, agDia = {};
   base.forEach(function(x){
     porDia[x.day] = (porDia[x.day]||0) + 1;
     (agDia[x.day] || (agDia[x.day] = {}))[x.agente] = 1;
-    if (names.length && x.agente === names[0]) topDia[x.day] = (topDia[x.day]||0) + 1;
   });
-  var sDia = dias.map(function(d){ return porDia[d] || 0; });
-  var faixa = dias.length ? brDate(dias[0]) + " a " + brDate(dias[dias.length-1]) : "";
-  $("kTotalSp").innerHTML = sparkSVG(sDia, "E-mails por dia, " + faixa);
-  $("kDiaSp").innerHTML   = sparkSVG(sDia.map(function(v, i){   // media movel de 3 dias: o ritmo, sem o sobe e desce
-    var a = sDia.slice(Math.max(0, i - 2), i + 1); return a.reduce(function(x, y){ return x + y; }, 0) / a.length;
-  }), "Média móvel de 3 dias, " + faixa);
-  $("kAgSp").innerHTML    = sparkSVG(dias.map(function(d){ return agDia[d] ? Object.keys(agDia[d]).length : 0; }), "Agentes com movimento por dia, " + faixa);
-  $("kTopSp").innerHTML   = names.length ? sparkSVG(dias.map(function(d){ return topDia[d] || 0; }), "E-mails por dia de " + names[0] + ", " + faixa) : "";
-  var hr = activeHours(rows), sHora = [];
-  for (var hh = hr.from; hh <= hr.to; hh++) sHora.push(A.byHour[hh] || 0);
-  $("kPicoSp").innerHTML  = hk.length ? sparkSVG(sHora, "E-mails por hora, das " + pad(hr.from) + "h às " + pad(hr.to) + "h, " + r.label) : "";
+  var comMov = dias.filter(function(d){ return porDia[d]; });
+  var cmp = function(itens){
+    return '<div class="kpi-cmp">' + itens.map(function(i){
+      return '<div><span>' + i[0] + '</span><b>' + i[1] + '</b></div>';
+    }).join("") + '</div>';
+  };
+  if (comMov.length){
+    var vals = comMov.map(function(d){ return porDia[d]; });
+    var soma = vals.reduce(function(x, y){ return x + y; }, 0);
+    var maior = comMov.reduce(function(m, d){ return porDia[d] > porDia[m] ? d : m; }, comMov[0]);
+    var menor = comMov.reduce(function(m, d){ return porDia[d] < porDia[m] ? d : m; }, comMov[0]);
+    var agMedia = comMov.reduce(function(s, d){ return s + Object.keys(agDia[d]).length; }, 0) / comMov.length;
+    $("kTotalSp").innerHTML = cmp([["média 14 dias", nf(Math.round(soma / comMov.length))], ["maior dia", nf(porDia[maior]) + " <small>" + brDate(maior) + "</small>"]]);
+    $("kDiaSp").innerHTML   = cmp([["menor dia", nf(porDia[menor]) + " <small>" + brDate(menor) + "</small>"], ["maior dia", nf(porDia[maior]) + " <small>" + brDate(maior) + "</small>"]]);
+    $("kAgSp").innerHTML    = cmp([["média 14 dias", (Math.round(agMedia * 10) / 10).toLocaleString("pt-BR") + " por dia"]]);
+  } else { $("kTotalSp").innerHTML = $("kDiaSp").innerHTML = $("kAgSp").innerHTML = ""; }
+  $("kTopSp").innerHTML  = names.length > 1 ? cmp([["2º lugar", esc(names[1]) + " <small>" + nf(A.byAgent[names[1]]) + "</small>"]]) : "";
+  $("kPicoSp").innerHTML = hk.length > 1 ? cmp([["2º horário", pad(+hk[1]) + "h–" + pad((+hk[1] + 1) % 24) + "h <small>" + nf(A.byHour[hk[1]]) + "</small>"]]) : "";
 }
 
 /** Dias do mini-grafico: os 14 dias ate o fim do periodo, sem passar do que ja foi carregado. */
