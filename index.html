@@ -375,6 +375,24 @@ tbody tr:last-child td{border-bottom:none}
 .empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14.5px;line-height:1.6}
 .empty b{color:var(--text2);font-weight:600}
 
+/* ---------- por loja (tela Agentes): um cartao por loja ---------- */
+.pl-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.plc{border:1px solid var(--line);border-top:3px solid var(--c);border-radius:var(--r);padding:16px 18px;min-width:0}
+.plc h3{font-size:15.5px;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-tot{font-size:27px;font-weight:600;letter-spacing:-.01em;margin:6px 0 6px}
+.pl-tot small{font-size:13.5px;color:var(--muted);font-weight:400;margin-left:5px;letter-spacing:0}
+.pl-l{display:grid;grid-template-columns:minmax(0,76px) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:14px;padding:6px 0}
+.pl-l > span{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-l b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pl-l .bar{min-width:40px}
+.pl-vazia{color:var(--muted);font-size:13.5px;padding:6px 0}
+.pl-tag{font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;margin-left:6px}
+.pl-tag.ok{background:var(--good-soft);color:var(--good-ink)}
+.pl-tag.no{background:var(--warn-soft);color:var(--warn-ink)}
+.pl-tag.run{background:var(--sunk);color:var(--text2);box-shadow:inset 0 0 0 1px var(--line)}
+@media(max-width:1240px){.pl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.pl-grid{grid-template-columns:1fr}}
+
 /* ---------- lista de barras horizontais (nome, barra, numero) ---------- */
 .hb-r{display:grid;grid-template-columns:minmax(0,118px) minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;font-size:14.5px}
 .hb-n{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1110,15 +1128,14 @@ tr.rv-row:focus{outline:none}
       <div class="tbl-wrap"><table id="prodTable"><thead></thead><tbody></tbody></table></div>
     </div>
 
-    <div class="grid g-2b">
-      <div class="card">
-        <div class="card-h"><div class="card-t">Total por agente</div></div>
-        <div class="chart-box xs"><canvas id="cAgents"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-h"><div class="card-t">Agente × loja</div></div>
-        <div class="chart-box xs"><canvas id="cAgSt"></canvas></div>
-      </div>
+    <div class="card">
+      <div class="card-h"><div><div class="card-t">Por loja</div><div class="card-sub" id="porLojaSub">&nbsp;</div></div></div>
+      <div class="pl-grid" id="porLojaBox"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><div class="card-t">Total por agente</div></div>
+      <div class="chart-box xs"><canvas id="cAgents"></canvas></div>
     </div>
   </section>
 
@@ -3071,12 +3088,43 @@ function renderAgentCharts(A, rows){
     borderWidth:0, borderRadius:3, maxBarThickness:18
   }]);
 
-  var st = STORES.filter(function(s){ return A.byStore[s]; });
-  bar("cAgSt", names, st.map(function(s){
-    return { label:s, data:names.map(function(a){ return A.byAgentStore[a+" "+s]||0; }),
-             backgroundColor:STORE_COLOR[s]||THEME.muted, borderColor:THEME.card,
-             borderWidth:1, borderRadius:2, borderSkipped:false, stack:"s", maxBarThickness:30 };
-  }), true);
+  renderPorLoja(A, rows);
+}
+
+/**
+ * Um cartao por loja: quem atendeu e quanto no periodo, com a meta da loja quando o
+ * agente tem. A meta do periodo soma a meta da loja nos dias em que ele trabalhou.
+ */
+function renderPorLoja(A, rows){
+  var r = dateRange(), hoje = iso(today());
+  var lojas = state.store !== "__all" ? [state.store] : LOJAS.concat(A.byStore["Sem loja"] ? ["Sem loja"] : []);
+  var diasAg = {};
+  rows.forEach(function(x){ (diasAg[x.agente] || (diasAg[x.agente] = {}))[x.day] = 1; });
+  var metaPeriodo = function(a, loja){
+    return Object.keys(diasAg[a] || {}).reduce(function(s, d){ return s + metaFor(a, d, loja); }, 0);
+  };
+  var comGente = lojas.filter(function(l){ return A.byStore[l]; }).length;
+  $("porLojaSub").textContent = r.label + ", " + comGente + (comGente === 1 ? " loja com movimento" : " lojas com movimento") +
+    (comGente < lojas.length ? ", " + (lojas.length - comGente) + " sem ninguém" : "");
+  $("porLojaBox").innerHTML = lojas.map(function(l){
+    var c = STORE_COLOR[l] || THEME.muted;
+    var quem = Object.keys(A.byAgent).filter(function(a){ return A.byAgentStore[a+" "+l]; })
+                 .sort(function(x, y){ return A.byAgentStore[y+" "+l] - A.byAgentStore[x+" "+l]; });
+    var tot = A.byStore[l] || 0, max = quem.length ? A.byAgentStore[quem[0]+" "+l] : 1;
+    return '<div class="plc" style="--c:' + c + '"><h3><i class="sw" style="background:' + c + '"></i>' + esc(l) + '</h3>' +
+      '<div class="pl-tot">' + nf(tot) + '<small>' + (tot === 1 ? "e-mail" : "e-mails") + '</small></div>' +
+      (quem.length ? quem.map(function(a){
+        var v = A.byAgentStore[a+" "+l], m = metaPeriodo(a, l);
+        var pct = tot ? Math.round(v / tot * 100) : 0;
+        var dica = a + " em " + l + ": " + nf(v) + " e-mails, " + pct + "% da loja" +
+          (m ? ". Meta da loja no período: " + nf(m) + (v >= m ? " (bateu, +" + nf(v - m) + ")" : " (faltam " + nf(m - v) + ")") : ". Sem meta nesta loja");
+        var tag = !m ? "" : v >= m ? '<span class="pl-tag ok">bateu</span>'
+                : '<span class="pl-tag ' + (r.to >= hoje ? "run" : "no") + '">−' + nf(m - v) + '</span>';
+        return '<div class="pl-l" title="' + esc(dica) + '"><span>' + esc(a) + '</span>' +
+          '<div class="bar"><span style="width:' + (v / max * 100).toFixed(1) + '%;background:' + c + '"></span></div>' +
+          '<b>' + nf(v) + tag + '</b></div>';
+      }).join("") : '<div class="pl-vazia">Ninguém atendeu no período.</div>') + '</div>';
+  }).join("");
 }
 
 /* =============================================================================
