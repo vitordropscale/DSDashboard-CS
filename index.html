@@ -2640,14 +2640,17 @@ function renderProd(rows){
  * Por enquanto e so observacao: nenhuma contagem e bloqueada por causa disso.
  */
 function renderQualidade(r){
-  var box = $("qualBox"), porAg = {}, campos = ["ticket","fora","outras","repetidos","repetidos1min","lojaDiferente","recusadas"];
+  var box = $("qualBox"), porAg = {}, campos = ["ticket","fora","outras","repetidos","repetidos1min","lojaDiferente","recusadas","novas"];
   QUALIDADE.forEach(function(q){
     if (q.data < r.from || q.data > r.to || state.agents[q.agente]) return;
     if (TEST_AGENTS.indexOf(q.agente) > -1) return;
-    var a = porAg[q.agente] || (porAg[q.agente] = { ticket:0, fora:0, outras:0, repetidos:0, repetidos1min:0, lojaDiferente:0, recusadas:0, reps:{} });
+    var a = porAg[q.agente] || (porAg[q.agente] = { ticket:0, fora:0, outras:0, repetidos:0, repetidos1min:0, lojaDiferente:0, recusadas:0, novas:0, reps:{}, novasT:{}, maxNovasDia:0 });
     campos.forEach(function(k){ a[k] += +q[k] || 0; });
     // os códigos dos tickets repetidos, somados pelos dias do período
     (q.repetidosLista||[]).forEach(function(x){ a.reps[x.t] = (a.reps[x.t]||0) + (+x.n||0); });
+    // respostas novas confirmadas no contador v7 (Apps Script v24): o pior dia decide o alerta
+    (q.novasLista||[]).forEach(function(x){ a.novasT[x.t] = (a.novasT[x.t]||0) + (+x.n||0); });
+    if ((+q.novas||0) > a.maxNovasDia) a.maxNovasDia = +q.novas;
   });
   var nomes = Object.keys(porAg).sort(function(a, b){
     return (porAg[b].ticket + porAg[b].fora) - (porAg[a].ticket + porAg[a].fora);
@@ -2667,7 +2670,7 @@ function renderQualidade(r){
   };
   box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
     '<th style="cursor:default">Agente</th>' + th("Contagens lidas") + th("Num ticket") + th("Outras conversas") +
-    th("Fora do helpdesk") + th("% fora") + th("Repetidas em 1 min") + th("Mesmo ticket no dia") +
+    th("Fora do helpdesk") + th("% fora") + th("Repetidas em 1 min") + th("Mesmo ticket no dia") + th("Respostas novas") +
     th("Loja diferente da caixa") + th("Recusadas") +
     '</tr></thead><tbody>' + nomes.map(function(n){
       var a = porAg[n], lidas = a.ticket + a.fora, pct = lidas ? a.fora / lidas * 100 : 0;
@@ -2678,12 +2681,13 @@ function renderQualidade(r){
         cell(a.outras) +
         cell(a.fora) +
         '<td class="num"><i class="st-dot" style="background:'+dot+';margin-right:7px"></i>'+pct.toFixed(1)+'%</td>' +
-        cell(a.repetidos1min, a.repetidos1min >= 5) + celulaRepetidos(a, n) + cell(a.lojaDiferente, a.lojaDiferente >= 5) + cell(a.recusadas) +
+        cell(a.repetidos1min, a.repetidos1min >= 5) + celulaRepetidos(a, n) + celulaNovas(a, n) + cell(a.lojaDiferente, a.lojaDiferente >= 5) + cell(a.recusadas) +
       '</tr>';
     }).join("") + '</tbody></table></div>' +
     '<div class="adj-why" style="padding-top:12px;line-height:1.6">' +
     '<b>Repetidas em 1 min</b>: o mesmo ticket contado de novo em menos de um minuto — é o que o modo bloquear recusa. ' +
-    '<b>Mesmo ticket no dia</b>: nem sempre é erro; se o cliente respondeu de novo, a segunda resposta conta. ' +
+    '<b>Mesmo ticket no dia</b>: o mesmo ticket contado de novo sem confirmação. Com o <b>contador v7</b> isso não passa mais; o que aparecer aqui veio de um contador antigo. ' +
+    '<b>Respostas novas</b>: o contador v7 perguntou "o cliente respondeu de novo?" e o agente confirmou. Mais de ' + LIMITE_NOVAS + ' num dia fica em âmbar. ' +
     'Clique no número para ver quais foram e abrir cada um no helpdesk. ' +
     '<b>Loja diferente da caixa</b>: a caixa do Commslayer (ou a conta do Gorgias) no endereço dizia outra loja — o agente esqueceu de trocar no widget. ' +
     '<b>Outras conversas</b>: o agente entrou pela ficha do cliente para fechar outra conversa pendente dele. ' +
@@ -2691,7 +2695,7 @@ function renderQualidade(r){
     '<b>Recusadas</b>: só existe em modo bloquear.</div>';
 
   [].forEach.call(box.querySelectorAll(".tk-btn"), function(b){
-    b.onclick = function(){ abrirTicketsRepetidos(b.dataset.ag, porAg[b.dataset.ag], r.label); };
+    b.onclick = function(){ abrirTicketsRepetidos(b.dataset.ag, porAg[b.dataset.ag], r.label, b.dataset.novas === "1"); };
   });
 }
 
@@ -2839,6 +2843,14 @@ $("tarSessoes").onclick = function(e){
 
 /* A célula de "mesmo ticket no dia": vira botão quando existe a lista dos
    códigos (Apps Script v13 em diante). */
+/** Respostas novas confirmadas no widget; o dia com mais de LIMITE_NOVAS fica em ambar. */
+var LIMITE_NOVAS = 15;
+function celulaNovas(a, nome){
+  if (!a.novas) return '<td class="num zero">–</td>';
+  var dot = a.maxNovasDia > LIMITE_NOVAS ? '<i class="st-dot" style="background:var(--warn);margin-right:7px" title="Um dia com mais de ' + LIMITE_NOVAS + '"></i>' : '';
+  if (!Object.keys(a.novasT || {}).length) return '<td class="num">' + dot + nf(a.novas) + '</td>';
+  return '<td class="num">' + dot + '<button class="linkish tk-btn" data-novas="1" data-ag="' + esc(nome) + '">' + nf(a.novas) + '</button></td>';
+}
 function celulaRepetidos(a, nome){
   if (!a.repetidos) return '<td class="num zero">–</td>';
   if (!Object.keys(a.reps || {}).length) return '<td class="num">'+nf(a.repetidos)+'</td>';
@@ -2857,18 +2869,20 @@ function ticketUrl(code){
 }
 
 /** Abre a lista dos tickets que o agente contou mais de uma vez no período. */
-function abrirTicketsRepetidos(nome, a, label){
-  var itens = Object.keys(a.reps||{}).map(function(t){ return { t:t, n:a.reps[t] }; })
+function abrirTicketsRepetidos(nome, a, label, novas){
+  var mapa = (novas ? a.novasT : a.reps) || {};
+  var itens = Object.keys(mapa).map(function(t){ return { t:t, n:mapa[t] }; })
                     .sort(function(x, y){ return y.n - x.n; });
-  $("tkSub").textContent = nome + ", " + label + ". " + itens.length +
-    (itens.length === 1 ? " ticket contado mais de uma vez." : " tickets contados mais de uma vez.");
+  $("tkSub").textContent = nome + ", " + label + ". " + itens.length + (novas
+    ? (itens.length === 1 ? " ticket com resposta nova confirmada." : " tickets com resposta nova confirmada.")
+    : (itens.length === 1 ? " ticket contado mais de uma vez." : " tickets contados mais de uma vez."));
   $("tkBox").innerHTML = itens.length ? itens.map(function(i){
     var url = ticketUrl(i.t);
     var num = i.t.replace(/^cs:\d+:\d+:/, "#").replace(/^rp:/, "Richpanel #").replace(/^gg:[a-z0-9-]+:/, "Gorgias #");
     var fora = /^cs:\d+:0:/.test(i.t) ? '<span class="tk-tag">fora da caixa</span>' : "";
     return '<div class="tk-row"><div>' +
       (url ? '<a href="'+url+'" target="_blank" rel="noopener">'+esc(num)+'</a>' : '<span>'+esc(num)+'</span>') +
-      fora + '</div><span class="tk-n">contado '+i.n+'×</span></div>';
+      fora + '</div><span class="tk-n">'+(novas ? i.n + (i.n === 1 ? " resposta nova" : " respostas novas") : "contado "+i.n+"×")+'</span></div>';
   }).join("") : '<div class="empty" style="padding:22px">Sem os códigos neste período. ' +
       'Eles passam a vir quando o <b>Apps Script v13</b> estiver implantado.</div>';
   $("ovTk").classList.add("show");

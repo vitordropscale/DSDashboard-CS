@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon + Nome do cliente)  v23.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon + Nome do cliente + Resposta nova)  v24.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -153,6 +153,12 @@
  *   A chave e a propriedade JHON_REVIEWS_KEY (criarChaveReviewsJhon() cria e mostra), que so
  *   serve para isto. A resposta fica 5 minutos no cache.
  *
+ *  RESPOSTA NOVA (v24, contador v7)
+ *   O contador v7 nao conta sozinho o mesmo ticket duas vezes no dia: antes de 10 min recusa,
+ *   depois pergunta "O cliente respondeu de novo?". Se o agente confirma, chega situacao
+ *   "nova": conta como email e entra no resumo "qualidade" como novas (e novasLista, so os
+ *   codigos, para conferir no helpdesk). Essas nao entram em "repetidos" (mesmo ticket no dia).
+ *
  *  NOME DO CLIENTE NO REVIEW (v23)
  *   O review ganha a coluna "Cliente" (ate 80 caracteres, opcional): addReview e updateReview
  *   aceitam "cliente" e o painel devolve "customer". A pesquisa por nome, review e ticket
@@ -181,7 +187,7 @@ var TZ          = 'America/Sao_Paulo';
 var HEADER      = ['Timestamp', 'Agente', 'Email #', 'Data', 'Hora', 'Dia da Semana', 'Loja', 'Ticket', 'Situacao'];
 var TENT_SHEET  = 'Tentativas';
 var TENT_HEADER = ['Timestamp', 'Agente', 'Data', 'Loja', 'Ticket', 'Situacao'];
-var SITUACOES   = ['ticket', 'repetido', 'fora', 'semleitura', 'outra'];
+var SITUACOES   = ['ticket', 'repetido', 'fora', 'semleitura', 'outra', 'nova'];
 /* Caixa de entrada do Commslayer -> loja. Fonte: README do CS Reporting (10/09/2026).
    Nouveian: preencher quando o usuario mandar o endereco de um ticket. */
 var INBOX_LOJA  = { '26430': 'Vellum', '26575': 'Vigewell', '27261': 'Stratum', '10077': 'Elevare' };
@@ -282,7 +288,7 @@ var TAREFA_ACOES = ['delTarefa'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 23 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 24 }, p.callback);
     if (p.action === 'reviewsJhon') return respond_(reviewsJhon_(p), p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
@@ -1953,18 +1959,20 @@ function getData_(p) {
 
       // Resumo de onde o agente estava ao contar. Os tickets em si nao saem daqui.
       var tk = String(dr[7] || '').trim();
+      var sit = String(dr[8] || '').trim();
       if (tk) {
         var qk = ymd_(dt) + '|' + agente;
-        var q = qual[qk] || (qual[qk] = { ticket: 0, fora: 0, outras: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
+        var q = qual[qk] || (qual[qk] = { ticket: 0, fora: 0, outras: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0, novas: 0, novasT: {} });
         if (tk === 'fora') q.fora++;
         else {
           q.ticket++;
-          if (q.vistos[tk]) q.repetidos++;
+          // resposta nova confirmada pelo agente (contador v7) nao e repeticao
+          if (sit === 'nova') { q.novas++; q.novasT[tk] = (q.novasT[tk] || 0) + 1; }
+          else if (q.vistos[tk]) q.repetidos++;
           q.vistos[tk] = (q.vistos[tk] || 0) + 1;
           var lj = lojaDoTicket_(tk);
           if (lj && lj !== loja) q.lojaDiferente++;
         }
-        var sit = String(dr[8] || '').trim();
         if (sit === 'repetido') q.repetidos1min++;
         // Fechamento de conversa paralela: ja foi contado como ticket acima;
         // aqui so fica registrado quantos dos tickets foram desses.
@@ -2016,7 +2024,7 @@ function getData_(p) {
         var ta = String(tv[ti][1] || '').trim();
         if (!td || !ta) continue;
         var tkk = ymd_(td) + '|' + ta;
-        var tq = qual[tkk] || (qual[tkk] = { ticket: 0, fora: 0, outras: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0 });
+        var tq = qual[tkk] || (qual[tkk] = { ticket: 0, fora: 0, outras: 0, vistos: {}, repetidos: 0, repetidos1min: 0, lojaDiferente: 0, recusadas: 0, novas: 0, novasT: {} });
         tq.recusadas++;
       }
     }
@@ -2032,15 +2040,20 @@ function getData_(p) {
     for (var t in q.vistos) if (q.vistos[t] > 1) reps.push({ t: t, n: q.vistos[t] });
     reps.sort(function (a, b) { return b.n - a.n; });
     if (reps.length > 80) reps = reps.slice(0, 80);
+    var novas = [];
+    for (var tn in q.novasT) novas.push({ t: tn, n: q.novasT[tn] });
+    novas.sort(function (a, b) { return b.n - a.n; });
+    if (novas.length > 80) novas = novas.slice(0, 80);
     return { data: p[0], agente: p[1], ticket: q.ticket, fora: q.fora, outras: q.outras,
              repetidos: q.repetidos, repetidos1min: q.repetidos1min,
-             lojaDiferente: q.lojaDiferente, recusadas: q.recusadas, repetidosLista: reps };
+             lojaDiferente: q.lojaDiferente, recusadas: q.recusadas, repetidosLista: reps,
+             novas: q.novas, novasLista: novas };
   });
 
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 23
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 24
   };
 
   if (p.compact) {
