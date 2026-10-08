@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon + Nome do cliente + Resposta nova + Conferencia diaria)  v25.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon + Nome do cliente + Resposta nova + Conferencia diaria)  v26.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -158,7 +158,10 @@
  *   resposta de verdade NO MESMO TICKET: Commslayer (mensagem enviada por pessoa) e
  *   Richpanel (mensagem do agente ou fechamento). Quem guarda as respostas e o Dashboard
  *   Jhon (funcao respostas-dia do Supabase, mesma chave JHON_REPORT_KEY). Uma resposta
- *   so confirma UMA contagem; a janela vai de 3 min antes a 15 min depois da contagem.
+ *   so confirma UMA contagem; a janela vai de 30 min antes a 30 min depois da contagem.
+ *   v26: no Commslayer, conversa FECHADA sem resposta tambem confirma (cliente diferente,
+ *   spam), a nao ser que o agente tenha contado outra coisa nos 2 min anteriores: fechar
+ *   em sequencia, logo depois de responder, sao as conversas repetidas do mesmo cliente.
  *   Gorgias (Old World Healing), "fora" e sem leitura nao tem como conferir.
  *   Resultado na aba "Conferencia" (uma linha por agente e dia, e "(sem dono)" com as
  *   respostas que ninguem contou, por loja). As 17h confere ONTEM inteiro e HOJE ate a hora.
@@ -300,7 +303,7 @@ var TAREFA_ACOES = ['delTarefa'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 25 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 26 }, p.callback);
     if (p.action === 'reviewsJhon') return respond_(reviewsJhon_(p), p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
@@ -1726,9 +1729,10 @@ function testarJhon() {
    ============================================================ */
 
 var CONF_SHEET  = 'Conferencia';
-var CONF_HEADER = ['Dia', 'Agente', 'Contados', 'Confirmados', 'Sem par', 'Nao conferiveis', 'Lista', 'Atualizado em'];
-var CONF_ANTES_MS   = 3 * 60000;    // a resposta pode ter sido registrada ate 3 min ANTES da contagem
-var CONF_DEPOIS_MS  = 15 * 60000;   // ... ou ate 15 min DEPOIS (o aviso do helpdesk pode atrasar)
+var CONF_HEADER = ['Dia', 'Agente', 'Contados', 'Confirmados', 'Sem par', 'Nao conferiveis', 'Lista', 'Atualizado em', 'Fechados sem resposta'];
+var CONF_ANTES_MS   = 30 * 60000;   // a resposta pode ter sido registrada ate 30 min ANTES da contagem
+var CONF_DEPOIS_MS  = 30 * 60000;   // ... ou ate 30 min DEPOIS (sempre no mesmo ticket)
+var CONF_RAJADA_MS  = 2 * 60000;    // fechamento sem resposta ate 2 min depois de outra contagem = mesmo cliente
 var CONF_JUNTA_RP_MS = 3 * 60000;   // Richpanel: mensagem + fechamento do mesmo ticket em 3 min = 1 resposta
 var SEM_DONO = '(sem dono)';
 
@@ -1785,8 +1789,9 @@ function conferirDia_(dia) {
 
   // 2. respostas do helpdesk, com 20 min de folga nas pontas
   var j = jhonRespostas_(isoUtc_(ini - 20 * 60000), isoUtc_(fim + 20 * 60000));
-  var resp = {}, todas = [];
+  var resp = {}, todas = [], fech = {};
   var poe = function (k, ms, loja) { var x = { ms: ms, usado: false, loja: loja }; (resp[k] || (resp[k] = [])).push(x); todas.push(x); };
+
   j.cs.forEach(function (x) { poe('cs|' + x[0] + '|' + x[1], +x[2], INBOX_LOJA[String(x[0])] || 'caixa ' + x[0]); });
   var rp = {};
   j.rp.forEach(function (x) { (rp[x[0]] || (rp[x[0]] = [])).push(+x[2]); });
@@ -1798,6 +1803,12 @@ function conferirDia_(dia) {
     });
   });
 
+  // so os fechamentos SEM resposta: o que veio junto com uma resposta (ate 2 min) ja e a resposta
+  (j.fc || []).forEach(function (x) {
+    var k = 'cs|' + x[0] + '|' + x[1], ms = +x[2];
+    var junto = (resp[k] || []).some(function (r) { return Math.abs(r.ms - ms) <= 2 * 60000; });
+    if (!junto) (fech[k] || (fech[k] = [])).push({ ms: ms, usado: false });
+  });
   // conversa aberta pela ficha do cliente (caixa 0): vale qualquer caixa da mesma conta
   var contaCaixas = {}, caixas = {};
   conts.forEach(function (c) {
@@ -1817,22 +1828,33 @@ function conferirDia_(dia) {
 
   // 3. casamento, em ordem de horario: cada resposta confirma uma contagem so
   conts.sort(function (a, b) { return a.ms - b.ms; });
-  var porAg = {};
+  var porAg = {}, anterior = {};
+  var maisPerto = function (lista, c) {
+    var melhor = null, dist = Infinity;
+    (lista || []).forEach(function (x) {
+      var d = x.ms - c.ms;
+      if (x.usado || d < -CONF_ANTES_MS || d > CONF_DEPOIS_MS) return;
+      if (Math.abs(d) < dist) { dist = Math.abs(d); melhor = x; }
+    });
+    return melhor;
+  };
   conts.forEach(function (c) {
-    var a = porAg[c.ag] || (porAg[c.ag] = { contados: 0, conf: 0, sem: 0, nao: 0, lista: [] });
+    var a = porAg[c.ag] || (porAg[c.ag] = { contados: 0, conf: 0, sem: 0, nao: 0, fech: 0, lista: [] });
+    var antes = anterior[c.ag];
+    anterior[c.ag] = c.ms;
     a.contados++;
     var ks = chaves(c.tk);
     if (!ks) { a.nao++; return; }
-    var melhor = null, dist = Infinity;
-    ks.forEach(function (k) {
-      (resp[k] || []).forEach(function (x) {
-        var d = x.ms - c.ms;
-        if (x.usado || d < -CONF_ANTES_MS || d > CONF_DEPOIS_MS) return;
-        if (Math.abs(d) < dist) { dist = Math.abs(d); melhor = x; }
-      });
-    });
-    if (melhor) { melhor.usado = true; a.conf++; }
-    else { a.sem++; if (a.lista.length < 150) a.lista.push(c.tk + ' ' + horaBr_(c.ms)); }
+    var melhor = null;
+    ks.forEach(function (k) { var x = maisPerto(resp[k], c); if (x && (!melhor || Math.abs(x.ms - c.ms) < Math.abs(melhor.ms - c.ms))) melhor = x; });
+    if (melhor) { melhor.usado = true; a.conf++; return; }
+    // sem resposta: o fechamento da conversa vale se nao veio em sequencia de outra contagem
+    var fc = null;
+    ks.forEach(function (k) { var x = maisPerto(fech[k], c); if (x && (!fc || Math.abs(x.ms - c.ms) < Math.abs(fc.ms - c.ms))) fc = x; });
+    var rajada = antes !== undefined && c.ms - antes <= CONF_RAJADA_MS;
+    if (fc && !rajada) { fc.usado = true; a.conf++; a.fech++; return; }
+    a.sem++;
+    if (a.lista.length < 150) a.lista.push(c.tk + ' ' + horaBr_(c.ms) + (fc ? ' sequencia' : ''));
   });
 
   // 4. respostas do dia que ninguem contou, por loja
@@ -1848,11 +1870,14 @@ function conferirDia_(dia) {
   var agora = nowStr_();
   var linhas = Object.keys(porAg).sort().map(function (ag) {
     var a = porAg[ag];
-    return [dia, ag, a.contados, a.conf, a.sem, a.nao, JSON.stringify(a.lista), agora];
+    return [dia, ag, a.contados, a.conf, a.sem, a.nao, JSON.stringify(a.lista), agora, a.fech];
   });
-  linhas.push([dia, SEM_DONO, nResp, nUsadas, nSemDono, 0, JSON.stringify(semDono), agora]);
+  linhas.push([dia, SEM_DONO, nResp, nUsadas, nSemDono, 0, JSON.stringify(semDono), agora, 0]);
   comLock_(function () {
     var sh = ensureSheet_(CONF_SHEET, CONF_HEADER);
+    // aba criada na v25 (8 colunas): ganha a coluna nova e o cabecalho dela
+    garanteColunas_(sh, CONF_HEADER.length);
+    if (!String(sh.getRange(1, CONF_HEADER.length).getDisplayValue()).trim()) sh.getRange(1, CONF_HEADER.length).setValue(CONF_HEADER[CONF_HEADER.length - 1]);
     var n = sh.getLastRow();
     if (n >= 2) {
       var dias = sh.getRange(2, 1, n - 1, 1).getDisplayValues();
@@ -1868,7 +1893,8 @@ function listConferencia_() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONF_SHEET);
   if (!sh || sh.getLastRow() < 2) return [];
   var lim = Utilities.formatDate(new Date(Date.now() - 70 * 86400000), TZ, 'yyyy-MM-dd');
-  var v = sh.getRange(2, 1, sh.getLastRow() - 1, CONF_HEADER.length).getDisplayValues();
+  var nc = Math.min(CONF_HEADER.length, sh.getMaxColumns());
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, nc).getDisplayValues();
   var out = [];
   for (var i = 0; i < v.length; i++) {
     var dia = String(v[i][0]).trim();
@@ -1876,7 +1902,8 @@ function listConferencia_() {
     var lista = [];
     try { lista = JSON.parse(v[i][6] || '[]'); } catch (eL) {}
     out.push({ dia: dia, agente: String(v[i][1]).trim(), contados: +v[i][2] || 0, confirmados: +v[i][3] || 0,
-               semPar: +v[i][4] || 0, naoConferiveis: +v[i][5] || 0, lista: lista, em: String(v[i][7] || '') });
+               semPar: +v[i][4] || 0, naoConferiveis: +v[i][5] || 0, lista: lista, em: String(v[i][7] || ''),
+               fechados: +v[i][8] || 0 });
   }
   return out;
 }
@@ -1915,7 +1942,7 @@ function testarConferencia() {
   Logger.log('Conferencia de ' + ontem + ': ' + r.respostas + ' respostas no helpdesk.');
   Object.keys(r.agentes).sort().forEach(function (ag) {
     var a = r.agentes[ag];
-    Logger.log('  ' + ag + ': ' + a.contados + ' contados, ' + a.conf + ' confirmados, ' + a.sem + ' sem par, ' + a.nao + ' sem como conferir');
+    Logger.log('  ' + ag + ': ' + a.contados + ' contados, ' + a.conf + ' confirmados (' + a.fech + ' fechados sem resposta), ' + a.sem + ' sem par, ' + a.nao + ' sem como conferir');
   });
   Logger.log('  Respostas que ninguem contou: ' + r.nSemDono + ' ' + JSON.stringify(r.semDono));
 }
@@ -2266,7 +2293,7 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 25
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 26
   };
   try { base.conferencia = listConferencia_(); } catch (eCf) { base.conferencia = []; }
 
