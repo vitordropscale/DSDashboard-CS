@@ -375,6 +375,14 @@ tbody tr:last-child td{border-bottom:none}
 .empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14.5px;line-height:1.6}
 .empty b{color:var(--text2);font-weight:600}
 
+/* ---------- conferencia das 17h (v25) ---------- */
+.meta-conf{font-size:13px;color:var(--muted);margin-top:8px}
+.meta-conf b{color:var(--text);font-weight:600}
+.meta-conf b.ok{color:var(--good-ink)}.meta-conf b.warn{color:var(--warn-ink)}.meta-conf b.no{color:var(--crit-ink)}
+.meta-conf span{color:var(--muted)}
+.conf-sd{margin-top:12px;padding:12px 16px;border-radius:var(--r-sm);background:var(--sunk);font-size:13.5px;color:var(--text2);line-height:1.55}
+.conf-sd b{color:var(--text);font-weight:600}
+
 /* ---------- por loja (tela Agentes): um cartao por loja ---------- */
 .pl-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
 .plc{border:1px solid var(--line);border-top:3px solid var(--c);border-radius:var(--r);padding:16px 18px;min-width:0}
@@ -1710,6 +1718,7 @@ var NOTAS = [];       // [{id, data, tipo, agente, loja, texto}]
 var NOTAS_DIA = {};
 var QUALIDADE = [];  // [{data, agente, ticket, fora, repetidos}] — resumo do Apps Script v10   // {"yyyy-MM-dd": [nota, ...]}
 var TAREFAS = [];    // sessões do Contador de Tarefas (Apps Script v14) — ver normalizeTarefas
+var CONFERENCIA = []; // conferência das 17h (Apps Script v25): contados x confirmados no helpdesk, por agente e dia
 var REVIEWS = [];    // reviews do Trustpilot (Apps Script v15) — ver normalizeReviews
 var REVIEWS_OK = true;
 var REVIEWS_ERRO = "";   // o Apps Script nao conseguiu trazer os reviews do Review Desk
@@ -2116,6 +2125,7 @@ function loadData(manual){
       METAS_HIST = Array.isArray(payload.metasHist) ? payload.metasHist : [];
       NOTAS = normalizeNotas(payload.notas);
       QUALIDADE = Array.isArray(payload.qualidade) ? payload.qualidade : [];
+      CONFERENCIA = Array.isArray(payload.conferencia) ? payload.conferencia : [];
       TAREFAS = normalizeTarefas(payload.tarefas);
       API_VERSION = Number(payload.version) || 0;
       if (API_VERSION >= 15) API_V15 = true;
@@ -2191,6 +2201,7 @@ function loadCache(){
     METAS_HIST = Array.isArray(c.payload.metasHist) ? c.payload.metasHist : [];
     NOTAS = normalizeNotas(c.payload.notas);
     QUALIDADE = Array.isArray(c.payload.qualidade) ? c.payload.qualidade : [];
+    CONFERENCIA = Array.isArray(c.payload.conferencia) ? c.payload.conferencia : [];
     TAREFAS = normalizeTarefas(c.payload.tarefas);
     API_VERSION = Number(c.payload.version) || 0;
     document.body.classList.toggle("api-v16", API_VERSION >= 16);
@@ -2688,7 +2699,7 @@ function renderQualidade(r){
   box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
     '<th style="cursor:default">Agente</th>' + th("Contagens lidas") + th("Num ticket") + th("Outras conversas") +
     th("Fora do helpdesk") + th("% fora") + th("Repetidas em 1 min") + th("Mesmo ticket no dia") + th("Respostas novas") +
-    th("Loja diferente da caixa") + th("Recusadas") +
+    th("Loja diferente da caixa") + th("Recusadas") + (API_VERSION >= 25 ? th("Confirmados no helpdesk") + th("Sem resposta") : "") +
     '</tr></thead><tbody>' + nomes.map(function(n){
       var a = porAg[n], lidas = a.ticket + a.fora, pct = lidas ? a.fora / lidas * 100 : 0;
       var dot = pct >= 10 ? "var(--warn)" : "var(--good)";
@@ -2698,7 +2709,7 @@ function renderQualidade(r){
         cell(a.outras) +
         cell(a.fora) +
         '<td class="num"><i class="st-dot" style="background:'+dot+';margin-right:7px"></i>'+pct.toFixed(1)+'%</td>' +
-        cell(a.repetidos1min, a.repetidos1min >= 5) + celulaRepetidos(a, n) + celulaNovas(a, n) + cell(a.lojaDiferente, a.lojaDiferente >= 5) + cell(a.recusadas) +
+        cell(a.repetidos1min, a.repetidos1min >= 5) + celulaRepetidos(a, n) + celulaNovas(a, n) + cell(a.lojaDiferente, a.lojaDiferente >= 5) + cell(a.recusadas) + (API_VERSION >= 25 ? celulasConf(n, r) : "") +
       '</tr>';
     }).join("") + '</tbody></table></div>' +
     '<div class="adj-why" style="padding-top:12px;line-height:1.6">' +
@@ -2709,10 +2720,13 @@ function renderQualidade(r){
     '<b>Loja diferente da caixa</b>: a caixa do Commslayer (ou a conta do Gorgias) no endereço dizia outra loja — o agente esqueceu de trocar no widget. ' +
     '<b>Outras conversas</b>: o agente entrou pela ficha do cliente para fechar outra conversa pendente dele. ' +
     'Conta como ticket — está dentro de "Num ticket" — e aparece aqui só para se saber quanto do dia é isso. ' +
-    '<b>Recusadas</b>: só existe em modo bloquear.</div>';
+    '<b>Recusadas</b>: só existe em modo bloquear.' +
+    (API_VERSION >= 25 ? ' <b>Confirmados no helpdesk</b>: contagens que casaram com uma resposta de verdade no mesmo ticket (conferência das 17h; Gorgias e "fora" não entram). <b>Sem resposta</b>: contagens sem resposta correspondente; clique para ver os tickets.' : '') +
+    '</div>' + confSemDono(r);
 
   [].forEach.call(box.querySelectorAll(".tk-btn"), function(b){
-    b.onclick = function(){ abrirTicketsRepetidos(b.dataset.ag, porAg[b.dataset.ag], r.label, b.dataset.novas === "1"); };
+    b.onclick = b.dataset.sem === "1" ? function(){ abrirSemResposta(b.dataset.ag, r); }
+                                      : function(){ abrirTicketsRepetidos(b.dataset.ag, porAg[b.dataset.ag], r.label, b.dataset.novas === "1"); };
   });
 }
 
@@ -2860,6 +2874,55 @@ $("tarSessoes").onclick = function(e){
 
 /* A célula de "mesmo ticket no dia": vira botão quando existe a lista dos
    códigos (Apps Script v13 em diante). */
+/** Soma da conferência (v25) de um agente no período. */
+function confPeriodo(nome, r){
+  var t = { contados:0, confirmados:0, semPar:0, nao:0, dias:0, lista:[] };
+  CONFERENCIA.forEach(function(c){
+    if (c.agente !== nome || c.dia < r.from || c.dia > r.to) return;
+    t.contados += c.contados; t.confirmados += c.confirmados; t.semPar += c.semPar; t.nao += c.naoConferiveis; t.dias++;
+    (c.lista || []).forEach(function(x){ t.lista.push({ dia:c.dia, x:x }); });
+  });
+  return t;
+}
+function celulasConf(nome, r){
+  var t = confPeriodo(nome, r);
+  if (!t.dias) return '<td class="num zero" title="Ainda sem conferência neste período">–</td><td class="num zero">–</td>';
+  var conferiveis = t.contados - t.nao, pct = conferiveis ? t.confirmados / conferiveis * 100 : 100;
+  var cor = pct >= 95 ? "var(--good)" : pct >= 85 ? "var(--warn)" : "var(--crit)";
+  return '<td class="num" title="' + nf(t.confirmados) + ' de ' + nf(conferiveis) + ' contagens conferíveis"><i class="st-dot" style="background:' + cor + ';margin-right:7px"></i>' + nf(t.confirmados) + ' <span class="zero">' + Math.round(pct) + '%</span></td>' +
+    (t.semPar ? '<td class="num"><button class="linkish tk-btn" data-sem="1" data-ag="' + esc(nome) + '">' + nf(t.semPar) + '</button></td>' : '<td class="num zero">–</td>');
+}
+/** Respostas do helpdesk que ninguém contou no período, por loja. */
+function confSemDono(r){
+  if (API_VERSION < 25 || !isAdmin()) return "";
+  var t = {}, n = 0, dias = 0;
+  CONFERENCIA.forEach(function(c){
+    if (c.agente !== "(sem dono)" || c.dia < r.from || c.dia > r.to) return;
+    dias++;
+    var por = c.lista && !Array.isArray(c.lista) ? c.lista : {};
+    Object.keys(por).forEach(function(l){ t[l] = (t[l] || 0) + por[l]; n += por[l]; });
+  });
+  if (!dias) return "";
+  var lojas = Object.keys(t).sort(function(a, b){ return t[b] - t[a]; });
+  return '<div class="conf-sd"><b>' + nf(n) + (n === 1 ? ' resposta' : ' respostas') + ' no helpdesk sem contagem</b> no período' +
+    (lojas.length ? ': ' + lojas.map(function(l){ return esc(l) + ' ' + nf(t[l]); }).join(", ") : '') +
+    '. É o que foi respondido e ninguém contou (ou contou num ticket diferente).</div>';
+}
+/** Lista das contagens sem resposta no helpdesk, com o link de cada ticket. */
+function abrirSemResposta(nome, r){
+  var t = confPeriodo(nome, r);
+  $("tkSub").textContent = nome + ", " + r.label + ". " + nf(t.semPar) + (t.semPar === 1 ? " contagem sem resposta" : " contagens sem resposta") +
+    " no mesmo ticket" + (t.lista.length < t.semPar ? " (mostrando " + t.lista.length + ")" : "") + ".";
+  $("tkBox").innerHTML = t.lista.length ? t.lista.map(function(i){
+    var p = String(i.x).split(" "), code = p[0], hora = p[1] || "";
+    var url = ticketUrl(code);
+    var num = code.replace(/^cs:\d+:\d+:/, "#").replace(/^rp:/, "Richpanel #");
+    return '<div class="tk-row"><div>' + (url ? '<a href="' + url + '" target="_blank" rel="noopener">' + esc(num) + '</a>' : '<span>' + esc(num) + '</span>') +
+      '</div><span class="tk-n">' + brDate(i.dia) + ' às ' + esc(hora) + '</span></div>';
+  }).join("") : '<div class="empty" style="padding:22px">Nada para mostrar.</div>';
+  $("ovTk").classList.add("show");
+}
+
 /** Respostas novas confirmadas no widget; o dia com mais de LIMITE_NOVAS fica em ambar. */
 var LIMITE_NOVAS = 15;
 function celulaNovas(a, nome){
@@ -3314,6 +3377,28 @@ function metaDay(){
 }
 
 /** Linha de progresso usada tanto no total quanto numa loja isolada. */
+/**
+ * Conferência das 17h (Apps Script v25) na linha da meta: e-mails contados no widget e
+ * quantos tiveram uma resposta de verdade no helpdesk, no mesmo ticket.
+ */
+function confDe(agente, dia){
+  for (var i = 0; i < CONFERENCIA.length; i++)
+    if (CONFERENCIA[i].dia === dia && CONFERENCIA[i].agente === agente) return CONFERENCIA[i];
+  return null;
+}
+function confLinha(agente, dia){
+  if (API_VERSION < 25) return "";
+  var c = confDe(agente, dia);
+  if (!c) return dia === iso(today()) ? '<div class="meta-conf">Conferência com o helpdesk às 17h.</div>' : "";
+  var conferiveis = c.contados - c.naoConferiveis;
+  var pct = conferiveis ? Math.round(c.confirmados / conferiveis * 100) : 100;
+  var cls = pct >= 95 ? "ok" : pct >= 85 ? "warn" : "no";
+  var hora = String(c.em || "").slice(11, 16);
+  return '<div class="meta-conf"><b>' + nf(c.contados) + '</b> contados, <b class="' + cls + '">' + nf(c.confirmados) + ' confirmados</b> no helpdesk' +
+    (c.semPar ? ', ' + nf(c.semPar) + ' sem resposta' : '') +
+    (c.naoConferiveis ? ', ' + nf(c.naoConferiveis) + ' sem como conferir' : '') +
+    (dia === iso(today()) && hora ? ' <span>(até ' + hora + ')</span>' : '') + '</div>';
+}
 function metaRowHTML(nome, feito, meta, aberto, extra){
   var pct = meta ? feito/meta*100 : 0;
   var bateu = feito >= meta;
@@ -3375,7 +3460,7 @@ function renderMetas(){
 
   box.innerHTML = comMeta.map(function(a){
     var m = metaDe(a);
-    var html = "";
+    var html = umaLoja ? "" : confLinha(a, day);
 
     // com "Todas" selecionado, abre a meta do agente em pastilhas por loja (embaixo da barra)
     if (!umaLoja){

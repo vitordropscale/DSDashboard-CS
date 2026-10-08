@@ -1,6 +1,6 @@
 /**
  * =============================================================
- *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon + Nome do cliente + Resposta nova)  v24.0
+ *  EMAIL COUNTER — Google Apps Script (API + Logger + Ajustes + Metas + Notas + Tarefas + Acessos + Reviews + Conferencia + Reviews Jhon + Nome do cliente + Resposta nova + Conferencia diaria)  v25.0
  *  Planilha: "Email counter KPI's"  |  Abas: "Logs", "Ajustes", "Metas", "Notas", "Tentativas", "Tarefas", "Usuarios", "Sessoes", "Reviews"
  * =============================================================
  *
@@ -153,6 +153,18 @@
  *   A chave e a propriedade JHON_REVIEWS_KEY (criarChaveReviewsJhon() cria e mostra), que so
  *   serve para isto. A resposta fica 5 minutos no cache.
  *
+ *  CONFERENCIA DIARIA DAS CONTAGENS (v25)
+ *   Todo dia as 17h (horario de Brasilia) cada contagem do widget e casada com uma
+ *   resposta de verdade NO MESMO TICKET: Commslayer (mensagem enviada por pessoa) e
+ *   Richpanel (mensagem do agente ou fechamento). Quem guarda as respostas e o Dashboard
+ *   Jhon (funcao respostas-dia do Supabase, mesma chave JHON_REPORT_KEY). Uma resposta
+ *   so confirma UMA contagem; a janela vai de 3 min antes a 15 min depois da contagem.
+ *   Gorgias (Old World Healing), "fora" e sem leitura nao tem como conferir.
+ *   Resultado na aba "Conferencia" (uma linha por agente e dia, e "(sem dono)" com as
+ *   respostas que ninguem contou, por loja). As 17h confere ONTEM inteiro e HOJE ate a hora.
+ *   Uma vez: ligarConferencia() cria o agendamento. testarConferencia() confere ontem e
+ *   mostra o resumo no registro.
+ *
  *  RESPOSTA NOVA (v24, contador v7)
  *   O contador v7 nao conta sozinho o mesmo ticket duas vezes no dia: antes de 10 min recusa,
  *   depois pergunta "O cliente respondeu de novo?". Se o agente confirma, chega situacao
@@ -288,7 +300,7 @@ var TAREFA_ACOES = ['delTarefa'];
 function doGet(e) {
   var p = (e && e.parameter) || {};
   try {
-    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 24 }, p.callback);
+    if (p.action === 'ping')    return respond_({ status: 'ok', pong: true, tz: TZ, now: nowStr_(), version: 25 }, p.callback);
     if (p.action === 'reviewsJhon') return respond_(reviewsJhon_(p), p.callback);
     if (p.action === 'getData') return respond_(getDataAuth_(p), p.callback);
     if (ACESSO.indexOf(p.action) > -1)     return respond_(acesso_(p), p.callback);
@@ -1257,6 +1269,8 @@ function restringe_(base, u, compact) {
   base.metas = minhas;
   base.metasHist = (base.metasHist || []).filter(function (m) { return ehMeu(m.agente); });
   base.qualidade = []; base.notas = []; base.ajustes = 0;
+  // conferencia (v25): so a linha do proprio agente; a de respostas sem dono e do admin
+  base.conferencia = (base.conferencia || []).filter(function (c) { return ehMeu(c.agente); });
   base.skipped = 0;
 }
 
@@ -1708,6 +1722,205 @@ function testarJhon() {
 }
 
 /* ============================================================
+   CONFERENCIA DIARIA DAS CONTAGENS (v25)
+   ============================================================ */
+
+var CONF_SHEET  = 'Conferencia';
+var CONF_HEADER = ['Dia', 'Agente', 'Contados', 'Confirmados', 'Sem par', 'Nao conferiveis', 'Lista', 'Atualizado em'];
+var CONF_ANTES_MS   = 3 * 60000;    // a resposta pode ter sido registrada ate 3 min ANTES da contagem
+var CONF_DEPOIS_MS  = 15 * 60000;   // ... ou ate 15 min DEPOIS (o aviso do helpdesk pode atrasar)
+var CONF_JUNTA_RP_MS = 3 * 60000;   // Richpanel: mensagem + fechamento do mesmo ticket em 3 min = 1 resposta
+var SEM_DONO = '(sem dono)';
+
+/** Respostas do helpdesk num intervalo (funcao respostas-dia do Dashboard Jhon). */
+function jhonRespostas_(deIso, ateIso) {
+  var pr = PropertiesService.getScriptProperties();
+  var base = String(pr.getProperty('JHON_REPORT_URL') || '').trim().split('?')[0];
+  var key  = String(pr.getProperty('JHON_REPORT_KEY') || '').trim();
+  if (!base || !key) throw new Error('Crie as propriedades JHON_REPORT_URL e JHON_REPORT_KEY no Apps Script.');
+  var url = base.replace(/[/]report-semanal[/]?$/, '/respostas-dia');
+  if (url === base) throw new Error('JHON_REPORT_URL precisa terminar em /report-semanal');
+  var resp = UrlFetchApp.fetch(url + '?de=' + deIso + '&ate=' + ateIso,
+    { muteHttpExceptions: true, followRedirects: true, headers: { 'x-report-key': key } });
+  var code = resp.getResponseCode();
+  if (code === 401) throw new Error('o Dashboard Jhon recusou a chave (confira JHON_REPORT_KEY)');
+  if (code !== 200) throw new Error('o Dashboard Jhon respondeu HTTP ' + code + ' na funcao respostas-dia');
+  var j;
+  try { j = JSON.parse(resp.getContentText()); } catch (eJ) { throw new Error('o Dashboard Jhon nao devolveu JSON'); }
+  if (!j || !j.ok || Object.prototype.toString.call(j.cs) !== '[object Array]' || Object.prototype.toString.call(j.rp) !== '[object Array]') {
+    throw new Error('resposta inesperada do Dashboard Jhon');
+  }
+  return j;
+}
+
+/** "08/10/2026 14:03:27" (Brasilia, sem horario de verao: -03:00) -> milissegundos. */
+function msBrasilia_(v) {
+  var m = /^(\d{2})[/](\d{2})[/](\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(v || '').trim());
+  if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4] + 3, +m[5], +(m[6] || 0));
+  var d = parseAny_(v);
+  return d ? d.getTime() : NaN;
+}
+function isoUtc_(ms) { return new Date(ms).toISOString().replace(/[.]\d{3}Z$/, 'Z'); }
+function horaBr_(ms) { var d = new Date(ms - 3 * 3600000); return pad2_(d.getUTCHours()) + ':' + pad2_(d.getUTCMinutes()); }
+
+/**
+ * Confere um dia ('yyyy-MM-dd'): casa cada contagem com uma resposta do mesmo ticket,
+ * uma para uma, e grava o resultado na aba Conferencia. Devolve o resumo.
+ */
+function conferirDia_(dia) {
+  if (!DIA_RE.test(dia)) throw new Error('dia invalido: ' + dia);
+  var p = dia.split('-');
+  var ini = Date.UTC(+p[0], +p[1] - 1, +p[2], 3, 0, 0), fim = ini + 86400000;
+
+  // 1. contagens do dia (aba Logs)
+  var conts = [], sheet = getSheet_(), last = sheet.getLastRow();
+  if (last >= 2) {
+    var v = sheet.getRange(2, 1, last - 1, HEADER.length).getDisplayValues();
+    for (var i = 0; i < v.length; i++) {
+      var ms = msBrasilia_(v[i][0]), ag = String(v[i][1] || '').trim();
+      if (!ag || isNaN(ms) || ms < ini || ms >= fim) continue;
+      conts.push({ ag: ag, ms: ms, tk: String(v[i][7] || '').trim().toLowerCase() });
+    }
+  }
+
+  // 2. respostas do helpdesk, com 20 min de folga nas pontas
+  var j = jhonRespostas_(isoUtc_(ini - 20 * 60000), isoUtc_(fim + 20 * 60000));
+  var resp = {}, todas = [];
+  var poe = function (k, ms, loja) { var x = { ms: ms, usado: false, loja: loja }; (resp[k] || (resp[k] = [])).push(x); todas.push(x); };
+  j.cs.forEach(function (x) { poe('cs|' + x[0] + '|' + x[1], +x[2], INBOX_LOJA[String(x[0])] || 'caixa ' + x[0]); });
+  var rp = {};
+  j.rp.forEach(function (x) { (rp[x[0]] || (rp[x[0]] = [])).push(+x[2]); });
+  Object.keys(rp).forEach(function (t) {
+    var ult = -Infinity;
+    rp[t].sort(function (a, b) { return a - b; }).forEach(function (ms) {
+      if (ms - ult > CONF_JUNTA_RP_MS) poe('rp|' + t, ms, 'Richpanel');
+      ult = ms;
+    });
+  });
+
+  // conversa aberta pela ficha do cliente (caixa 0): vale qualquer caixa da mesma conta
+  var contaCaixas = {}, caixas = {};
+  conts.forEach(function (c) {
+    var m = /^cs:(\d+):(\d+):\d+$/.exec(c.tk);
+    if (m && m[2] !== '0') (contaCaixas[m[1]] || (contaCaixas[m[1]] = {}))[m[2]] = 1;
+  });
+  j.cs.forEach(function (x) { caixas[String(x[0])] = 1; });
+  var chaves = function (tk) {
+    var m = /^cs:(\d+):(\d+):(\d+)$/.exec(tk);
+    if (m) {
+      if (m[2] !== '0') return ['cs|' + m[2] + '|' + m[3]];
+      return Object.keys(contaCaixas[m[1]] || caixas).map(function (cx) { return 'cs|' + cx + '|' + m[3]; });
+    }
+    var r = /^rp:(\d+)$/.exec(tk);
+    return r ? ['rp|' + r[1]] : null;   // Gorgias, fora e sem leitura: nao da para conferir
+  };
+
+  // 3. casamento, em ordem de horario: cada resposta confirma uma contagem so
+  conts.sort(function (a, b) { return a.ms - b.ms; });
+  var porAg = {};
+  conts.forEach(function (c) {
+    var a = porAg[c.ag] || (porAg[c.ag] = { contados: 0, conf: 0, sem: 0, nao: 0, lista: [] });
+    a.contados++;
+    var ks = chaves(c.tk);
+    if (!ks) { a.nao++; return; }
+    var melhor = null, dist = Infinity;
+    ks.forEach(function (k) {
+      (resp[k] || []).forEach(function (x) {
+        var d = x.ms - c.ms;
+        if (x.usado || d < -CONF_ANTES_MS || d > CONF_DEPOIS_MS) return;
+        if (Math.abs(d) < dist) { dist = Math.abs(d); melhor = x; }
+      });
+    });
+    if (melhor) { melhor.usado = true; a.conf++; }
+    else { a.sem++; if (a.lista.length < 150) a.lista.push(c.tk + ' ' + horaBr_(c.ms)); }
+  });
+
+  // 4. respostas do dia que ninguem contou, por loja
+  var semDono = {}, nSemDono = 0, nResp = 0, nUsadas = 0;
+  todas.forEach(function (x) {
+    if (x.ms < ini || x.ms >= fim) return;
+    nResp++;
+    if (x.usado) { nUsadas++; return; }
+    nSemDono++; semDono[x.loja] = (semDono[x.loja] || 0) + 1;
+  });
+
+  // 5. grava (troca as linhas do dia)
+  var agora = nowStr_();
+  var linhas = Object.keys(porAg).sort().map(function (ag) {
+    var a = porAg[ag];
+    return [dia, ag, a.contados, a.conf, a.sem, a.nao, JSON.stringify(a.lista), agora];
+  });
+  linhas.push([dia, SEM_DONO, nResp, nUsadas, nSemDono, 0, JSON.stringify(semDono), agora]);
+  comLock_(function () {
+    var sh = ensureSheet_(CONF_SHEET, CONF_HEADER);
+    var n = sh.getLastRow();
+    if (n >= 2) {
+      var dias = sh.getRange(2, 1, n - 1, 1).getDisplayValues();
+      for (var k = dias.length - 1; k >= 0; k--) if (String(dias[k][0]).trim() === dia) sh.deleteRow(k + 2);
+    }
+    sh.getRange(sh.getLastRow() + 1, 1, linhas.length, CONF_HEADER.length).setValues(linhas.map(function (l) { return l.map(txt_); }));
+  });
+  return { dia: dia, agentes: porAg, respostas: nResp, semDono: semDono, nSemDono: nSemDono };
+}
+
+/** Linhas da aba Conferencia (ultimos 70 dias) no formato do painel. */
+function listConferencia_() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONF_SHEET);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var lim = Utilities.formatDate(new Date(Date.now() - 70 * 86400000), TZ, 'yyyy-MM-dd');
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, CONF_HEADER.length).getDisplayValues();
+  var out = [];
+  for (var i = 0; i < v.length; i++) {
+    var dia = String(v[i][0]).trim();
+    if (!DIA_RE.test(dia) || dia < lim) continue;
+    var lista = [];
+    try { lista = JSON.parse(v[i][6] || '[]'); } catch (eL) {}
+    out.push({ dia: dia, agente: String(v[i][1]).trim(), contados: +v[i][2] || 0, confirmados: +v[i][3] || 0,
+               semPar: +v[i][4] || 0, naoConferiveis: +v[i][5] || 0, lista: lista, em: String(v[i][7] || '') });
+  }
+  return out;
+}
+
+/** O agendamento das 17h: ontem inteiro e hoje ate agora. Erro fica em CONF_ERRO. */
+function conferenciaDiaria() {
+  var pr = PropertiesService.getScriptProperties();
+  var hoje = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  var ontem = Utilities.formatDate(new Date(Date.now() - 86400000), TZ, 'yyyy-MM-dd');
+  try {
+    conferirDia_(ontem);
+    conferirDia_(hoje);
+    pr.deleteProperty('CONF_ERRO');
+  } catch (e) {
+    pr.setProperty('CONF_ERRO', nowStr_() + ' ' + String((e && e.message) || e));
+    throw e;
+  }
+}
+
+/** Executar › ligarConferencia: cria (ou recria) o agendamento diario das 17h. */
+function ligarConferencia() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'conferenciaDiaria') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('conferenciaDiaria').timeBased().everyDays(1).atHour(17).nearMinute(0).inTimezone(TZ).create();
+  Logger.log('Conferencia ligada: roda todo dia entre 17h e 17h15 (Brasilia).');
+}
+
+/** Executar › testarConferencia: confere ONTEM agora e mostra o resumo. */
+function testarConferencia() {
+  if (typeof ScriptApp.requireScopes === 'function') {
+    ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ['https://www.googleapis.com/auth/script.external_request']);
+  }
+  var ontem = Utilities.formatDate(new Date(Date.now() - 86400000), TZ, 'yyyy-MM-dd');
+  var r = conferirDia_(ontem);
+  Logger.log('Conferencia de ' + ontem + ': ' + r.respostas + ' respostas no helpdesk.');
+  Object.keys(r.agentes).sort().forEach(function (ag) {
+    var a = r.agentes[ag];
+    Logger.log('  ' + ag + ': ' + a.contados + ' contados, ' + a.conf + ' confirmados, ' + a.sem + ' sem par, ' + a.nao + ' sem como conferir');
+  });
+  Logger.log('  Respostas que ninguem contou: ' + r.nSemDono + ' ' + JSON.stringify(r.semDono));
+}
+
+/* ============================================================
    CAPACIDADE (v20): rodar no editor, nunca roda sozinho
    ============================================================ */
 
@@ -2053,8 +2266,9 @@ function getData_(p) {
   var base = {
     status: 'ok', total: out.length, skipped: skipped, ajustes: aplicados,
     metas: listMetas_(), metasHist: listMetasHist_(), notas: notas, qualidade: qualidade,
-    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 24
+    tarefas: tarefas, tz: tz, generatedAt: nowStr_(), version: 25
   };
+  try { base.conferencia = listConferencia_(); } catch (eCf) { base.conferencia = []; }
 
   if (p.compact) {
     base.cols = ['data', 'hora', 'agente', 'loja', 'contador'];
