@@ -2721,7 +2721,7 @@ function renderQualidade(r){
     '<b>Outras conversas</b>: o agente entrou pela ficha do cliente para fechar outra conversa pendente dele. ' +
     'Conta como ticket — está dentro de "Num ticket" — e aparece aqui só para se saber quanto do dia é isso. ' +
     '<b>Recusadas</b>: só existe em modo bloquear.' +
-    (API_VERSION >= 25 ? ' <b>Confirmados no helpdesk</b>: contagens que casaram com uma resposta de verdade no mesmo ticket (conferência das 17h; Gorgias e "fora" não entram). <b>Sem resposta</b>: contagens sem resposta correspondente; clique para ver os tickets.' : '') +
+    (API_VERSION >= 25 ? ' <b>Confirmados no helpdesk</b>: contagens que casaram com uma resposta de verdade no mesmo ticket (conferência das 17h; Gorgias e "fora" não entram). <b>Sem resposta</b>: contagens sem resposta correspondente; clique para ver os tickets. Conversa fechada sem resposta conta, a não ser que tenha sido fechada em sequência, até 2 min depois de outra contagem (conversas repetidas do mesmo cliente).' : '') +
     '</div>' + confSemDono(r);
 
   [].forEach.call(box.querySelectorAll(".tk-btn"), function(b){
@@ -2914,11 +2914,11 @@ function abrirSemResposta(nome, r){
   $("tkSub").textContent = nome + ", " + r.label + ". " + nf(t.semPar) + (t.semPar === 1 ? " contagem sem resposta" : " contagens sem resposta") +
     " no mesmo ticket" + (t.lista.length < t.semPar ? " (mostrando " + t.lista.length + ")" : "") + ".";
   $("tkBox").innerHTML = t.lista.length ? t.lista.map(function(i){
-    var p = String(i.x).split(" "), code = p[0], hora = p[1] || "";
+    var p = String(i.x).split(" "), code = p[0], hora = p[1] || "", seq = p[2] === "sequencia";
     var url = ticketUrl(code);
     var num = code.replace(/^cs:\d+:\d+:/, "#").replace(/^rp:/, "Richpanel #");
     return '<div class="tk-row"><div>' + (url ? '<a href="' + url + '" target="_blank" rel="noopener">' + esc(num) + '</a>' : '<span>' + esc(num) + '</span>') +
-      '</div><span class="tk-n">' + brDate(i.dia) + ' às ' + esc(hora) + '</span></div>';
+      (seq ? '<span class="tk-tag">fechou em sequência</span>' : '') + '</div><span class="tk-n">' + brDate(i.dia) + ' às ' + esc(hora) + '</span></div>';
   }).join("") : '<div class="empty" style="padding:22px">Nada para mostrar.</div>';
   $("ovTk").classList.add("show");
 }
@@ -3395,6 +3395,7 @@ function confLinha(agente, dia){
   var cls = pct >= 95 ? "ok" : pct >= 85 ? "warn" : "no";
   var hora = String(c.em || "").slice(11, 16);
   return '<div class="meta-conf"><b>' + nf(c.contados) + '</b> contados, <b class="' + cls + '">' + nf(c.confirmados) + ' confirmados</b> no helpdesk' +
+    (c.fechados ? ' (' + nf(c.fechados) + (c.fechados === 1 ? ' fechado' : ' fechados') + ' sem resposta)' : '') +
     (c.semPar ? ', ' + nf(c.semPar) + ' sem resposta' : '') +
     (c.naoConferiveis ? ', ' + nf(c.naoConferiveis) + ' sem como conferir' : '') +
     (dia === iso(today()) && hora ? ' <span>(até ' + hora + ')</span>' : '') + '</div>';
