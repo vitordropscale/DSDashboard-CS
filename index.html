@@ -376,6 +376,10 @@ tbody tr:last-child td{border-bottom:none}
 .empty b{color:var(--text2);font-weight:600}
 
 /* ---------- conferencia das 17h (v25) ---------- */
+.tk-grp{padding:14px 2px 6px;border-bottom:1px solid var(--line)}
+.tk-grp b{display:block;font-size:14px;font-weight:600}
+.tk-grp span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.5}
+.tk-grp:first-child{padding-top:2px}
 .meta-conf{font-size:13px;color:var(--muted);margin-top:8px}
 .meta-conf b{color:var(--text);font-weight:600}
 .meta-conf b.ok{color:var(--good-ink)}.meta-conf b.warn{color:var(--warn-ink)}.meta-conf b.no{color:var(--crit-ink)}
@@ -1381,7 +1385,7 @@ tr.rv-row:focus{outline:none}
     <div class="modal" style="max-width:520px">
       <div class="modal-h">
         <div>
-          <h2>Contados mais de uma vez</h2>
+          <h2 id="tkT">Contados mais de uma vez</h2>
           <p id="tkSub"></p>
         </div>
         <button class="x" id="tkClose" title="Fechar">×</button>
@@ -2876,11 +2880,15 @@ $("tarSessoes").onclick = function(e){
    códigos (Apps Script v13 em diante). */
 /** Soma da conferência (v25) de um agente no período. */
 function confPeriodo(nome, r){
-  var t = { contados:0, confirmados:0, semPar:0, nao:0, dias:0, lista:[] };
+  var t = { contados:0, confirmados:0, semPar:0, nao:0, dias:0, lista:[], fechados:0 };
   CONFERENCIA.forEach(function(c){
     if (c.agente !== nome || c.dia < r.from || c.dia > r.to) return;
     t.contados += c.contados; t.confirmados += c.confirmados; t.semPar += c.semPar; t.nao += c.naoConferiveis; t.dias++;
-    (c.lista || []).forEach(function(x){ t.lista.push({ dia:c.dia, x:x }); });
+    (c.lista || []).forEach(function(x){
+      var fechado = String(x).split(" ")[2] === "sequencia";   // a conversa foi fechada no helpdesk, mas sem resposta
+      if (fechado) t.fechados++;
+      t.lista.push({ dia:c.dia, x:x, fechado:fechado });
+    });
   });
   return t;
 }
@@ -2890,7 +2898,8 @@ function celulasConf(nome, r){
   var conferiveis = t.contados - t.nao, pct = conferiveis ? t.confirmados / conferiveis * 100 : 100;
   var cor = pct >= 95 ? "var(--good)" : pct >= 85 ? "var(--warn)" : "var(--crit)";
   return '<td class="num" title="' + nf(t.confirmados) + ' de ' + nf(conferiveis) + ' contagens conferíveis"><i class="st-dot" style="background:' + cor + ';margin-right:7px"></i>' + nf(t.confirmados) + ' <span class="zero">' + Math.round(pct) + '%</span></td>' +
-    (t.semPar ? '<td class="num"><button class="linkish tk-btn" data-sem="1" data-ag="' + esc(nome) + '">' + nf(t.semPar) + '</button></td>' : '<td class="num zero">–</td>');
+    (t.semPar ? '<td class="num"><button class="linkish tk-btn" data-sem="1" data-ag="' + esc(nome) + '" title="Clique para ver os tickets">' + nf(t.semPar) + '</button>' +
+      (t.fechados ? ' <span class="zero" title="' + nf(t.fechados) + ' desses foram fechados no helpdesk, sem resposta">(' + nf(t.fechados) + ' fechados)</span>' : '') + '</td>' : '<td class="num zero">–</td>');
 }
 /** Respostas do helpdesk que ninguém contou no período, por loja. */
 function confSemDono(r){
@@ -2911,15 +2920,24 @@ function confSemDono(r){
 /** Lista das contagens sem resposta no helpdesk, com o link de cada ticket. */
 function abrirSemResposta(nome, r){
   var t = confPeriodo(nome, r);
-  $("tkSub").textContent = nome + ", " + r.label + ". " + nf(t.semPar) + (t.semPar === 1 ? " contagem sem resposta" : " contagens sem resposta") +
-    " no mesmo ticket" + (t.lista.length < t.semPar ? " (mostrando " + t.lista.length + ")" : "") + ".";
-  $("tkBox").innerHTML = t.lista.length ? t.lista.map(function(i){
-    var p = String(i.x).split(" "), code = p[0], hora = p[1] || "", seq = p[2] === "sequencia";
+  $("tkT").textContent = "Contagens sem resposta";
+  $("tkSub").textContent = nome + ", " + r.label + ". " + nf(t.semPar) + (t.semPar === 1 ? " contagem" : " contagens") + " sem resposta no mesmo ticket" +
+    (t.lista.length < t.semPar ? " (mostrando " + t.lista.length + ")" : "") + ".";
+  var linha = function(i, marca){
+    var p = String(i.x).split(" "), code = p[0], hora = p[1] || "";
     var url = ticketUrl(code);
     var num = code.replace(/^cs:\d+:\d+:/, "#").replace(/^rp:/, "Richpanel #");
     return '<div class="tk-row"><div>' + (url ? '<a href="' + url + '" target="_blank" rel="noopener">' + esc(num) + '</a>' : '<span>' + esc(num) + '</span>') +
-      (seq ? '<span class="tk-tag">fechou em sequência</span>' : '') + '</div><span class="tk-n">' + brDate(i.dia) + ' às ' + esc(hora) + '</span></div>';
-  }).join("") : '<div class="empty" style="padding:22px">Nada para mostrar.</div>';
+      (marca ? '<span class="tk-tag">' + marca + '</span>' : '') + '</div><span class="tk-n">' + brDate(i.dia) + ' às ' + esc(hora) + '</span></div>';
+  };
+  var fech = t.lista.filter(function(i){ return i.fechado; }), resto = t.lista.filter(function(i){ return !i.fechado; });
+  var grupo = function(titulo, nota, itens, marca){
+    return itens.length ? '<div class="tk-grp"><b>' + titulo + ' (' + nf(itens.length) + ')</b><span>' + nota + '</span></div>' + itens.map(function(i){ return linha(i, marca); }).join("") : "";
+  };
+  $("tkBox").innerHTML = t.lista.length
+    ? grupo("Fechados no helpdesk, sem resposta", "A conversa foi fechada logo depois de outra contagem do mesmo agente: em geral o cliente mandou mais de uma mensagem e as outras conversas foram fechadas. Abra e confira.", fech, "fechado, sem resposta") +
+      grupo("Sem resposta e sem fechamento", "Nada no helpdesk que confirme: nem resposta, nem conversa fechada perto da contagem.", resto, "")
+    : '<div class="empty" style="padding:22px">Nada para mostrar.</div>';
   $("ovTk").classList.add("show");
 }
 
@@ -2950,6 +2968,7 @@ function ticketUrl(code){
 
 /** Abre a lista dos tickets que o agente contou mais de uma vez no período. */
 function abrirTicketsRepetidos(nome, a, label, novas){
+  $("tkT").textContent = novas ? "Respostas novas" : "Contados mais de uma vez";
   var mapa = (novas ? a.novasT : a.reps) || {};
   var itens = Object.keys(mapa).map(function(t){ return { t:t, n:mapa[t] }; })
                     .sort(function(x, y){ return y.n - x.n; });
