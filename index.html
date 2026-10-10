@@ -34,7 +34,7 @@
    ========================================================================== */
 :root{
   /* moldura e menu: quase pretos, nos dois temas */
-  --frame:#020203; --side-ink:#f6f6f7; --side-ink2:#8d8e93; --side-lab:#66676c;
+  --frame:#020203; --side-ink:#f6f6f7; --side-ink2:#8d8e93; --side-lab:#8d8e93;
   --side-act:#242427; --side-hov:#141416; --side-line:#242427; --side-btn:#141416;
   --frame-edge:rgba(255,255,255,.06); --badge-bg:rgba(255,128,115,.2); --badge-ink:#ffa094;
   /* notas do Trustpilot: as cores sao da marca deles, de 1 (vermelho) a 5 (verde) */
@@ -42,7 +42,7 @@
   /* painel inserido */
   --bg:#09090b; --card:#151518; --card2:#1c1c20; --card3:#25252a; --sunk:#0e0e10; --side:#0e0e10;
   --line:#232328; --line2:#37373d;
-  --text:#f4f4f5; --text2:#a1a1aa; --muted:#71717a;
+  --text:#f4f4f5; --text2:#a1a1aa; --muted:#8e8e97;
   /* azul de marca: um so por tema. --acc nas linhas, barras e destaques; --brand nos botoes cheios
      (o mesmo azul), com --on-brand como tinta por cima (escura no tema escuro, branca no claro) */
   --acc:#5b9bff; --acc-m:rgba(91,155,255,.5);
@@ -69,17 +69,17 @@
    cartoes brancos). As tintas de texto dos selos ficam mais escuras para ler bem. */
 :root[data-tema=claro]{
   --scheme:light;
-  --bg:#fafafa; --card:#ffffff; --card2:#f7f7f7; --card3:#ebebeb; --sunk:#f4f4f4; --side:#f4f4f4;
+  --bg:#f1f1f3; --card:#ffffff; --card2:#f7f7f7; --card3:#ebebeb; --sunk:#ececee; --side:#f4f4f4;
   --line:#e3e3e3; --line2:#cccccc;
   --shadow-card:0 1px 0 rgba(26,26,26,.07),0 1px 3px rgba(26,26,26,.05);
-  --text:#18181b; --text2:#52525b; --muted:#8b8b94;
+  --text:#18181b; --text2:#52525b; --muted:#6b6b74;
   --acc:#2f6fed; --acc-m:rgba(47,111,237,.5);
   --brand:#2f6fed; --brand-2:#2f6fed; --brand-soft:rgba(47,111,237,.10); --on-brand:#ffffff;
   --good:#15803d; --warn:#a16207; --crit:#b91c1c;
   --good-soft:rgba(21,128,61,.10); --warn-soft:rgba(202,138,4,.14); --crit-soft:rgba(185,28,28,.09);
   --off:#e4e4e7;
   --hover:rgba(24,24,27,.04); --hover2:rgba(24,24,27,.05); --hover3:rgba(24,24,27,.08);
-  --row-hover:rgba(24,24,27,.025); --field:#f4f4f5; --track:#e4e4e7;
+  --row-hover:rgba(24,24,27,.025); --field:#ececee; --track:#e4e4e7;
   --sk:rgba(24,24,27,.07); --code:rgba(24,24,27,.07); --well:rgba(24,24,27,.04); --overlay:rgba(2,2,3,.45);
   --faint:rgba(24,24,27,.18); --faint2:rgba(24,24,27,.30); --faint3:rgba(24,24,27,.38);
   --good-ink:#15803d; --warn-ink:#a16207; --crit-ink:#b91c1c; --brand-ink:#1d4ed8;
@@ -296,6 +296,9 @@ td .sw{margin-right:8px;vertical-align:1px}
   display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;min-height:31px}
 .kpi-v small{font-size:14.5px;font-weight:400;letter-spacing:0;color:var(--muted)}
 .kpi-v.sm{font-size:31px;letter-spacing:-.02em}
+.kpis > .kpi:first-child .kpi-v{font-size:38px;min-height:38px}
+.kpis > .kpi:not(:first-child) .kpi-v{font-size:26px;min-height:31px}
+.kpis > .kpi:not(:first-child) .kpi-v.sm{font-size:24px}
 .kpi-s{font-size:13px;color:var(--muted);margin-top:0;display:flex;align-items:center;gap:8px;
   min-height:20px;flex-wrap:wrap;line-height:1.45}
 /* mini-grafico: a serie dos ultimos 14 dias, ou das horas, em azul */
@@ -303,7 +306,7 @@ td .sw{margin-right:8px;vertical-align:1px}
 .kpi-cmp{display:flex;gap:0;border-top:1px solid var(--line);padding-top:10px}
 .kpi-cmp > div{flex:1 1 0;min-width:0;padding-left:12px;border-left:1px solid var(--line)}
 .kpi-cmp > div:first-child{padding-left:0;border-left:0}
-.kpi-cmp span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-cmp span{display:block;font-size:12px;color:var(--muted);white-space:normal;line-height:1.35}
 .kpi-cmp b{display:block;font-size:15px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi-cmp small{font-size:12px;font-weight:400;color:var(--muted);margin-left:3px}
 @media(max-width:680px){.kpi-cmp small{display:block;margin-left:0}}
@@ -581,7 +584,7 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
   text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
 .linkish:hover{color:var(--text)}
 .tk-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
-  padding:10px 2px;border-bottom:1px solid var(--line2)}
+  padding:10px 2px;border-bottom:1px solid var(--line)}
 .tk-row:last-child{border-bottom:none}
 .tk-row a{color:var(--brand-2);text-decoration:none;font-weight:600}
 .tk-row a:hover{text-decoration:underline}
@@ -589,7 +592,7 @@ table.mtx tfoot td{border-top:1px solid var(--line2);border-bottom:none;padding-
 .tk-tag{font-size:12px;color:var(--text2);background:var(--off);border-radius:999px;padding:2px 8px;margin-left:8px}
 
 /* ---------- modais ---------- */
-.ov{position:fixed;inset:0;z-index:90;background:var(--overlay);backdrop-filter:blur(6px);
+.ov{position:fixed;inset:0;z-index:90;background:var(--overlay);
   display:none;align-items:flex-start;justify-content:center;padding:48px 16px;overflow-y:auto}
 .ov.show{display:flex}
 .modal{background:var(--card);border:1px solid var(--line2);border-radius:12px;width:100%;max-width:600px}
@@ -617,6 +620,7 @@ textarea.inp{resize:vertical;line-height:1.55}
 .inp:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+@media(max-width:680px){.row2,.row3{grid-template-columns:1fr}}
 .tabs{display:flex;gap:2px;background:var(--side);border:1px solid var(--line);border-radius:8px;padding:3px;margin-bottom:18px}
 .tabs button{flex:1;padding:8px 10px;border-radius:6px;border:none;background:transparent;
   color:var(--muted);font-size:14px;cursor:pointer;font-weight:500;transition:.15s}
@@ -668,8 +672,8 @@ body[data-tela=equipe] .page-ctl,body[data-tela=equipe] .filters{display:none!im
 .rv-tag{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--sunk);color:var(--text2);white-space:nowrap;box-shadow:inset 0 0 0 1px var(--line)}
 .rv-tag.investigando{background:var(--warn-soft);color:var(--warn-ink)}
 .rv-tag.contatado{background:var(--brand-soft);color:var(--brand-ink)}
-.rv-tag.follow-up{background:var(--violet-soft);color:var(--violet-ink)}
-.rv-tag.resolvendo{background:var(--cyan-soft);color:var(--cyan-ink)}
+.rv-tag.follow-up{background:var(--sunk);color:var(--text)}
+.rv-tag.resolvendo{background:var(--brand-soft);color:var(--brand-ink)}
 .rv-tag.repetido{background:var(--crit-soft);color:var(--crit-ink);margin-left:6px}
 .rv-tag.resolvido{background:var(--good-soft);color:var(--good-ink)}
 .rv-risk{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--crit-ink);white-space:nowrap}
@@ -837,6 +841,7 @@ tr.rv-row:focus{outline:none}
   .kpis .kpi:last-child:nth-child(odd){grid-column:span 2}
   .kpi{padding:14px 16px 16px}
   .kpi-v,.kpi-v.sm{font-size:26.5px}
+  .kpis > .kpi:first-child .kpi-v{font-size:30px;min-height:31px}
   .card{padding:18px 16px}
   .tbl-wrap{margin:0 -16px;padding:0 16px}
   .chart-box{height:240px}
@@ -950,7 +955,7 @@ tr.rv-row:focus{outline:none}
         <div class="kpi-h">
           <div class="kpi-l">Total de emails</div>
         </div>
-        <div class="kpi-v"><span class="sk" id="kTotal">0</span><small>emails</small></div>
+        <div class="kpi-v"><span class="sk" id="kTotal">—</span></div>
         <div class="kpi-s" id="kTotalS">&nbsp;</div>
         <div class="kpi-sp" id="kTotalSp"></div>
       </div>
@@ -958,7 +963,7 @@ tr.rv-row:focus{outline:none}
         <div class="kpi-h">
           <div class="kpi-l">Média por dia</div>
         </div>
-        <div class="kpi-v"><span class="sk" id="kDia">0</span><small>por dia</small></div>
+        <div class="kpi-v"><span class="sk" id="kDia">—</span></div>
         <div class="kpi-s" id="kDiaS">&nbsp;</div>
         <div class="kpi-sp" id="kDiaSp"></div>
       </div>
@@ -966,7 +971,7 @@ tr.rv-row:focus{outline:none}
         <div class="kpi-h">
           <div class="kpi-l">Agentes ativos</div>
         </div>
-        <div class="kpi-v"><span class="sk" id="kAg">0</span><small>agentes</small></div>
+        <div class="kpi-v"><span class="sk" id="kAg">—</span></div>
         <div class="kpi-s" id="kAgS">&nbsp;</div>
         <div class="kpi-sp" id="kAgSp"></div>
       </div>
@@ -1097,9 +1102,9 @@ tr.rv-row:focus{outline:none}
         <div class="card-sub" id="heatSub">dia da semana × hora</div></div></div>
       <div class="heat" id="heat"></div>
       <div class="legend ramp">menos
-        <i style="background:rgba(91,155,255,.14)"></i><i style="background:rgba(91,155,255,.34)"></i>
-        <i style="background:rgba(91,155,255,.56)"></i><i style="background:rgba(91,155,255,.78)"></i>
-        <i style="background:rgba(91,155,255,1)"></i>mais
+        <i style="background:color-mix(in srgb,var(--acc) 14%,transparent)"></i><i style="background:color-mix(in srgb,var(--acc) 34%,transparent)"></i>
+        <i style="background:color-mix(in srgb,var(--acc) 56%,transparent)"></i><i style="background:color-mix(in srgb,var(--acc) 78%,transparent)"></i>
+        <i style="background:var(--acc)"></i>mais
       </div>
     </div>
   </section>
@@ -1381,14 +1386,14 @@ tr.rv-row:focus{outline:none}
     </div>
   </div>
 
-  <div class="ov" id="ovTk">
+  <div class="ov" id="ovTk" role="dialog" aria-modal="true" aria-labelledby="tkT">
     <div class="modal" style="max-width:520px">
       <div class="modal-h">
         <div>
           <h2 id="tkT">Contados mais de uma vez</h2>
           <p id="tkSub"></p>
         </div>
-        <button class="x" id="tkClose" title="Fechar">×</button>
+        <button class="x" id="tkClose" title="Fechar" aria-label="Fechar">×</button>
       </div>
       <div class="modal-b"><div id="tkBox"></div></div>
     </div>
@@ -2401,26 +2406,26 @@ function deltaHTML(cur, prev){
 
 function renderKPIs(A, rows, prows, r){
   var total = A.total;
-  $("kTotal").textContent = nf(total);
+  $("kTotal").textContent = total ? nf(total) : "—";
   $("kTotalS").innerHTML  = deltaHTML(total, prows.length);
 
   var daysWith = Object.keys(A.byDay).length || 1;
-  $("kDia").textContent = nf(Math.round(total/daysWith));
+  $("kDia").textContent = total ? nf(Math.round(total/daysWith)) : "—";
   $("kDiaS").textContent = daysWith+" dia"+(daysWith>1?"s":"")+" com movimento";
 
   var names = Object.keys(A.byAgent).sort(function(a,b){ return A.byAgent[b]-A.byAgent[a]; });
-  $("kAg").textContent  = names.length;
+  $("kAg").textContent  = names.length || "—";
   $("kAgS").textContent = names.length ? Math.round(total/names.length)+" emails por agente em média" : "nenhum agente no filtro";
 
   if (names.length){
     $("kTop").textContent  = names[0];
-    $("kTopS").textContent = nf(A.byAgent[names[0]])+" emails, "+Math.round(A.byAgent[names[0]]/total*100)+"% do total";
+    $("kTopS").textContent = Math.round(A.byAgent[names[0]]/total*100)+"% do total";
   } else { $("kTop").textContent="—"; $("kTopS").innerHTML="&nbsp;"; }
 
   var hk = Object.keys(A.byHour).sort(function(a,b){ return A.byHour[b]-A.byHour[a]; });
   if (hk.length){
     $("kPico").textContent  = pad(+hk[0])+"h–"+pad((+hk[0]+1)%24)+"h";
-    $("kPicoS").textContent = nf(A.byHour[hk[0]])+" emails nessa faixa";
+    $("kPicoS").textContent = nf(A.byHour[hk[0]])+" emails";
   } else { $("kPico").textContent="—"; $("kPicoS").innerHTML="&nbsp;"; }
 
   // comparacao em numeros (no lugar dos mini-graficos): os 14 dias ate o fim do periodo e o 2o colocado
@@ -2442,12 +2447,12 @@ function renderKPIs(A, rows, prows, r){
     var maior = comMov.reduce(function(m, d){ return porDia[d] > porDia[m] ? d : m; }, comMov[0]);
     var menor = comMov.reduce(function(m, d){ return porDia[d] < porDia[m] ? d : m; }, comMov[0]);
     var agMedia = comMov.reduce(function(s, d){ return s + Object.keys(agDia[d]).length; }, 0) / comMov.length;
-    $("kTotalSp").innerHTML = cmp([["média 14 dias", nf(Math.round(soma / comMov.length))], ["maior dia", nf(porDia[maior]) + " <small>" + brDate(maior) + "</small>"]]);
-    $("kDiaSp").innerHTML   = cmp([["menor dia", nf(porDia[menor]) + " <small>" + brDate(menor) + "</small>"], ["maior dia", nf(porDia[maior]) + " <small>" + brDate(maior) + "</small>"]]);
-    $("kAgSp").innerHTML    = cmp([["média 14 dias", (Math.round(agMedia * 10) / 10).toLocaleString("pt-BR") + " por dia"]]);
+    $("kTotalSp").innerHTML = cmp([["média dos últimos 14 dias", nf(Math.round(soma / comMov.length)) + " <small>por dia</small>"]]);
+    $("kDiaSp").innerHTML   = cmp([["maior dia", nf(porDia[maior]) + " <small>" + brDate(maior) + "</small>"]]);
+    $("kAgSp").innerHTML    = "";
   } else { $("kTotalSp").innerHTML = $("kDiaSp").innerHTML = $("kAgSp").innerHTML = ""; }
-  $("kTopSp").innerHTML  = names.length > 1 ? cmp([["2º lugar", esc(names[1]) + " <small>" + nf(A.byAgent[names[1]]) + "</small>"]]) : "";
-  $("kPicoSp").innerHTML = hk.length > 1 ? cmp([["2º horário", pad(+hk[1]) + "h–" + pad((+hk[1] + 1) % 24) + "h <small>" + nf(A.byHour[hk[1]]) + "</small>"]]) : "";
+  $("kTopSp").innerHTML  = "";
+  $("kPicoSp").innerHTML = "";
 }
 
 /** Dias do mini-grafico: os 14 dias ate o fim do periodo, sem passar do que ja foi carregado. */
@@ -2509,8 +2514,8 @@ function buildTrend(id, rows, ax, mode, empilhado){
   if (mode === "total"){
     var arr = ax.order.map(function(){ return 0; });
     rows.forEach(function(rec){ var k=ax.keyOf(rec); if(idx[k]!==undefined) arr[idx[k]]++; });
-    datasets = [{ label:"Emails", data:arr, borderColor:THEME.brand, backgroundColor:veilFill(THEME.brandRgb),
-                  fill:true, tension:.2, borderWidth:2, pointRadius:0, pointHoverRadius:4 }];
+    datasets = [{ label:"Emails", data:arr, borderColor:THEME.brand, backgroundColor:THEME.brand,
+                  fill:false, tension:.2, borderWidth:2, pointRadius:thin ? 0 : 3, pointHoverRadius:5 }];
   } else {
     var field = mode === "agente" ? "agente" : "loja";
     var keys={}, tot={};
@@ -2527,17 +2532,20 @@ function buildTrend(id, rows, ax, mode, empilhado){
       return { label:n, data:arr, borderColor:c,
                backgroundColor: empilhado ? c+"99" : c+"22",
                fill:!!empilhado, tension:.2, borderWidth:empilhado?1.5:2,
-               pointRadius:0, pointHoverRadius:5 };
+               pointRadius:(empilhado || thin) ? 0 : 3, pointHoverRadius:5 };
     });
   }
   line(id, ax.labels, datasets, empilhado);
 }
 
 function renderStores(A){
-  var names = STORES.filter(function(s){ return A.byStore[s]; });
-  if (!names.length){ doughnut("cStores", ["Sem dados"], [1], [THEME.off], { texto:"0", sub:"e-mails" }); return; }
-  doughnut("cStores", names, names.map(function(s){ return A.byStore[s]; }),
-           names.map(function(s){ return STORE_COLOR[s]||THEME.muted; }), { texto:nf(A.total), sub:A.total === 1 ? "e-mail" : "e-mails" });
+  var names = STORES.filter(function(s){ return A.byStore[s]; })
+    .sort(function(a, b){ return A.byStore[b] - A.byStore[a]; });
+  if (!names.length){ hbar("cStores", ["Sem dados"], [{ label:"Emails", data:[0], backgroundColor:THEME.off, borderWidth:0 }]); return; }
+  var tot = names.reduce(function(s, n){ return s + A.byStore[n]; }, 0);
+  hbar("cStores", names.map(function(n){ return n + "  " + Math.round(A.byStore[n] / tot * 100) + "%"; }),
+       [{ label:"Emails", data:names.map(function(n){ return A.byStore[n]; }), backgroundColor:THEME.brand,
+          borderWidth:0, borderRadius:3, maxBarThickness:16 }]);
 }
 
 function renderHour(rows){
@@ -2690,43 +2698,43 @@ function renderQualidade(r){
 
   $("qualSub").textContent = r.label + ", todas as lojas";
   if (!nomes.length){
-    box.innerHTML = '<div class="empty" style="padding:30px">Ainda sem leituras neste período. Os números aparecem ' +
-      'quando o agente estiver com o <b>contador v6</b> e o <b>Apps Script v11</b> estiver implantado.</div>';
+    box.innerHTML = '<div class="empty" style="padding:30px">Sem leituras neste período.</div>';
     return;
   }
 
-  var th = function(t){ return '<th class="num" style="cursor:default">'+t+'</th>'; };
-  var cell = function(v, alerta){
-    if (!v) return '<td class="num zero">–</td>';
-    return '<td class="num">'+(alerta ? '<i class="st-dot" style="background:var(--warn);margin-right:7px"></i>' : '')+nf(v)+'</td>';
+  var th = function(t, dica){ return '<th class="num" style="cursor:default"' + (dica ? ' title="' + esc(dica) + '"' : '') + '>' + t + '</th>'; };
+  var conf = API_VERSION >= 25;
+  var alertas = function(a, n){
+    var forte = a.repetidos1min + a.repetidos + a.lojaDiferente + (a.maxNovasDia > LIMITE_NOVAS ? a.novas : 0);
+    var det = [];
+    if (a.repetidos1min) det.push(nf(a.repetidos1min) + " repetidas em 1 min");
+    if (a.repetidos) det.push(nf(a.repetidos) + " no mesmo ticket no dia");
+    if (a.novas) det.push(nf(a.novas) + " respostas novas");
+    if (a.lojaDiferente) det.push(nf(a.lojaDiferente) + " com loja diferente da caixa");
+    if (!det.length) return '<td class="num zero">–</td>';
+    var links = '';
+    if (Object.keys(a.reps || {}).length) links += ' <button class="linkish tk-btn" data-ag="' + esc(n) + '">repetidos</button>';
+    if (Object.keys(a.novasT || {}).length) links += ' <button class="linkish tk-btn" data-novas="1" data-ag="' + esc(n) + '">novas</button>';
+    return '<td class="num" title="' + esc(det.join(", ")) + '">' + (forte ? '<i class="st-dot" style="background:var(--warn);margin-right:7px"></i>' : '') +
+      nf(a.repetidos1min + a.repetidos + a.novas + a.lojaDiferente) + (links ? '<span class="zero">' + links + '</span>' : '') + '</td>';
   };
   box.innerHTML = '<div class="tbl-wrap"><table><thead><tr>' +
-    '<th style="cursor:default">Agente</th>' + th("Contagens lidas") + th("Num ticket") + th("Outras conversas") +
-    th("Fora do helpdesk") + th("% fora") + th("Repetidas em 1 min") + th("Mesmo ticket no dia") + th("Respostas novas") +
-    th("Loja diferente da caixa") + th("Recusadas") + (API_VERSION >= 25 ? th("Confirmados no helpdesk") + th("Sem resposta") : "") +
+    '<th style="cursor:default">Agente</th>' +
+    th("Contados", "Contagens lidas pelo contador: tickets identificados mais os fora do helpdesk.") +
+    (conf ? th("Confirmados", "Contagens com o ticket fechado no helpdesk (conferência das 17h). Gorgias e \"fora\" não entram.") + th("Sem par", "Contagens a mais do que fechamentos no helpdesk. Clique para ver os tickets.") : "") +
+    th("% fora", "Parte das contagens que não tinha ticket do helpdesk.") +
+    th("Alertas", "Repetidas em 1 minuto, mesmo ticket no dia, respostas novas e loja diferente da caixa.") +
     '</tr></thead><tbody>' + nomes.map(function(n){
       var a = porAg[n], lidas = a.ticket + a.fora, pct = lidas ? a.fora / lidas * 100 : 0;
       var dot = pct >= 10 ? "var(--warn)" : "var(--good)";
       return '<tr><td><div class="ag"><span class="av">'+esc(initials(n))+'</span>'+esc(n)+'</div></td>' +
         '<td class="num" style="font-weight:600">'+nf(lidas)+'</td>' +
-        '<td class="num">'+nf(a.ticket)+'</td>' +
-        cell(a.outras) +
-        cell(a.fora) +
+        (conf ? celulasConf(n, r) : "") +
         '<td class="num"><i class="st-dot" style="background:'+dot+';margin-right:7px"></i>'+pct.toFixed(1)+'%</td>' +
-        cell(a.repetidos1min, a.repetidos1min >= 5) + celulaRepetidos(a, n) + celulaNovas(a, n) + cell(a.lojaDiferente, a.lojaDiferente >= 5) + cell(a.recusadas) + (API_VERSION >= 25 ? celulasConf(n, r) : "") +
+        alertas(a, n) +
       '</tr>';
     }).join("") + '</tbody></table></div>' +
-    '<div class="adj-why" style="padding-top:12px;line-height:1.6">' +
-    '<b>Repetidas em 1 min</b>: o mesmo ticket contado de novo em menos de um minuto — é o que o modo bloquear recusa. ' +
-    '<b>Mesmo ticket no dia</b>: o mesmo ticket contado de novo sem confirmação. Com o <b>contador v7</b> isso não passa mais; o que aparecer aqui veio de um contador antigo. ' +
-    '<b>Respostas novas</b>: o contador v7 perguntou "o cliente respondeu de novo?" e o agente confirmou. Mais de ' + LIMITE_NOVAS + ' num dia fica em âmbar. ' +
-    'Clique no número para ver quais foram e abrir cada um no helpdesk. ' +
-    '<b>Loja diferente da caixa</b>: a caixa do Commslayer (ou a conta do Gorgias) no endereço dizia outra loja — o agente esqueceu de trocar no widget. ' +
-    '<b>Outras conversas</b>: o agente entrou pela ficha do cliente para fechar outra conversa pendente dele. ' +
-    'Conta como ticket — está dentro de "Num ticket" — e aparece aqui só para se saber quanto do dia é isso. ' +
-    '<b>Recusadas</b>: só existe em modo bloquear.' +
-    (API_VERSION >= 25 ? ' <b>Confirmados no helpdesk</b>: contagens que casaram com uma resposta de verdade no mesmo ticket (conferência das 17h; Gorgias e "fora" não entram). <b>Sem resposta</b>: contagens sem resposta correspondente; clique para ver os tickets. Conversa fechada sem resposta conta, a não ser que tenha sido fechada em sequência, até 2 min depois de outra contagem (conversas repetidas do mesmo cliente).' : '') +
-    '</div>' + confSemDono(r);
+    '<div class="adj-why" style="padding-top:12px">' + (conf ? 'Conferência feita às 17h. ' : '') + 'Passe o mouse no título da coluna para ver o que ela conta.</div>' + confSemDono(r);
 
   [].forEach.call(box.querySelectorAll(".tk-btn"), function(b){
     b.onclick = b.dataset.sem === "1" ? function(){ abrirSemResposta(b.dataset.ag, r); }
@@ -2899,7 +2907,7 @@ function celulasConf(nome, r){
   var cor = pct >= 95 ? "var(--good)" : pct >= 85 ? "var(--warn)" : "var(--crit)";
   return '<td class="num" title="' + nf(t.confirmados) + ' de ' + nf(conferiveis) + ' contagens conferíveis"><i class="st-dot" style="background:' + cor + ';margin-right:7px"></i>' + nf(t.confirmados) + ' <span class="zero">' + Math.round(pct) + '%</span></td>' +
     (t.semPar ? '<td class="num"><button class="linkish tk-btn" data-sem="1" data-ag="' + esc(nome) + '" title="Clique para ver os tickets">' + nf(t.semPar) + '</button>' +
-      (t.fechados ? ' <span class="zero" title="' + nf(t.fechados) + ' desses foram fechados no helpdesk, sem resposta">(' + nf(t.fechados) + ' fechados)</span>' : '') + '</td>' : '<td class="num zero">–</td>');
+'</td>' : '<td class="num zero">–</td>');
 }
 /** Respostas do helpdesk que ninguém contou no período, por loja. */
 function confSemDono(r){
@@ -2913,16 +2921,14 @@ function confSemDono(r){
   });
   if (!dias) return "";
   var lojas = Object.keys(t).sort(function(a, b){ return t[b] - t[a]; });
-  return '<div class="conf-sd"><b>' + nf(n) + (n === 1 ? ' resposta' : ' respostas') + ' no helpdesk sem contagem</b> no período' +
-    (lojas.length ? ': ' + lojas.map(function(l){ return esc(l) + ' ' + nf(t[l]); }).join(", ") : '') +
-    '. É o que foi respondido e ninguém contou (ou contou num ticket diferente).</div>';
+  return '<div class="conf-sd" title="' + esc(lojas.map(function(l){ return l + " " + nf(t[l]); }).join(", ") + ". Fechado no helpdesk e ninguém contou (ou contou em outro ticket).") + '"><b>' + nf(n) + (n === 1 ? ' fechamento' : ' fechamentos') + ' sem contagem</b> no período</div>';
 }
 /** Lista das contagens sem resposta no helpdesk, com o link de cada ticket. */
 function abrirSemResposta(nome, r){
   var t = confPeriodo(nome, r);
   $("tkT").textContent = "Contagens sem resposta";
-  $("tkSub").textContent = nome + ", " + r.label + ". " + nf(t.semPar) + (t.semPar === 1 ? " contagem" : " contagens") + " sem resposta no mesmo ticket" +
-    (t.lista.length < t.semPar ? " (mostrando " + t.lista.length + ")" : "") + ".";
+  $("tkSub").textContent = nome + " · " + r.label + " · " + nf(t.semPar) + " sem par" +
+    (t.lista.length < t.semPar ? " (mostrando " + t.lista.length + ")" : "");
   var linha = function(i, marca){
     var p = String(i.x).split(" "), code = p[0], hora = p[1] || "";
     var url = ticketUrl(code);
@@ -2935,8 +2941,8 @@ function abrirSemResposta(nome, r){
     return itens.length ? '<div class="tk-grp"><b>' + titulo + ' (' + nf(itens.length) + ')</b><span>' + nota + '</span></div>' + itens.map(function(i){ return linha(i, marca); }).join("") : "";
   };
   $("tkBox").innerHTML = t.lista.length
-    ? grupo("Fechados no helpdesk, sem resposta", "A conversa foi fechada logo depois de outra contagem do mesmo agente: em geral o cliente mandou mais de uma mensagem e as outras conversas foram fechadas. Abra e confira.", fech, "fechado, sem resposta") +
-      grupo("Sem resposta e sem fechamento", "Nada no helpdesk que confirme: nem resposta, nem conversa fechada perto da contagem.", resto, "")
+    ? grupo("Fechados no helpdesk, sem resposta", "Fechadas logo depois de outra contagem do mesmo agente.", fech, "") +
+      grupo("Sem resposta e sem fechamento", "Nem resposta nem fechamento perto da contagem.", resto, "")
     : '<div class="empty" style="padding:22px">Nada para mostrar.</div>';
   $("ovTk").classList.add("show");
 }
@@ -3272,6 +3278,29 @@ function baseOpts(showLegend, stacked){
   };
 }
 
+/** Nome de cada serie no fim da linha (evita legenda embaixo e deixa a cor ligada ao nome). */
+var FIM_LINHA = { id:"fimLinha", afterDatasetsDraw:function(chart){
+  var op = chart.options.plugins.fimLinha;
+  if (!op || !op.on) return;
+  var ctx = chart.ctx, itens = [];
+  chart.data.datasets.forEach(function(d, i){
+    var m = chart.getDatasetMeta(i);
+    if (m.hidden || !m.data.length) return;
+    var p = m.data[m.data.length - 1];
+    if (p && isFinite(p.y)) itens.push({ x:p.x, y:p.y, t:String(d.label || ""), c:d.borderColor });
+  });
+  itens.sort(function(a, b){ return a.y - b.y; });
+  for (var k = 1; k < itens.length; k++) if (itens[k].y - itens[k-1].y < 15) itens[k].y = itens[k-1].y + 15;
+  ctx.save();
+  ctx.font = "500 12.5px 'DM Sans','Segoe UI',system-ui,sans-serif"; ctx.textBaseline = "middle";
+  itens.forEach(function(it){
+    var t = it.t;
+    while (t.length > 3 && ctx.measureText(t).width > 92) t = t.slice(0, -2);
+    if (t !== it.t) t += "…";
+    ctx.fillStyle = it.c; ctx.fillText(t, it.x + 9, it.y);
+  });
+  ctx.restore();
+} };
 function line(id, labels, datasets, stacked){
   if(!hasChart()) return; kill(id);
   datasets.forEach(function(d){
@@ -3279,8 +3308,13 @@ function line(id, labels, datasets, stacked){
     d.pointBackgroundColor = d.borderColor;
     d.pointHoverBorderColor = THEME.card; d.pointHoverBorderWidth = 2;   // anel na cor do cartao
   });
-  var o = baseOpts(datasets.length>1, stacked);
-  CHARTS[id] = new Chart($(id), { type:"line", data:{labels:labels,datasets:datasets}, options:o });
+  var o = baseOpts(!!stacked && datasets.length>1, stacked), plug = [];
+  if (!stacked){          // nome da serie no fim da linha, no lugar da legenda
+    o.layout = { padding:{ right:104 } };
+    o.plugins.fimLinha = { on:true };
+    plug.push(FIM_LINHA);
+  }
+  CHARTS[id] = new Chart($(id), { type:"line", data:{labels:labels,datasets:datasets}, options:o, plugins:plug });
 }
 function bar(id, labels, datasets, stacked){
   if(!hasChart()) return; kill(id);
@@ -3413,11 +3447,12 @@ function confLinha(agente, dia){
   var pct = conferiveis ? Math.round(c.confirmados / conferiveis * 100) : 100;
   var cls = pct >= 95 ? "ok" : pct >= 85 ? "warn" : "no";
   var hora = String(c.em || "").slice(11, 16);
-  return '<div class="meta-conf"><b>' + nf(c.contados) + '</b> contados, <b class="' + cls + '">' + nf(c.confirmados) + ' confirmados</b> no helpdesk' +
-    (c.fechados ? ' (' + nf(c.fechados) + (c.fechados === 1 ? ' fechado' : ' fechados') + ' sem resposta)' : '') +
-    (c.semPar ? ', ' + nf(c.semPar) + ' sem resposta' : '') +
-    (c.naoConferiveis ? ', ' + nf(c.naoConferiveis) + ' sem como conferir' : '') +
-    (dia === iso(today()) && hora ? ' <span>(até ' + hora + ')</span>' : '') + '</div>';
+  var det = nf(c.contados) + " contados, " + nf(c.confirmados) + " confirmados no helpdesk" +
+    (c.fechados ? ", " + nf(c.fechados) + " fechados sem resposta" : "") +
+    (c.semPar ? ", " + nf(c.semPar) + " sem par" : "") +
+    (c.naoConferiveis ? ", " + nf(c.naoConferiveis) + " sem como conferir" : "") +
+    (hora ? " (conferência até " + hora + ")" : "");
+  return '<div class="meta-conf" title="' + esc(det) + '"><b class="' + cls + '">' + nf(c.confirmados) + '</b> / ' + nf(c.contados) + ' confirmados no helpdesk</div>';
 }
 function metaRowHTML(nome, feito, meta, aberto, extra){
   var pct = meta ? feito/meta*100 : 0;
@@ -3485,7 +3520,7 @@ function renderMetas(){
     // com "Todas" selecionado, abre a meta do agente em pastilhas por loja (embaixo da barra)
     if (!umaLoja){
       var lojas = metaStores(a, day);
-      if (lojas.length){
+      if (lojas.length > 1){
         html += '<div class="meta-sub">' + lojas.map(function(l){
           var ml = metaFor(a, day, l), fl = feitoLoja[a+"|"+l]||0;
           return '<span class="ms '+(fl>=ml?"ok":"no")+'">' +
@@ -3493,11 +3528,6 @@ function renderMetas(){
             ' <b>'+nf(fl)+'</b>/'+nf(ml)+'</span>';
         }).join("") + '</div>';
 
-        var soma = metaStoreSum(a, day), tot = metaFor(a, day, "");
-        if (tot && soma !== tot && isAdmin()){   // o aviso e para quem pode ajustar
-          html += '<div class="meta-warn">As metas por loja somam '+nf(soma)+
-                  ', mas a meta total é '+nf(tot)+'. Ajuste em <b>Definir metas</b>.</div>';
-        }
       }
     }
     return '<div class="meta-blk">' + metaRowHTML(a, feitoDe(a), m, day === hoje, html) + '</div>';
